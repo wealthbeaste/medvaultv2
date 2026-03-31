@@ -382,7 +382,7 @@ async function registerPharmacy() {
 
   // Try real API first, fallback to demo
   try {
-    const res = await fetch('http://localhost:4000/api/auth/register', {
+    const res = await fetch('https://medvaultv2-production.up.railway.app/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pharmacyName: pharmacy, address: '', phone, email, password: pass || 'medvault123' })
