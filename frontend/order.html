@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MedVault – Order Medicines Online</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+  :root{
+    --bg:#f7f8fc;--white:#ffffff;--surface:#f0f2f8;--border:#e4e8f0;
+    --text:#0d1117;--muted:#7a8499;--accent:#00c49a;--accent2:#0066ff;
+    --danger:#ef4444;--warn:#f59e0b;--success:#10b981;
+    --dark:#0a0f1e;--card-shadow:0 2px 12px rgba(13,17,23,0.08);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+
+  /* NAVBAR */
+  .navbar{
+    background:var(--white);border-bottom:1px solid var(--border);
+    padding:0 32px;height:64px;display:flex;align-items:center;
+    justify-content:space-between;position:sticky;top:0;z-index:50;
+    box-shadow:0 2px 12px rgba(0,0,0,0.04);
+  }
+  .nav-logo{display:flex;align-items:center;gap:10px;}
+  .nav-logo-icon{width:36px;height:36px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;}
+  .nav-logo-text{font-family:'Syne',sans-serif;font-weight:800;font-size:20px;letter-spacing:-0.5px;}
+  .nav-logo-sub{font-size:11px;color:var(--muted);margin-top:1px;}
+  .nav-center{display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px 16px;width:340px;}
+  .nav-center input{background:none;border:none;outline:none;font-family:'Outfit',sans-serif;font-size:14px;color:var(--text);width:100%;}
+  .nav-center input::placeholder{color:var(--muted);}
+  .nav-right{display:flex;align-items:center;gap:12px;}
+  .nav-btn{padding:8px 18px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;border:none;font-family:'Outfit',sans-serif;transition:all 0.2s;}
+  .nav-btn.ghost{background:var(--surface);color:var(--text);border:1px solid var(--border);}
+  .nav-btn.ghost:hover{background:var(--border);}
+  .nav-btn.primary{background:var(--accent);color:#fff;}
+  .nav-btn.primary:hover{filter:brightness(1.08);transform:translateY(-1px);}
+  .cart-btn{position:relative;width:40px;height:40px;border-radius:12px;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;transition:all 0.2s;}
+  .cart-btn:hover{background:var(--border);}
+  .cart-count{position:absolute;top:-6px;right:-6px;background:var(--accent);color:#fff;font-size:10px;font-weight:700;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid var(--white);}
+
+  /* HERO */
+  .hero{
+    background:linear-gradient(135deg,var(--dark) 0%,#0f2044 60%,#0a1628 100%);
+    padding:56px 32px 64px;text-align:center;position:relative;overflow:hidden;
+  }
+  .hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(0,196,154,0.15) 0%,transparent 70%);pointer-events:none;}
+  .hero-badge{display:inline-flex;align-items:center;gap:7px;background:rgba(0,196,154,0.12);border:1px solid rgba(0,196,154,0.25);color:var(--accent);padding:6px 16px;border-radius:20px;font-size:12px;font-weight:600;letter-spacing:0.3px;margin-bottom:20px;animation:fadeUp 0.5s ease both;}
+  .hero-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.7)}}
+  .hero h1{font-family:'Syne',sans-serif;font-weight:800;font-size:48px;color:#fff;letter-spacing:-2px;line-height:1.05;margin-bottom:14px;animation:fadeUp 0.5s ease 0.1s both;}
+  .hero h1 span{color:var(--accent);}
+  .hero p{font-size:16px;color:rgba(255,255,255,0.6);max-width:480px;margin:0 auto 32px;line-height:1.6;animation:fadeUp 0.5s ease 0.2s both;}
+  .hero-search{display:flex;align-items:center;gap:0;background:#fff;border-radius:14px;overflow:hidden;max-width:500px;margin:0 auto;box-shadow:0 8px 32px rgba(0,0,0,0.3);animation:fadeUp 0.5s ease 0.3s both;}
+  .hero-search input{flex:1;padding:16px 20px;border:none;outline:none;font-family:'Outfit',sans-serif;font-size:15px;color:var(--text);}
+  .hero-search input::placeholder{color:var(--muted);}
+  .hero-search button{padding:12px 24px;background:var(--accent);color:#fff;border:none;font-family:'Syne',sans-serif;font-weight:700;font-size:14px;cursor:pointer;margin:6px;border-radius:10px;transition:all 0.2s;white-space:nowrap;}
+  .hero-search button:hover{filter:brightness(1.1);}
+  .hero-stats{display:flex;align-items:center;justify-content:center;gap:32px;margin-top:32px;animation:fadeUp 0.5s ease 0.4s both;}
+  .hero-stat .val{font-family:'Syne',sans-serif;font-weight:800;font-size:22px;color:#fff;}
+  .hero-stat .lbl{font-size:12px;color:rgba(255,255,255,0.5);margin-top:2px;}
+  .hero-divider{width:1px;height:32px;background:rgba(255,255,255,0.12);}
+
+  @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+
+  /* LAYOUT */
+  .main-wrap{max-width:1200px;margin:0 auto;padding:36px 24px;display:grid;grid-template-columns:1fr 340px;gap:28px;align-items:start;}
+
+  /* CATEGORIES */
+  .section-title{font-family:'Syne',sans-serif;font-weight:700;font-size:18px;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+  .cat-scroll{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;margin-bottom:28px;scrollbar-width:none;}
+  .cat-scroll::-webkit-scrollbar{display:none;}
+  .cat-chip{display:flex;align-items:center;gap:7px;padding:9px 18px;border-radius:12px;background:var(--white);border:1.5px solid var(--border);font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;transition:all 0.2s;flex-shrink:0;}
+  .cat-chip:hover{border-color:var(--accent);color:var(--accent);}
+  .cat-chip.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .cat-chip .cat-icon{font-size:16px;}
+
+  /* PHARMACY SELECTOR */
+  .pharmacy-bar{background:var(--white);border:1px solid var(--border);border-radius:14px;padding:14px 18px;margin-bottom:22px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--card-shadow);}
+  .pharm-left{display:flex;align-items:center;gap:12px;}
+  .pharm-icon{width:40px;height:40px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+  .pharm-name{font-weight:600;font-size:14px;}
+  .pharm-addr{font-size:12px;color:var(--muted);margin-top:2px;}
+  .pharm-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(16,185,129,0.1);color:var(--success);border:1px solid rgba(16,185,129,0.2);padding:4px 11px;border-radius:20px;font-size:11px;font-weight:600;}
+  .pharm-dot{width:6px;height:6px;border-radius:50%;background:var(--success);}
+  .change-btn{font-size:12px;color:var(--accent2);cursor:pointer;font-weight:500;padding:6px 14px;border-radius:8px;border:1px solid rgba(0,102,255,0.2);transition:all 0.15s;}
+  .change-btn:hover{background:rgba(0,102,255,0.05);}
+
+  /* DRUG GRID */
+  .drugs-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;}
+  .drug-card{background:var(--white);border:1.5px solid var(--border);border-radius:16px;overflow:hidden;transition:all 0.2s;cursor:pointer;box-shadow:var(--card-shadow);}
+  .drug-card:hover{border-color:var(--accent);transform:translateY(-3px);box-shadow:0 8px 28px rgba(0,196,154,0.15);}
+  .dc-img{height:100px;background:linear-gradient(135deg,var(--surface),#e8f4ff);display:flex;align-items:center;justify-content:center;font-size:48px;position:relative;}
+  .dc-badge{position:absolute;top:10px;right:10px;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;}
+  .dc-badge.otc{background:rgba(16,185,129,0.12);color:var(--success);}
+  .dc-badge.rx{background:rgba(239,68,68,0.12);color:var(--danger);}
+  .dc-badge.low{background:rgba(245,158,11,0.12);color:var(--warn);}
+  .dc-body{padding:14px;}
+  .dc-name{font-weight:600;font-size:14px;margin-bottom:3px;}
+  .dc-cat{font-size:11px;color:var(--muted);margin-bottom:8px;}
+  .dc-footer{display:flex;align-items:center;justify-content:space-between;}
+  .dc-price{font-family:'Syne',sans-serif;font-weight:800;font-size:16px;color:var(--accent);}
+  .dc-unit{font-size:10px;color:var(--muted);margin-top:2px;}
+  .add-btn{width:32px;height:32px;border-radius:9px;background:var(--accent);border:none;color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s;flex-shrink:0;}
+  .add-btn:hover{filter:brightness(1.1);transform:scale(1.1);}
+  .add-btn.added{background:var(--accent2);}
+  .stock-label{font-size:11px;color:var(--muted);}
+
+  /* CART SIDEBAR */
+  .cart-sidebar{background:var(--white);border:1px solid var(--border);border-radius:18px;padding:22px;position:sticky;top:84px;box-shadow:var(--card-shadow);}
+  .cart-title{font-family:'Syne',sans-serif;font-weight:700;font-size:17px;margin-bottom:4px;}
+  .cart-sub{font-size:12px;color:var(--muted);margin-bottom:18px;}
+  .cart-empty{text-align:center;padding:28px 16px;}
+  .cart-empty-icon{font-size:48px;margin-bottom:10px;}
+  .cart-empty-txt{font-size:13px;color:var(--muted);line-height:1.5;}
+  .cart-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);}
+  .cart-item:last-of-type{border-bottom:none;}
+  .ci-icon{width:36px;height:36px;background:var(--surface);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+  .ci-info{flex:1;min-width:0;}
+  .ci-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ci-price{font-size:12px;color:var(--muted);margin-top:2px;}
+  .ci-ctrl{display:flex;align-items:center;gap:6px;}
+  .ci-btn{width:24px;height:24px;border-radius:6px;background:var(--surface);border:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all 0.15s;font-family:'Outfit',sans-serif;}
+  .ci-btn:hover{background:var(--border);}
+  .ci-qty{font-weight:700;font-size:13px;min-width:16px;text-align:center;}
+  .cart-divider{height:1px;background:var(--border);margin:14px 0;}
+  .cart-total-row{display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px;}
+  .cart-total-row .cl{color:var(--muted);}
+  .cart-total-row.grand{font-size:16px;margin-top:10px;padding-top:10px;border-top:1.5px solid var(--border);}
+  .cart-total-row.grand .cl{font-family:'Syne',sans-serif;font-weight:700;color:var(--text);}
+  .cart-total-row.grand .cv{font-family:'Syne',sans-serif;font-weight:800;color:var(--accent);font-size:20px;}
+
+  /* DELIVERY */
+  .delivery-section{margin-top:16px;}
+  .del-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;}
+  .del-options{display:flex;gap:8px;margin-bottom:14px;}
+  .del-opt{flex:1;padding:10px;border-radius:10px;border:1.5px solid var(--border);text-align:center;cursor:pointer;transition:all 0.2s;font-size:12px;font-weight:500;}
+  .del-opt:hover{border-color:var(--accent);}
+  .del-opt.sel{border-color:var(--accent);background:rgba(0,196,154,0.06);color:var(--accent);}
+  .del-opt .do-icon{font-size:20px;margin-bottom:4px;}
+  .address-input{width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;font-family:'Outfit',sans-serif;font-size:13px;color:var(--text);outline:none;transition:border-color 0.2s;margin-bottom:10px;}
+  .address-input:focus{border-color:var(--accent);}
+  .address-input::placeholder{color:var(--muted);}
+  .phone-input{width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:10px 14px;font-family:'Outfit',sans-serif;font-size:13px;color:var(--text);outline:none;transition:border-color 0.2s;margin-bottom:14px;}
+  .phone-input:focus{border-color:var(--accent);}
+  .phone-input::placeholder{color:var(--muted);}
+
+  /* PAYMENT */
+  .pay-section{margin-bottom:14px;}
+  .pay-opts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
+  .pay-opt{padding:10px 8px;border-radius:10px;border:1.5px solid var(--border);text-align:center;cursor:pointer;transition:all 0.2s;font-size:11px;font-weight:600;}
+  .pay-opt:hover{border-color:var(--accent);}
+  .pay-opt.sel{border-color:var(--accent);background:rgba(0,196,154,0.06);color:var(--accent);}
+  .pay-opt .poi{font-size:20px;margin-bottom:4px;}
+
+  .order-btn{width:100%;padding:14px;border-radius:12px;background:linear-gradient(135deg,var(--accent),#00a882);color:#fff;font-family:'Syne',sans-serif;font-weight:800;font-size:16px;border:none;cursor:pointer;transition:all 0.2s;letter-spacing:-0.3px;}
+  .order-btn:hover{filter:brightness(1.08);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,196,154,0.35);}
+  .order-btn:disabled{opacity:0.45;cursor:not-allowed;transform:none;box-shadow:none;}
+  .order-note{font-size:11px;color:var(--muted);text-align:center;margin-top:10px;line-height:1.5;}
+
+  /* PAGINATION / LOAD MORE */
+  .load-more{display:flex;justify-content:center;margin-bottom:24px;}
+  .load-btn{padding:11px 28px;border-radius:12px;background:var(--white);border:1.5px solid var(--border);font-size:14px;font-weight:600;cursor:pointer;transition:all 0.2s;font-family:'Outfit',sans-serif;color:var(--text);}
+  .load-btn:hover{border-color:var(--accent);color:var(--accent);}
+
+  /* SUCCESS MODAL */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(6px);z-index:100;display:none;align-items:center;justify-content:center;}
+  .overlay.open{display:flex;}
+  .success-modal{background:#fff;border-radius:24px;padding:40px 36px;text-align:center;width:400px;max-width:90vw;box-shadow:0 30px 80px rgba(0,0,0,0.3);animation:modalIn 0.3s ease;}
+  @keyframes modalIn{from{opacity:0;transform:scale(0.9) translateY(20px)}to{opacity:1;transform:scale(1) translateY(0)}}
+  .success-icon{width:80px;height:80px;background:linear-gradient(135deg,var(--accent),#00a882);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:36px;margin:0 auto 20px;}
+  .success-title{font-family:'Syne',sans-serif;font-weight:800;font-size:24px;margin-bottom:8px;color:var(--text);}
+  .success-sub{font-size:14px;color:var(--muted);line-height:1.6;margin-bottom:24px;}
+  .order-track{background:var(--surface);border-radius:14px;padding:16px;margin-bottom:24px;}
+  .track-row{display:flex;align-items:center;justify-content:space-between;font-size:13px;margin-bottom:8px;}
+  .track-row:last-child{margin-bottom:0;}
+  .track-lbl{color:var(--muted);}
+  .track-val{font-weight:600;}
+  .track-steps{display:flex;align-items:center;justify-content:space-between;margin-top:18px;position:relative;}
+  .track-steps::before{content:'';position:absolute;top:14px;left:14px;right:14px;height:2px;background:var(--border);z-index:0;}
+  .track-step{display:flex;flex-direction:column;align-items:center;gap:6px;position:relative;z-index:1;}
+  .ts-dot{width:28px;height:28px;border-radius:50%;border:2px solid var(--border);background:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;transition:all 0.3s;}
+  .ts-dot.done{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .ts-dot.active{background:var(--accent2);border-color:var(--accent2);color:#fff;animation:ringPulse 1.5s infinite;}
+  @keyframes ringPulse{0%,100%{box-shadow:0 0 0 0 rgba(0,102,255,0.3)}50%{box-shadow:0 0 0 8px rgba(0,102,255,0)}}
+  .ts-label{font-size:10px;color:var(--muted);white-space:nowrap;}
+  .modal-btns{display:flex;gap:10px;}
+  .modal-btn{flex:1;padding:12px;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;border:none;font-family:'Outfit',sans-serif;transition:all 0.2s;}
+  .modal-btn.primary{background:var(--accent);color:#fff;}
+  .modal-btn.primary:hover{filter:brightness(1.08);}
+  .modal-btn.ghost{background:var(--surface);color:var(--text);border:1px solid var(--border);}
+  .modal-btn.ghost:hover{background:var(--border);}
+
+  /* TOAST */
+  .toast{position:fixed;bottom:24px;right:24px;background:var(--dark);color:#fff;border-radius:12px;padding:12px 18px;font-size:13px;font-weight:500;transform:translateY(80px);opacity:0;transition:all 0.3s ease;z-index:200;display:flex;align-items:center;gap:8px;box-shadow:0 8px 32px rgba(0,0,0,0.3);}
+  .toast.show{transform:translateY(0);opacity:1;}
+
+  /* FOOTER */
+  .footer{background:var(--dark);color:rgba(255,255,255,0.5);text-align:center;padding:24px;font-size:13px;margin-top:40px;}
+  .footer strong{color:var(--accent);}
+
+  /* RESPONSIVE */
+  @media(max-width:900px){
+    .main-wrap{grid-template-columns:1fr;}
+    .cart-sidebar{position:fixed;bottom:0;left:0;right:0;border-radius:20px 20px 0 0;max-height:60vh;overflow-y:auto;transform:translateY(calc(100% - 72px));transition:transform 0.3s ease;z-index:40;}
+    .cart-sidebar.open{transform:translateY(0);}
+    .drugs-grid{grid-template-columns:repeat(2,1fr);}
+    .hero h1{font-size:32px;}
+  }
+</style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+  <div class="nav-logo">
+    <div class="nav-logo-icon">💊</div>
+    <div>
+      <div class="nav-logo-text">MedVault</div>
+      <div class="nav-logo-sub">Order Medicines Online</div>
+    </div>
+  </div>
+  <div class="nav-center">
+    <span>🔍</span>
+    <input type="text" id="navSearch" placeholder="Search medicines, vitamins, supplements…" oninput="filterDrugs()"/>
+  </div>
+  <div class="nav-right">
+    <button class="nav-btn ghost" onclick="showToast('📍 Delivery available in Kampala & nearby areas')">📍 Kampala</button>
+    <div class="cart-btn" onclick="scrollToCart()">
+      🛒
+      <div class="cart-count" id="cartCount">0</div>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-badge"><div class="hero-dot"></div> Fast Delivery in Kampala</div>
+  <h1>Get Your Medicines<br><span>Delivered Fast.</span></h1>
+  <p>Order from verified pharmacies near you. Safe, affordable, and delivered to your door.</p>
+  <div class="hero-search">
+    <input type="text" placeholder="Search for Paracetamol, Coartem, Vitamins…" id="heroSearch" oninput="filterDrugs()"/>
+    <button onclick="filterDrugs()">Search</button>
+  </div>
+  <div class="hero-stats">
+    <div class="hero-stat"><div class="val">142+</div><div class="lbl">Medicines</div></div>
+    <div class="hero-divider"></div>
+    <div class="hero-stat"><div class="val">30 min</div><div class="lbl">Avg. Delivery</div></div>
+    <div class="hero-divider"></div>
+    <div class="hero-stat"><div class="val">284</div><div class="lbl">Happy Customers</div></div>
+    <div class="hero-divider"></div>
+    <div class="hero-stat"><div class="val">NDA ✓</div><div class="lbl">Verified</div></div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main-wrap">
+  <!-- LEFT -->
+  <div>
+    <!-- PHARMACY -->
+    <div class="pharmacy-bar">
+      <div class="pharm-left">
+        <div class="pharm-icon">💊</div>
+        <div>
+          <div class="pharm-name">Kato Pharma</div>
+          <div class="pharm-addr">📍 Kampala Road, Kampala · 1.2km away</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="pharm-badge"><div class="pharm-dot"></div> Open Now</div>
+        <div class="change-btn" onclick="showToast('More pharmacies coming soon!')">Change →</div>
+      </div>
+    </div>
+
+    <!-- CATEGORIES -->
+    <div class="section-title">🗂 Browse by Category</div>
+    <div class="cat-scroll" id="catScroll"></div>
+
+    <!-- DRUGS -->
+    <div class="section-title">💊 Available Medicines</div>
+    <div class="drugs-grid" id="drugsGrid"></div>
+    <div class="load-more"><button class="load-btn" onclick="showToast('Loading more medicines…')">Load More Medicines</button></div>
+  </div>
+
+  <!-- CART SIDEBAR -->
+  <div class="cart-sidebar" id="cartSidebar">
+    <div class="cart-title">🛒 Your Order</div>
+    <div class="cart-sub" id="cartSubtitle">Add medicines to get started</div>
+    <div id="cartItems"><div class="cart-empty"><div class="cart-empty-icon">🛒</div><div class="cart-empty-txt">Your cart is empty.<br>Browse medicines and add them here.</div></div></div>
+
+    <div id="cartDetails" style="display:none">
+      <div class="cart-divider"></div>
+      <div class="cart-total-row"><span class="cl">Subtotal</span><span class="cv" id="cartSub">UGX 0</span></div>
+      <div class="cart-total-row"><span class="cl">Delivery fee</span><span class="cv" id="deliveryFee">UGX 5,000</span></div>
+      <div class="cart-total-row grand"><span class="cl">Total</span><span class="cv" id="cartTotal">UGX 0</span></div>
+
+      <div class="delivery-section">
+        <div class="del-label">Delivery Method</div>
+        <div class="del-options">
+          <div class="del-opt sel" onclick="selDel(this,'delivery',5000)" data-fee="5000">
+            <div class="do-icon">🏍️</div>Delivery
+          </div>
+          <div class="del-opt" onclick="selDel(this,'pickup',0)" data-fee="0">
+            <div class="do-icon">🏪</div>Pickup
+          </div>
+        </div>
+        <input class="address-input" id="addrInput" placeholder="Enter delivery address…"/>
+        <input class="phone-input" id="phoneInput" placeholder="📞 Your phone number (07XX XXX XXX)"/>
+      </div>
+
+      <div class="pay-section">
+        <div class="del-label">Payment Method</div>
+        <div class="pay-opts">
+          <div class="pay-opt sel" onclick="selPay(this)" data-m="MTN MoMo">
+            <div class="poi">📱</div>MTN MoMo
+          </div>
+          <div class="pay-opt" onclick="selPay(this)" data-m="Airtel Money">
+            <div class="poi">📲</div>Airtel Money
+          </div>
+          <div class="pay-opt" onclick="selPay(this)" data-m="Cash on Delivery">
+            <div class="poi">💵</div>Cash on Delivery
+          </div>
+          <div class="pay-opt" onclick="selPay(this)" data-m="Card">
+            <div class="poi">💳</div>Card
+          </div>
+        </div>
+      </div>
+
+      <button class="order-btn" id="orderBtn" onclick="placeOrder()">Place Order →</button>
+      <div class="order-note">🔒 Secure checkout · NDA verified pharmacy · 30-min delivery</div>
+    </div>
+  </div>
+</div>
+
+<!-- SUCCESS MODAL -->
+<div class="overlay" id="overlay" onclick="if(event.target===this)closeModal()">
+  <div class="success-modal">
+    <div class="success-icon">✅</div>
+    <div class="success-title">Order Placed! 🎉</div>
+    <div class="success-sub">Your medicines are being prepared.<br>Track your order below.</div>
+    <div class="order-track">
+      <div class="track-row"><span class="track-lbl">Order ID</span><span class="track-val" id="orderId">ORD-2026-001</span></div>
+      <div class="track-row"><span class="track-lbl">Pharmacy</span><span class="track-val">Kato Pharma</span></div>
+      <div class="track-row"><span class="track-lbl">Payment</span><span class="track-val" id="orderPay">MTN MoMo</span></div>
+      <div class="track-row"><span class="track-lbl">Est. Delivery</span><span class="track-val">~25–35 minutes</span></div>
+      <div class="track-steps">
+        <div class="track-step"><div class="ts-dot done">✓</div><div class="ts-label">Placed</div></div>
+        <div class="track-step"><div class="ts-dot active">⚙</div><div class="ts-label">Preparing</div></div>
+        <div class="track-step"><div class="ts-dot">🏍</div><div class="ts-label">On the way</div></div>
+        <div class="track-step"><div class="ts-dot">🏠</div><div class="ts-label">Delivered</div></div>
+      </div>
+    </div>
+    <div class="modal-btns">
+      <button class="modal-btn primary" onclick="closeModal()">Track Order</button>
+      <button class="modal-btn ghost" onclick="closeModal()">Continue Shopping</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span id="toastMsg"></span></div>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <strong>MedVault</strong> · Powered by Kato Pharma · Kampala, Uganda · NDA Registered · medvault.ug
+</footer>
+
+<script>
+const catalog=[
+  {name:'Paracetamol 500mg',cat:'Analgesic',price:500,stock:240,icon:'🟡',badge:'otc',rx:false},
+  {name:'Amoxicillin 250mg',cat:'Antibiotic',price:3500,stock:18,icon:'💊',badge:'rx',rx:true},
+  {name:'Coartem (AL) 6-tabs',cat:'Antimalarial',price:12000,stock:95,icon:'🔴',badge:'rx',rx:true},
+  {name:'ORS Sachets 1L',cat:'Rehydration',price:800,stock:380,icon:'💧',badge:'otc',rx:false},
+  {name:'Vitamin C 500mg',cat:'Vitamin',price:1000,stock:120,icon:'🍊',badge:'otc',rx:false},
+  {name:'Omeprazole 20mg',cat:'Gastric',price:2000,stock:60,icon:'🟠',badge:'rx',rx:true},
+  {name:'Ibuprofen 400mg',cat:'Analgesic',price:700,stock:180,icon:'🔵',badge:'otc',rx:false},
+  {name:'Ciprofloxacin 500mg',cat:'Antibiotic',price:4500,stock:45,icon:'💊',badge:'rx',rx:true},
+  {name:'Zinc Sulphate 20mg',cat:'Vitamin',price:600,stock:90,icon:'⚗️',badge:'otc',rx:false},
+  {name:'Metronidazole 400mg',cat:'Antibiotic',price:2200,stock:55,icon:'💊',badge:'rx',rx:true},
+  {name:'Antimalaria Duo',cat:'Antimalarial',price:9500,stock:30,icon:'🔴',badge:'rx',rx:true},
+  {name:'Multivitamin Tabs',cat:'Vitamin',price:3500,stock:200,icon:'🌈',badge:'otc',rx:false},
+];
+
+const categories=[
+  {label:'All',icon:'💊'},
+  {label:'Analgesic',icon:'🟡'},
+  {label:'Antibiotic',icon:'💊'},
+  {label:'Antimalarial',icon:'🔴'},
+  {label:'Vitamin',icon:'🍊'},
+  {label:'Rehydration',icon:'💧'},
+  {label:'Gastric',icon:'🟠'},
+];
+
+let cart=[];
+let activeCat='All';
+let deliveryFee=5000;
+let payMethod='MTN MoMo';
+let orderCount=1;
+
+// Render categories
+function renderCats(){
+  const el=document.getElementById('catScroll');
+  el.innerHTML=categories.map(c=>`<div class="cat-chip ${c.label===activeCat?'active':''}" onclick="setCat('${c.label}')"><span class="cat-icon">${c.icon}</span>${c.label}</div>`).join('');
+}
+
+function setCat(cat){
+  activeCat=cat;
+  renderCats();
+  renderDrugs();
+}
+
+// Render drugs
+function renderDrugs(){
+  const q=(document.getElementById('navSearch')?.value||document.getElementById('heroSearch')?.value||'').toLowerCase();
+  const el=document.getElementById('drugsGrid');
+  const filtered=catalog.filter(d=>{
+    const catMatch=activeCat==='All'||d.cat===activeCat;
+    const searchMatch=!q||d.name.toLowerCase().includes(q)||d.cat.toLowerCase().includes(q);
+    return catMatch&&searchMatch;
+  });
+  if(!filtered.length){el.innerHTML=`<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted)">😕 No medicines found for "<strong>${q||activeCat}</strong>"</div>`;return;}
+  el.innerHTML=filtered.map(d=>{
+    const inCart=cart.find(c=>c.name===d.name);
+    const bdgClass=d.badge==='otc'?'otc':d.badge==='rx'?'rx':'low';
+    const bdgLabel=d.badge==='otc'?'OTC':d.badge==='rx'?'Rx ⚕':'Low Stock';
+    return`<div class="drug-card" onclick="addToCart('${d.name}')">
+      <div class="dc-img">
+        <span style="font-size:42px">${d.icon}</span>
+        <span class="dc-badge ${bdgClass}">${bdgLabel}</span>
+      </div>
+      <div class="dc-body">
+        <div class="dc-name">${d.name}</div>
+        <div class="dc-cat">${d.cat} · ${d.stock} units left</div>
+        <div class="dc-footer">
+          <div><div class="dc-price">UGX ${d.price.toLocaleString()}</div><div class="dc-unit">per unit</div></div>
+          <button class="add-btn ${inCart?'added':''}" onclick="event.stopPropagation();addToCart('${d.name}')" title="Add to cart">
+            ${inCart?'✓':'+'}
+          </button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filterDrugs(){renderDrugs();}
+
+// CART
+function addToCart(name){
+  const d=catalog.find(x=>x.name===name);
+  if(d.rx){showToast('⚕️ Prescription required. Our pharmacist will verify your order.');}
+  const ex=cart.find(x=>x.name===name);
+  if(ex){ex.qty++;showToast('Updated: '+name);}
+  else{cart.push({...d,qty:1});showToast('Added: '+name);}
+  renderCart();renderDrugs();
+}
+
+function renderCart(){
+  const count=cart.reduce((s,c)=>s+c.qty,0);
+  document.getElementById('cartCount').textContent=count;
+  const sub=cart.reduce((s,c)=>s+c.price*c.qty,0);
+  const total=sub+deliveryFee;
+  const el=document.getElementById('cartItems');
+  const det=document.getElementById('cartDetails');
+  const subtitle=document.getElementById('cartSubtitle');
+
+  if(!cart.length){
+    el.innerHTML=`<div class="cart-empty"><div class="cart-empty-icon">🛒</div><div class="cart-empty-txt">Your cart is empty.<br>Browse medicines and add them here.</div></div>`;
+    det.style.display='none';
+    subtitle.textContent='Add medicines to get started';
+    return;
+  }
+
+  subtitle.textContent=`${count} item${count>1?'s':''} · UGX ${sub.toLocaleString()}`;
+  el.innerHTML=cart.map((c,i)=>`
+    <div class="cart-item">
+      <div class="ci-icon">${c.icon}</div>
+      <div class="ci-info">
+        <div class="ci-name">${c.name}</div>
+        <div class="ci-price">UGX ${(c.price*c.qty).toLocaleString()}</div>
+      </div>
+      <div class="ci-ctrl">
+        <button class="ci-btn" onclick="cq(${i},-1)">−</button>
+        <div class="ci-qty">${c.qty}</div>
+        <button class="ci-btn" onclick="cq(${i},1)">+</button>
+      </div>
+    </div>
+  `).join('');
+
+  document.getElementById('cartSub').textContent='UGX '+sub.toLocaleString();
+  document.getElementById('deliveryFee').textContent='UGX '+deliveryFee.toLocaleString();
+  document.getElementById('cartTotal').textContent='UGX '+total.toLocaleString();
+  det.style.display='block';
+}
+
+function cq(i,d){
+  cart[i].qty+=d;
+  if(cart[i].qty<=0)cart.splice(i,1);
+  renderCart();renderDrugs();
+}
+
+function selDel(el,type,fee){
+  document.querySelectorAll('.del-opt').forEach(d=>d.classList.remove('sel'));
+  el.classList.add('sel');
+  deliveryFee=fee;
+  const addr=document.getElementById('addrInput');
+  addr.placeholder=type==='pickup'?'📍 Kato Pharma, Kampala Road':'Enter your delivery address…';
+  if(type==='pickup'){addr.value='Kato Pharma, Kampala Road';}else{addr.value='';}
+  renderCart();
+}
+
+function selPay(el){
+  document.querySelectorAll('.pay-opt').forEach(p=>p.classList.remove('sel'));
+  el.classList.add('sel');
+  payMethod=el.dataset.m;
+}
+
+function placeOrder(){
+  const phone=document.getElementById('phoneInput').value.trim();
+  const addr=document.getElementById('addrInput').value.trim();
+  if(!phone){showToast('📞 Please enter your phone number');return;}
+  if(!addr){showToast('📍 Please enter your delivery address');return;}
+  if(!cart.length)return;
+  const id='ORD-2026-00'+String(orderCount).padStart(3,'0');
+  orderCount++;
+  document.getElementById('orderId').textContent=id;
+  document.getElementById('orderPay').textContent=payMethod;
+  document.getElementById('overlay').classList.add('open');
+  cart=[];
+  renderCart();renderDrugs();
+}
+
+function closeModal(){document.getElementById('overlay').classList.remove('open');}
+function scrollToCart(){document.getElementById('cartSidebar').scrollIntoView({behavior:'smooth'});}
+
+function showToast(msg){
+  const t=document.getElementById('toast');
+  document.getElementById('toastMsg').textContent=msg;
+  t.classList.add('show');
+  clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+// Init
+renderCats();
+renderDrugs();
+</script>
+</body>
+</html>

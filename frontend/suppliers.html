@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MedVault — Suppliers & Insurance</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Epilogue:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#f4f6fb;--white:#ffffff;--s1:#f0f2f8;--s2:#e8eaf2;
+  --border:#dde1ee;--border2:#c8cedd;
+  --dark:#0c1220;--dark2:#1a2540;--dark3:#243050;
+  --accent:#0052ff;--accent2:#00c896;--gold:#f5a623;
+  --danger:#e53935;--success:#00b96b;--warn:#f59e0b;--purple:#7c3aed;
+  --text:#0c1220;--muted:#6b7594;--muted2:#9aa0b8;
+  --font:'Epilogue',sans-serif;--display:'Syne',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;}
+
+/* ── NAV ── */
+.nav{background:var(--dark);padding:0 32px;height:58px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;}
+.nav-logo{display:flex;align-items:center;gap:9px;}
+.nl-icon{width:32px;height:32px;background:linear-gradient(135deg,var(--accent2),var(--accent));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;}
+.nl-text{font-family:var(--display);font-weight:800;font-size:17px;color:#fff;letter-spacing:-0.3px;}
+.nav-tabs{display:flex;gap:2px;}
+.nt{padding:8px 16px;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;color:rgba(255,255,255,0.55);transition:all 0.18s;}
+.nt:hover{color:#fff;background:rgba(255,255,255,0.08);}
+.nt.active{color:#fff;background:rgba(255,255,255,0.12);}
+.nav-right{display:flex;align-items:center;gap:10px;}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all 0.18s;font-family:var(--font);}
+.btn-accent{background:var(--accent2);color:#000;}
+.btn-accent:hover{filter:brightness(1.08);transform:translateY(-1px);}
+.btn-ghost{background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.15);}
+.btn-ghost:hover{background:rgba(255,255,255,0.15);}
+.btn-dark{background:var(--dark);color:#fff;}
+.btn-outline{background:transparent;color:var(--accent);border:1.5px solid var(--accent);}
+.btn-outline:hover{background:var(--accent);color:#fff;}
+.btn-danger{background:rgba(229,57,53,0.1);color:var(--danger);border:1px solid rgba(229,57,53,0.2);}
+
+/* ── PAGES ── */
+.page{display:none;animation:fadeUp 0.25s ease both;}
+.page.active{display:block;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── HERO BANNER ── */
+.hero-banner{background:linear-gradient(135deg,var(--dark) 0%,var(--dark2) 50%,var(--dark3) 100%);padding:40px 32px;position:relative;overflow:hidden;}
+.hero-banner::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 60% 80% at 80% 50%,rgba(0,200,150,0.12) 0%,transparent 60%);pointer-events:none;}
+.hb-inner{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr auto;align-items:center;gap:24px;}
+.hb-tag{display:inline-flex;align-items:center;gap:6px;background:rgba(0,200,150,0.12);border:1px solid rgba(0,200,150,0.2);color:var(--accent2);padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:0.3px;margin-bottom:12px;}
+.hb-title{font-family:var(--display);font-weight:800;font-size:32px;color:#fff;letter-spacing:-1px;line-height:1.1;margin-bottom:8px;}
+.hb-sub{font-size:14px;color:rgba(255,255,255,0.55);line-height:1.6;max-width:480px;}
+.hb-stats{display:flex;gap:24px;margin-top:20px;}
+.hbs{text-align:center;}
+.hbs-val{font-family:var(--display);font-weight:800;font-size:22px;color:var(--accent2);}
+.hbs-lbl{font-size:11px;color:rgba(255,255,255,0.4);margin-top:2px;}
+.hbs-div{width:1px;background:rgba(255,255,255,0.1);}
+.hb-right{display:flex;flex-direction:column;gap:10px;align-items:flex-end;}
+
+/* ── LAYOUT ── */
+.content{max-width:1100px;margin:0 auto;padding:28px 32px;}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px;}
+.three-col{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:24px;}
+
+/* ── STATS ROW ── */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px;}
+.stat{background:var(--white);border:1px solid var(--border);border-radius:14px;padding:18px 20px;box-shadow:0 2px 8px rgba(12,18,32,0.06);}
+.stat-ico{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;margin-bottom:10px;}
+.stat-ico.g{background:rgba(0,185,107,0.1)}.stat-ico.b{background:rgba(0,82,255,0.1)}.stat-ico.o{background:rgba(245,166,35,0.1)}.stat-ico.p{background:rgba(124,58,237,0.1)}
+.stat-val{font-family:var(--display);font-weight:800;font-size:22px;letter-spacing:-0.5px;line-height:1;margin-bottom:4px;}
+.stat-lbl{font-size:11px;color:var(--muted);}
+.stat-chg{font-size:11px;margin-top:3px;}
+.chg-up{color:var(--success)}.chg-dn{color:var(--danger)}.chg-n{color:var(--muted)}
+
+/* ── CARDS ── */
+.card{background:var(--white);border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(12,18,32,0.06);}
+.ch{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.ct{font-family:var(--display);font-weight:700;font-size:14px;}
+.cs{font-size:11px;color:var(--muted);margin-top:2px;}
+
+/* ── SUPPLIER CARDS ── */
+.supplier-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:24px;}
+.supplier-card{background:var(--white);border:1.5px solid var(--border);border-radius:14px;overflow:hidden;transition:all 0.2s;cursor:pointer;box-shadow:0 2px 8px rgba(12,18,32,0.05);}
+.supplier-card:hover{border-color:var(--accent2);transform:translateY(-3px);box-shadow:0 8px 28px rgba(0,82,255,0.1);}
+.supplier-card.featured{border-color:var(--gold);}
+.sc-header{background:linear-gradient(135deg,var(--dark),var(--dark2));padding:16px 18px;display:flex;align-items:center;justify-content:space-between;}
+.sc-logo{width:44px;height:44px;border-radius:10px;background:rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;font-size:22px;}
+.sc-badge{font-size:9px;font-weight:700;padding:3px 9px;border-radius:20px;letter-spacing:0.3px;}
+.sc-badge.verified{background:rgba(0,200,150,0.2);color:var(--accent2);}
+.sc-badge.featured{background:rgba(245,166,35,0.2);color:var(--gold);}
+.sc-badge.new{background:rgba(0,82,255,0.2);color:#60a5fa;}
+.sc-body{padding:16px 18px;}
+.sc-name{font-family:var(--display);font-weight:700;font-size:15px;margin-bottom:3px;}
+.sc-type{font-size:11px;color:var(--muted);margin-bottom:10px;}
+.sc-tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px;}
+.sc-tag{font-size:10px;font-weight:600;padding:3px 8px;border-radius:5px;background:var(--s1);color:var(--muted);}
+.sc-meta{display:flex;align-items:center;justify-content:space-between;font-size:12px;}
+.sc-rating{color:var(--gold);}
+.sc-products{color:var(--muted);}
+.sc-footer{padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;}
+.sc-btn{flex:1;padding:8px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;font-family:var(--font);transition:all 0.18s;text-align:center;}
+.sc-btn.primary{background:var(--accent2);color:#000;}
+.sc-btn.primary:hover{filter:brightness(1.08);}
+.sc-btn.outline{background:transparent;color:var(--accent);border:1.5px solid var(--accent);}
+.sc-btn.outline:hover{background:var(--accent);color:#fff;}
+
+/* ── PRODUCT TABLE ── */
+.tbl{width:100%;border-collapse:collapse;font-size:13px;}
+.tbl th{padding:11px 16px;text-align:left;font-size:10px;letter-spacing:0.7px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);font-weight:600;}
+.tbl td{padding:12px 16px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.tbl tr:last-child td{border-bottom:none;}
+.tbl tbody tr:hover td{background:var(--s1);}
+.tbl tbody tr{cursor:pointer;}
+.pill{display:inline-flex;align-items:center;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:600;}
+.pill.in{background:rgba(0,185,107,0.1);color:var(--success);}
+.pill.low{background:rgba(245,158,11,0.1);color:var(--warn);}
+.pill.out{background:rgba(229,57,53,0.1);color:var(--danger);}
+.pill.pending{background:rgba(245,158,11,0.1);color:var(--warn);}
+.pill.approved{background:rgba(0,185,107,0.1);color:var(--success);}
+.pill.rejected{background:rgba(229,57,53,0.1);color:var(--danger);}
+.pill.processing{background:rgba(0,82,255,0.1);color:var(--accent);}
+.pill.paid{background:rgba(0,185,107,0.1);color:var(--success);}
+
+/* ── REVENUE FLOW ── */
+.rev-flow{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-bottom:24px;}
+.rf-step{background:var(--white);border:1px solid var(--border);padding:20px;position:relative;text-align:center;}
+.rf-step:first-child{border-radius:14px 0 0 14px;}
+.rf-step:last-child{border-radius:0 14px 14px 0;}
+.rf-step:not(:last-child)::after{content:'→';position:absolute;right:-14px;top:50%;transform:translateY(-50%);font-size:20px;color:var(--muted2);z-index:1;background:var(--white);padding:2px;}
+.rf-ico{font-size:28px;margin-bottom:8px;}
+.rf-label{font-size:11px;color:var(--muted);margin-bottom:4px;}
+.rf-val{font-family:var(--display);font-weight:700;font-size:16px;color:var(--accent2);}
+
+/* ── MARKUP NEGOTIATION ── */
+.markup-card{background:var(--white);border:1.5px solid var(--accent2);border-radius:14px;padding:20px;box-shadow:0 4px 20px rgba(0,200,150,0.1);}
+.markup-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);}
+.markup-row:last-child{border-bottom:none;}
+.mr-drug{font-size:13px;font-weight:500;}
+.mr-supplier{font-size:11px;color:var(--muted);margin-top:2px;}
+.mr-prices{display:flex;align-items:center;gap:10px;}
+.mr-cost{font-size:12px;color:var(--muted);text-decoration:line-through;}
+.mr-sell{font-size:14px;font-weight:700;color:var(--accent2);}
+.mr-margin{font-size:11px;font-weight:700;padding:2px 8px;border-radius:5px;}
+.mr-margin.good{background:rgba(0,185,107,0.1);color:var(--success);}
+.mr-margin.great{background:rgba(0,200,150,0.12);color:var(--accent2);}
+.mr-margin.ok{background:rgba(245,158,11,0.1);color:var(--warn);}
+
+/* ── INSURANCE CARDS ── */
+.insurer-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;}
+.insurer-card{background:var(--white);border:1.5px solid var(--border);border-radius:14px;padding:20px;transition:all 0.2s;cursor:pointer;}
+.insurer-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,82,255,0.1);}
+.insurer-card.connected{border-color:var(--success);background:rgba(0,185,107,0.02);}
+.ins-header{display:flex;align-items:center;gap:12px;margin-bottom:14px;}
+.ins-logo{width:46px;height:46px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
+.ins-name{font-family:var(--display);font-weight:700;font-size:15px;}
+.ins-type{font-size:11px;color:var(--muted);}
+.ins-status{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;margin-top:4px;}
+.ins-dot{width:6px;height:6px;border-radius:50%;}
+.ins-dot.connected{background:var(--success);}
+.ins-dot.pending{background:var(--warn);}
+.ins-dot.disconnected{background:var(--muted2);}
+.ins-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
+.ins-stat{background:var(--s1);border-radius:8px;padding:8px 10px;}
+.ins-stat-val{font-family:var(--display);font-weight:700;font-size:15px;}
+.ins-stat-lbl{font-size:10px;color:var(--muted);margin-top:2px;}
+.ins-footer{display:flex;gap:8px;}
+.ins-btn{flex:1;padding:8px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;font-family:var(--font);transition:all 0.18s;text-align:center;}
+.ins-btn.primary{background:var(--accent);color:#fff;}
+.ins-btn.primary:hover{filter:brightness(1.1);}
+.ins-btn.ghost{background:var(--s1);color:var(--text);border:1px solid var(--border);}
+
+/* ── CLAIM FLOW ── */
+.claim-flow{display:flex;align-items:center;gap:0;margin-bottom:24px;}
+.cf-step{flex:1;background:var(--white);border:1px solid var(--border);padding:16px;text-align:center;position:relative;}
+.cf-step:first-child{border-radius:12px 0 0 12px;}
+.cf-step:last-child{border-radius:0 12px 12px 0;}
+.cf-step.active{background:linear-gradient(135deg,rgba(0,82,255,0.04),rgba(0,200,150,0.04));border-color:var(--accent2);}
+.cf-step.done{background:rgba(0,185,107,0.04);border-color:var(--success);}
+.cf-num{width:28px;height:28px;border-radius:50%;background:var(--s2);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;margin:0 auto 8px;}
+.cf-step.active .cf-num{background:var(--accent2);color:#000;}
+.cf-step.done .cf-num{background:var(--success);color:#fff;}
+.cf-title{font-size:12px;font-weight:600;margin-bottom:3px;}
+.cf-sub{font-size:10px;color:var(--muted);}
+.cf-arrow{font-size:18px;color:var(--muted2);flex-shrink:0;padding:0 4px;}
+
+/* ── MODAL ── */
+.overlay{position:fixed;inset:0;background:rgba(12,18,32,0.6);backdrop-filter:blur(4px);z-index:100;display:none;align-items:center;justify-content:center;}
+.overlay.open{display:flex;}
+.modal{background:var(--white);border-radius:16px;padding:28px;width:520px;max-width:92vw;box-shadow:0 20px 60px rgba(12,18,32,0.2);animation:modalIn 0.22s ease;}
+@keyframes modalIn{from{opacity:0;transform:scale(0.96) translateY(12px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.modal-title{font-family:var(--display);font-weight:700;font-size:20px;margin-bottom:4px;}
+.modal-sub{font-size:13px;color:var(--muted);margin-bottom:22px;}
+.fg{display:flex;flex-direction:column;gap:5px;margin-bottom:14px;}
+.fl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;}
+.fi{background:var(--s1);border:1.5px solid var(--border);border-radius:9px;padding:10px 14px;color:var(--text);font-family:var(--font);font-size:14px;outline:none;transition:border-color 0.2s;width:100%;}
+.fi:focus{border-color:var(--accent2);}
+.fi::placeholder{color:var(--muted2);}
+.fsel{background:var(--s1);border:1.5px solid var(--border);border-radius:9px;padding:10px 14px;color:var(--text);font-family:var(--font);font-size:14px;outline:none;width:100%;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.modal-footer{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid var(--border);}
+.modal-footer .btn{padding:10px 20px;}
+
+/* ── HOW YOU EARN ── */
+.earn-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:24px;}
+.earn-card{background:var(--white);border:1px solid var(--border);border-radius:14px;padding:22px;text-align:center;}
+.earn-icon{font-size:36px;margin-bottom:12px;}
+.earn-title{font-family:var(--display);font-weight:700;font-size:16px;margin-bottom:6px;}
+.earn-desc{font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:12px;}
+.earn-amount{font-family:var(--display);font-weight:800;font-size:18px;color:var(--accent2);}
+.earn-lbl{font-size:10px;color:var(--muted);margin-top:2px;}
+
+/* ── NOTIFICATION STRIP ── */
+.notif{background:rgba(0,200,150,0.08);border:1px solid rgba(0,200,150,0.2);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:10px;margin-bottom:20px;font-size:13px;}
+.notif.warn{background:rgba(245,158,11,0.08);border-color:rgba(245,158,11,0.2);}
+.notif.info{background:rgba(0,82,255,0.06);border-color:rgba(0,82,255,0.15);}
+
+/* ── TOOLBAR ── */
+.toolbar{display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap;}
+.srch{display:flex;align-items:center;gap:8px;background:var(--white);border:1.5px solid var(--border);border-radius:9px;padding:8px 14px;}
+.srch input{background:none;border:none;outline:none;color:var(--text);font-family:var(--font);font-size:13px;width:180px;}
+.srch input::placeholder{color:var(--muted2);}
+.filter-tab{padding:8px 14px;border-radius:8px;background:var(--white);border:1.5px solid var(--border);font-size:12px;cursor:pointer;font-family:var(--font);color:var(--muted);transition:all 0.18s;font-weight:500;}
+.filter-tab:hover,.filter-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--dark);color:#fff;border-radius:10px;padding:12px 18px;font-size:13px;font-weight:500;transform:translateY(70px);opacity:0;transition:all 0.28s ease;z-index:200;display:flex;align-items:center;gap:8px;box-shadow:0 8px 32px rgba(12,18,32,0.3);max-width:340px;}
+.toast.show{transform:translateY(0);opacity:1;}
+.toast.success{border-left:3px solid var(--success);}
+.toast.warn{border-left:3px solid var(--warn);}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-logo">
+    <div class="nl-icon">💊</div>
+    <div class="nl-text">MedVault</div>
+  </div>
+  <div class="nav-tabs">
+    <div class="nt active" onclick="goPage('suppliers',this)">🏭 Supplier Marketplace</div>
+    <div class="nt" onclick="goPage('insurance',this)">🏥 Insurance Claims</div>
+    <div class="nt" onclick="goPage('earnings',this)">💰 Your Earnings</div>
+  </div>
+  <div class="nav-right">
+    <button class="btn btn-ghost" onclick="window.open('medvault-admin.html','_blank')">← Admin Panel</button>
+    <button class="btn btn-accent" onclick="openOrderModal()">+ Place Order</button>
+  </div>
+</nav>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- SUPPLIER MARKETPLACE PAGE -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="page active" id="page-suppliers">
+
+  <!-- Hero -->
+  <div class="hero-banner">
+    <div class="hb-inner">
+      <div>
+        <div class="hb-tag">🏭 Supplier Marketplace</div>
+        <div class="hb-title">Buy drugs cheaper.<br>Sell them higher.</div>
+        <div class="hb-sub">MedVault negotiates bulk deals with verified suppliers. You order through us, we take a small commission, you save 15–30% on every drug you stock.</div>
+        <div class="hb-stats">
+          <div class="hbs"><div class="hbs-val">23</div><div class="hbs-lbl">Verified Suppliers</div></div>
+          <div class="hbs-div"></div>
+          <div class="hbs"><div class="hbs-val">1,400+</div><div class="hbs-lbl">Drug Products</div></div>
+          <div class="hbs-div"></div>
+          <div class="hbs"><div class="hbs-val">15–30%</div><div class="hbs-lbl">Avg. Savings</div></div>
+          <div class="hbs-div"></div>
+          <div class="hbs"><div class="hbs-val">2–3 days</div><div class="hbs-lbl">Delivery to Kampala</div></div>
+        </div>
+      </div>
+      <div class="hb-right">
+        <button class="btn btn-accent" onclick="openSupplierModal()">📋 List Your Products</button>
+        <button class="btn btn-ghost" onclick="toast('Bulk quote request sent to all suppliers!','success')">💬 Request Bulk Quote</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- How MedVault earns from suppliers -->
+    <div class="notif info">
+      💡 <strong>How you earn:</strong> Suppliers pay MedVault a <strong>3–8% listing commission</strong> on every order placed through the platform. You also negotiate a <strong>markup</strong> — buy at supplier price, sell to pharmacies at your price.
+    </div>
+
+    <!-- Revenue flow -->
+    <div class="rev-flow">
+      <div class="rf-step"><div class="rf-ico">🏭</div><div class="rf-label">Supplier sells to MedVault network</div><div class="rf-val">UGX 8,000/unit</div></div>
+      <div class="rf-step"><div class="rf-ico">💰</div><div class="rf-label">MedVault takes commission (5%)</div><div class="rf-val">UGX 400/unit</div></div>
+      <div class="rf-step"><div class="rf-ico">🏥</div><div class="rf-label">Pharmacy buys from supplier</div><div class="rf-val">UGX 8,400/unit</div></div>
+      <div class="rf-step"><div class="rf-ico">💊</div><div class="rf-label">Pharmacy sells to customer</div><div class="rf-val">UGX 12,000/unit</div></div>
+    </div>
+
+    <!-- Suppliers -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div style="font-family:var(--display);font-weight:700;font-size:18px">Verified Suppliers</div>
+      <div class="toolbar" style="margin:0">
+        <div class="srch"><span>🔍</span><input type="text" placeholder="Search supplier or drug…" oninput="filterSuppliers(this.value)"/></div>
+        <button class="filter-tab active" onclick="setSupFilter(this,'all')">All</button>
+        <button class="filter-tab" onclick="setSupFilter(this,'mfg')">Manufacturers</button>
+        <button class="filter-tab" onclick="setSupFilter(this,'dist')">Distributors</button>
+        <button class="filter-tab" onclick="setSupFilter(this,'imp')">Importers</button>
+      </div>
+    </div>
+
+    <div class="supplier-grid" id="supplierGrid"></div>
+
+    <!-- Markup Negotiation -->
+    <div style="font-family:var(--display);font-weight:700;font-size:18px;margin-bottom:16px">💹 Your Markup on Current Stock</div>
+    <div class="notif">
+      ✅ MedVault negotiated these prices for your network. Your pharmacy buys at <strong>Cost Price</strong>, sells at <strong>Selling Price</strong>. The <strong>margin</strong> is your profit per unit.
+    </div>
+    <div class="markup-card">
+      <div id="markupList"></div>
+    </div>
+
+    <!-- Orders -->
+    <div style="font-family:var(--display);font-weight:700;font-size:18px;margin:24px 0 16px">📦 Your Supplier Orders</div>
+    <div class="card">
+      <div class="ch"><div class="ct">Order History</div><button class="btn btn-accent" style="padding:7px 14px;font-size:12px" onclick="openOrderModal()">+ New Order</button></div>
+      <table class="tbl"><thead><tr><th>Order ID</th><th>Supplier</th><th>Products</th><th>Total</th><th>Commission Paid</th><th>Date</th><th>Status</th></tr></thead>
+      <tbody id="orderHistory"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- INSURANCE PAGE -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="page" id="page-insurance">
+
+  <div class="hero-banner" style="background:linear-gradient(135deg,#0c1f3f,#1a2d5a,#0f3460)">
+    <div class="hb-inner">
+      <div>
+        <div class="hb-tag" style="background:rgba(0,82,255,0.15);border-color:rgba(0,82,255,0.3);color:#93c5fd">🏥 Insurance Integration</div>
+        <div class="hb-title">Get paid by insurance<br>companies automatically.</div>
+        <div class="hb-sub">Connect your pharmacy to Uganda's top insurers. When insured customers buy, the insurance company pays MedVault, MedVault pays you — minus a small processing fee.</div>
+        <div class="hb-stats">
+          <div class="hbs"><div class="hbs-val" style="color:#60a5fa">UGX 658B</div><div class="hbs-lbl">Claims paid in Uganda Q3 2024</div></div>
+          <div class="hbs-div"></div>
+          <div class="hbs"><div class="hbs-val" style="color:#60a5fa">6</div><div class="hbs-lbl">Insurers Connected</div></div>
+          <div class="hbs-div"></div>
+          <div class="hbs"><div class="hbs-val" style="color:#60a5fa">2–5%</div><div class="hbs-lbl">Your Processing Fee</div></div>
+        </div>
+      </div>
+      <div class="hb-right">
+        <button class="btn btn-accent" onclick="openClaimModal()">+ Submit Claim</button>
+        <button class="btn btn-ghost" onclick="toast('Accreditation guide sent to your email!','success')">📋 Get Accredited</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <div class="notif info">
+      ℹ️ <strong>How insurance works for your pharmacy:</strong> You serve insured customers → Submit the claim through MedVault → Insurer pays within 30 days → MedVault transfers to your MoMo account (minus 2–5% processing fee). <strong>You never chase insurance companies yourself.</strong>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat"><div class="stat-ico g">✅</div><div class="stat-val" id="insClaims">47</div><div class="stat-lbl">Claims This Month</div><div class="stat-chg chg-up">↑ 12 vs last month</div></div>
+      <div class="stat"><div class="stat-ico b">⏳</div><div class="stat-val" id="insPending">8</div><div class="stat-lbl">Pending Approval</div><div class="stat-chg chg-n">avg 3 days</div></div>
+      <div class="stat"><div class="stat-ico o">💰</div><div class="stat-val" id="insRevenue">UGX 2.8M</div><div class="stat-lbl">Insurance Revenue</div><div class="stat-chg chg-up">↑ 34% growth</div></div>
+      <div class="stat"><div class="stat-ico p">🏥</div><div class="stat-val" id="insPatients">156</div><div class="stat-lbl">Insured Patients Served</div><div class="stat-chg chg-up">↑ 28 this week</div></div>
+    </div>
+
+    <!-- How claims work -->
+    <div style="font-family:var(--display);font-weight:700;font-size:18px;margin-bottom:14px">How a Claim Works (Step by Step)</div>
+    <div class="claim-flow" id="claimFlow"></div>
+
+    <!-- Connected Insurers -->
+    <div style="font-family:var(--display);font-weight:700;font-size:18px;margin:24px 0 14px">Insurance Companies</div>
+    <div class="insurer-grid" id="insurerGrid"></div>
+
+    <!-- Claims Table -->
+    <div style="font-family:var(--display);font-weight:700;font-size:18px;margin-bottom:14px">Recent Claims</div>
+    <div class="toolbar">
+      <div class="srch"><span>🔍</span><input type="text" placeholder="Search patient, insurer…"/></div>
+      <button class="filter-tab active" onclick="setClaimFilter(this,'all')">All</button>
+      <button class="filter-tab" onclick="setClaimFilter(this,'approved')">✅ Approved</button>
+      <button class="filter-tab" onclick="setClaimFilter(this,'pending')">⏳ Pending</button>
+      <button class="filter-tab" onclick="setClaimFilter(this,'rejected')">❌ Rejected</button>
+    </div>
+    <div class="card">
+      <table class="tbl"><thead><tr><th>Claim ID</th><th>Patient</th><th>Insurance</th><th>Drugs Dispensed</th><th>Claim Amount</th><th>Your Fee (3%)</th><th>Date</th><th>Status</th></tr></thead>
+      <tbody id="claimsBody"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- EARNINGS PAGE -->
+<!-- ══════════════════════════════════════════════════════ -->
+<div class="page" id="page-earnings">
+
+  <div class="hero-banner" style="background:linear-gradient(135deg,#0f1e10,#1a3a1c,#0d2b0e)">
+    <div class="hb-inner">
+      <div>
+        <div class="hb-tag" style="background:rgba(0,185,107,0.15);border-color:rgba(0,185,107,0.3);color:#6ee7b7">💰 Your MedVault Earnings</div>
+        <div class="hb-title">Every stream that<br>makes you money.</div>
+        <div class="hb-sub">MedVault generates revenue for you in 4 ways. Here's your complete earnings dashboard — subscriptions, supplier commissions, insurance processing, and markup profits.</div>
+      </div>
+      <div style="background:rgba(0,185,107,0.1);border:1px solid rgba(0,185,107,0.2);border-radius:14px;padding:20px 24px;text-align:center;">
+        <div style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:4px">TOTAL THIS MONTH</div>
+        <div style="font-family:var(--display);font-weight:800;font-size:34px;color:var(--accent2);letter-spacing:-1px">UGX 4.7M</div>
+        <div style="font-size:12px;color:rgba(255,255,255,0.4);margin-top:4px">↑ 28% vs last month</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- How you earn -->
+    <div style="font-family:var(--display);font-weight:700;font-size:18px;margin-bottom:16px">Your 4 Revenue Streams</div>
+    <div class="earn-grid" id="earnGrid"></div>
+
+    <!-- Monthly breakdown -->
+    <div class="two-col">
+      <div class="card">
+        <div class="ch"><div class="ct">Monthly Breakdown</div><span style="font-size:12px;color:var(--muted)">March 2026</span></div>
+        <div style="padding:18px 20px">
+          <div id="earningBreakdown"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ch"><div class="ct">Projected Annual Revenue</div></div>
+        <div style="padding:18px 20px">
+          <div style="text-align:center;margin-bottom:20px">
+            <div style="font-family:var(--display);font-weight:800;font-size:36px;color:var(--accent2);letter-spacing:-1px">UGX 56M</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px">at current growth rate · 47 pharmacies</div>
+          </div>
+          <div id="projections"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Payout history -->
+    <div style="font-family:var(--display);font-weight:700;font-size:18px;margin-bottom:14px">Payout History</div>
+    <div class="card">
+      <table class="tbl"><thead><tr><th>Date</th><th>Source</th><th>Description</th><th>Amount</th><th>Method</th><th>Status</th></tr></thead>
+      <tbody id="payoutHistory"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- MODALS -->
+<div class="overlay" id="overlay1" onclick="if(event.target===this)closeModal('overlay1')">
+  <div class="modal">
+    <div class="modal-title" id="modal1Title">List Your Products</div>
+    <div class="modal-sub" id="modal1Sub">Fill in your supplier details</div>
+    <div id="modal1Content"></div>
+    <div class="modal-footer" id="modal1Footer"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span id="toastMsg"></span></div>
+
+<script>
+// ══════════════════════════════════════════
+// DATA
+// ══════════════════════════════════════════
+const suppliers = [
+  {id:1,name:'Cipla Quality Chemical',type:'mfg',logo:'💊',tags:['Generics','Antimalarials','Antibiotics'],products:320,rating:4.9,commission:5,verified:true,featured:true,location:'Luzira, Kampala'},
+  {id:2,name:'Abacus Pharma',type:'dist',logo:'🏭',tags:['Distribution','Vaccines','Hospital Supplies'],products:850,rating:4.7,commission:4,verified:true,featured:false,location:'Industrial Area, Kampala'},
+  {id:3,name:'Agro Medical',type:'dist',logo:'🌿',tags:['Vitamins','Supplements','OTC'],products:240,rating:4.5,commission:6,verified:true,featured:false,location:'Nakawa, Kampala'},
+  {id:4,name:'Novartis East Africa',type:'mfg',logo:'⚗️',tags:['Coartem','Antimalarials','Branded'],products:45,rating:5.0,commission:3,verified:true,featured:true,location:'Nairobi (ships to UG)'},
+  {id:5,name:'Kampala Pharmaceutical',type:'imp',logo:'📦',tags:['Imports','Wide Range','Budget'],products:1100,rating:4.3,commission:7,verified:true,featured:false,location:'Kikuubo, Kampala'},
+  {id:6,name:'JMS Uganda',type:'dist',logo:'🏥',tags:['Hospital Supplies','Surgical','Consumables'],products:2200,rating:4.8,commission:3,verified:true,featured:false,location:'Industrial Area'},
+];
+
+const markupData = [
+  {name:'Paracetamol 500mg',supplier:'Cipla Quality',cost:350,sell:500,margin:43},
+  {name:'Coartem (AL) 6-tabs',supplier:'Novartis EA',cost:8500,sell:12000,margin:41},
+  {name:'Amoxicillin 250mg',supplier:'Cipla Quality',cost:2400,sell:3500,margin:46},
+  {name:'ORS Sachets 1L',supplier:'Abacus Pharma',cost:500,sell:800,margin:60},
+  {name:'Vitamin C 500mg',supplier:'Agro Medical',cost:600,sell:1000,margin:67},
+  {name:'Ciprofloxacin 500mg',supplier:'Cipla Quality',cost:2800,sell:4500,margin:61},
+];
+
+const supplierOrders = [
+  {id:'ORD-SUP-001',supplier:'Cipla Quality Chemical',products:'Paracetamol×500, Amoxicillin×200',total:480000,commission:24000,date:'Mar 20, 2026',status:'delivered'},
+  {id:'ORD-SUP-002',supplier:'Novartis East Africa',products:'Coartem 6-tabs ×100',total:850000,commission:25500,date:'Mar 18, 2026',status:'delivered'},
+  {id:'ORD-SUP-003',supplier:'Abacus Pharma',products:'ORS Sachets ×1000, Vitamin C ×500',total:1300000,commission:52000,date:'Mar 22, 2026',status:'processing'},
+  {id:'ORD-SUP-004',supplier:'JMS Uganda',products:'Surgical Gloves ×50 boxes',total:750000,commission:22500,date:'Mar 24, 2026',status:'pending'},
+];
+
+const insurers = [
+  {name:'AAR Insurance Uganda',logo:'🏥',type:'Health & Medical',status:'connected',claims:18,revenue:980000,clients:45,fee:3,color:'#dc2626'},
+  {name:'Jubilee Insurance',logo:'⭐',type:'Health & General',status:'connected',claims:14,revenue:760000,clients:38,fee:2.5,color:'#2563eb'},
+  {name:'UAP Old Mutual',logo:'🦁',type:'Medical Cover',status:'pending',claims:0,revenue:0,clients:0,fee:3,color:'#d97706'},
+  {name:'ICEA Lion Uganda',logo:'🦁',type:'Life & Health',status:'connected',claims:9,revenue:620000,clients:22,fee:4,color:'#7c3aed'},
+  {name:'Britam Uganda',logo:'💎',type:'Health Cover',status:'disconnected',claims:0,revenue:0,clients:0,fee:3.5,color:'#059669'},
+  {name:'CIC Insurance',logo:'🛡',type:'Community Health',status:'disconnected',claims:0,revenue:0,clients:0,fee:5,color:'#0284c7'},
+];
+
+const claims = [
+  {id:'CLM-2026-0047',patient:'Robert Ssali',insurer:'AAR Insurance',drugs:'Coartem ×1, Paracetamol ×6',amount:18000,fee:540,date:'Mar 24',status:'approved'},
+  {id:'CLM-2026-0046',patient:'Grace Amoding',insurer:'Jubilee Insurance',drugs:'Metformin ×30, Atenolol ×30',amount:72000,fee:1800,date:'Mar 23',status:'approved'},
+  {id:'CLM-2026-0045',patient:'Christine Akello',insurer:'AAR Insurance',drugs:'Amoxicillin ×21, ORS ×5',amount:33500,fee:1005,date:'Mar 23',status:'pending'},
+  {id:'CLM-2026-0044',patient:'Moses Kizito',insurer:'ICEA Lion',drugs:'Vitamin C ×60, Zinc ×30',amount:48000,fee:1920,date:'Mar 22',status:'pending'},
+  {id:'CLM-2026-0043',patient:'Sarah Nambi',insurer:'Jubilee Insurance',drugs:'Fluconazole ×3',amount:15000,fee:375,date:'Mar 21',status:'rejected'},
+  {id:'CLM-2026-0042',patient:'Brian Mugabe',insurer:'AAR Insurance',drugs:'Ciprofloxacin ×14',amount:63000,fee:1890,date:'Mar 20',status:'approved'},
+  {id:'CLM-2026-0041',patient:'Rose Atim',insurer:'AAR Insurance',drugs:'Omeprazole ×30, Antacid ×20',amount:56000,fee:1680,date:'Mar 19',status:'approved'},
+];
+
+const claimFlow = [
+  {num:1,title:'Patient Presents Card',sub:'Insured customer shows ID at counter',state:'done'},
+  {num:2,title:'Verify Benefits',sub:'MedVault checks cover instantly',state:'done'},
+  {num:3,title:'Dispense Drugs',sub:'Serve the customer as normal',state:'active'},
+  {num:4,title:'Submit Claim',sub:'One click in MedVault dashboard',state:''},
+  {num:5,title:'Insurer Pays',sub:'Within 14–30 days to MedVault',state:''},
+  {num:6,title:'You Receive',sub:'MoMo transfer, minus 2–5% fee',state:''},
+];
+
+const earnings = [
+  {icon:'💳',title:'Pharmacy Subscriptions',desc:'Monthly fees from pharmacies using MedVault platform',amount:'UGX 2.35M',lbl:'per month · 47 pharmacies',stream:'subscriptions'},
+  {icon:'🏭',title:'Supplier Commissions',desc:'3–8% commission on every drug order placed through MedVault',amount:'UGX 960K',lbl:'per month · 23 suppliers',stream:'supplier'},
+  {icon:'🏥',title:'Insurance Processing Fee',desc:'2–5% fee on every insurance claim processed through MedVault',amount:'UGX 780K',lbl:'per month · 3 insurers',stream:'insurance'},
+  {icon:'💹',title:'Markup on Drug Prices',desc:'You buy at negotiated supplier prices, sell to pharmacies at markup',amount:'UGX 620K',lbl:'avg 15% markup on orders',stream:'markup'},
+  {icon:'🚚',title:'Delivery Commissions',desc:'5–10% on every customer delivery fulfilled through MedVault',amount:'UGX 340K',lbl:'per month · growing',stream:'delivery'},
+  {icon:'📊',title:'Data Insights (Coming)',desc:'Sell anonymised drug sales data to pharma companies & researchers',amount:'UGX 500K+',lbl:'potential · when at 200+ pharmacies',stream:'data'},
+];
+
+const payouts = [
+  {date:'Mar 22, 2026',source:'Subscriptions',desc:'47 pharmacies — monthly billing',amount:2350000,method:'MTN MoMo',status:'paid'},
+  {date:'Mar 20, 2026',source:'Supplier Commission',desc:'Cipla Quality order ORD-SUP-001',amount:24000,method:'MTN MoMo',status:'paid'},
+  {date:'Mar 18, 2026',source:'Insurance Claim',desc:'AAR Insurance — 6 approved claims',amount:34200,method:'MTN MoMo',status:'paid'},
+  {date:'Mar 18, 2026',source:'Supplier Commission',desc:'Novartis EA order ORD-SUP-002',amount:25500,method:'MTN MoMo',status:'paid'},
+  {date:'Mar 15, 2026',source:'Insurance Claim',desc:'Jubilee Insurance — 4 approved claims',amount:18600,method:'MTN MoMo',status:'paid'},
+  {date:'Mar 10, 2026',source:'Subscriptions',desc:'Additional 3 new signups',amount:150000,method:'Airtel Money',status:'paid'},
+  {date:'Apr 5, 2026',source:'Subscriptions',desc:'Next billing cycle — 47 pharmacies',amount:2350000,method:'MTN MoMo',status:'pending'},
+];
+
+// ══════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════
+function goPage(page, el) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  document.querySelectorAll('.nt').forEach(n=>n.classList.remove('active'));
+  if(el) el.classList.add('active');
+  renderPage(page);
+}
+
+function renderPage(page) {
+  if(page==='suppliers') { renderSuppliers(suppliers); renderMarkup(); renderOrderHistory(); }
+  if(page==='insurance') { renderClaimFlow(); renderInsurers(); renderClaims(claims); }
+  if(page==='earnings')  { renderEarnings(); renderPayouts(); }
+}
+
+// ══════════════════════════════════════════
+// SUPPLIERS
+// ══════════════════════════════════════════
+let supFilter = 'all';
+function renderSuppliers(data) {
+  const filtered = supFilter==='all' ? data : data.filter(s=>s.type===supFilter);
+  document.getElementById('supplierGrid').innerHTML = filtered.map(s => `
+    <div class="supplier-card ${s.featured?'featured':''}">
+      <div class="sc-header">
+        <div class="sc-logo">${s.logo}</div>
+        <div style="display:flex;gap:6px">
+          ${s.verified?'<span class="sc-badge verified">✓ Verified</span>':''}
+          ${s.featured?'<span class="sc-badge featured">⭐ Featured</span>':''}
+        </div>
+      </div>
+      <div class="sc-body">
+        <div class="sc-name">${s.name}</div>
+        <div class="sc-type">${s.type==='mfg'?'Manufacturer':s.type==='dist'?'Distributor':'Importer'} · ${s.location}</div>
+        <div class="sc-tags">${s.tags.map(t=>`<span class="sc-tag">${t}</span>`).join('')}</div>
+        <div class="sc-meta">
+          <span class="sc-rating">${'★'.repeat(Math.floor(s.rating))} <span style="color:var(--muted);font-size:11px">${s.rating}</span></span>
+          <span class="sc-products" style="font-size:12px;color:var(--muted)">${s.products} products</span>
+          <span style="font-size:11px;font-weight:600;color:var(--accent2)">${s.commission}% commission</span>
+        </div>
+      </div>
+      <div class="sc-footer">
+        <div class="sc-btn primary" onclick="toast('Browsing ${s.name} catalogue…','success')">Browse Products</div>
+        <div class="sc-btn outline" onclick="toast('Quote request sent to ${s.name}!')">Request Quote</div>
+      </div>
+    </div>`).join('');
+}
+
+function filterSuppliers(q) {
+  const filtered = suppliers.filter(s=>s.name.toLowerCase().includes(q.toLowerCase())||s.tags.join(' ').toLowerCase().includes(q.toLowerCase()));
+  renderSuppliers(filtered);
+}
+
+function setSupFilter(btn,val) {
+  supFilter=val;
+  document.querySelectorAll('.filter-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderSuppliers(suppliers);
+}
+
+function renderMarkup() {
+  document.getElementById('markupList').innerHTML = markupData.map(m => {
+    const mClass = m.margin>=60?'great':m.margin>=40?'good':'ok';
+    return `<div class="markup-row">
+      <div><div class="mr-drug">${m.name}</div><div class="mr-supplier">via ${m.supplier}</div></div>
+      <div class="mr-prices">
+        <span class="mr-cost">UGX ${m.cost.toLocaleString()}</span>
+        <span style="color:var(--muted2);font-size:12px">→</span>
+        <span class="mr-sell">UGX ${m.sell.toLocaleString()}</span>
+        <span class="mr-margin ${mClass}">+${m.margin}% margin</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderOrderHistory() {
+  document.getElementById('orderHistory').innerHTML = supplierOrders.map(o => {
+    const sc = o.status==='delivered'?'in':o.status==='processing'?'processing':'pending';
+    return `<tr onclick="toast('Order ${o.id} details')">
+      <td style="font-weight:700;color:var(--accent);font-size:11px">${o.id}</td>
+      <td><strong>${o.supplier}</strong></td>
+      <td style="font-size:12px;color:var(--muted)">${o.products}</td>
+      <td style="font-weight:700">UGX ${o.total.toLocaleString()}</td>
+      <td style="color:var(--accent2);font-weight:600">UGX ${o.commission.toLocaleString()}</td>
+      <td style="color:var(--muted);font-size:12px">${o.date}</td>
+      <td><span class="pill ${sc}">${o.status}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════
+// INSURANCE
+// ══════════════════════════════════════════
+function renderClaimFlow() {
+  document.getElementById('claimFlow').innerHTML = claimFlow.map((s,i) => `
+    ${i>0?'<div class="cf-arrow">→</div>':''}
+    <div class="cf-step ${s.state}">
+      <div class="cf-num">${s.state==='done'?'✓':s.state==='active'?'●':s.num}</div>
+      <div class="cf-title">${s.title}</div>
+      <div class="cf-sub">${s.sub}</div>
+    </div>`).join('');
+}
+
+function renderInsurers() {
+  document.getElementById('insurerGrid').innerHTML = insurers.map(ins => `
+    <div class="insurer-card ${ins.status==='connected'?'connected':''}">
+      <div class="ins-header">
+        <div class="ins-logo" style="background:${ins.color}15;font-size:24px">${ins.logo}</div>
+        <div>
+          <div class="ins-name">${ins.name}</div>
+          <div class="ins-type">${ins.type}</div>
+          <div class="ins-status">
+            <div class="ins-dot ${ins.status}"></div>
+            <span style="color:${ins.status==='connected'?'var(--success)':ins.status==='pending'?'var(--warn)':'var(--muted2)'}">${ins.status==='connected'?'Connected':ins.status==='pending'?'Pending Accreditation':'Not Connected'}</span>
+          </div>
+        </div>
+      </div>
+      ${ins.status==='connected'?`
+      <div class="ins-stats">
+        <div class="ins-stat"><div class="ins-stat-val">${ins.claims}</div><div class="ins-stat-lbl">Claims this month</div></div>
+        <div class="ins-stat"><div class="ins-stat-val">UGX ${(ins.revenue/1000).toFixed(0)}K</div><div class="ins-stat-lbl">Revenue</div></div>
+        <div class="ins-stat"><div class="ins-stat-val">${ins.clients}</div><div class="ins-stat-lbl">Patients served</div></div>
+        <div class="ins-stat"><div class="ins-stat-val">${ins.fee}%</div><div class="ins-stat-lbl">MedVault fee</div></div>
+      </div>`:`<div style="padding:12px 0;color:var(--muted2);font-size:12px;line-height:1.5">Connect to start accepting ${ins.name} insured customers. Apply for accreditation below.</div>`}
+      <div class="ins-footer">
+        ${ins.status==='connected'
+          ?`<div class="ins-btn primary" onclick="toast('Submitting claim to ${ins.name}…')">+ Submit Claim</div><div class="ins-btn ghost" onclick="toast('${ins.name} claim history')">View Claims</div>`
+          :ins.status==='pending'
+          ?`<div class="ins-btn ghost" style="background:rgba(245,158,11,0.1);color:var(--warn)">⏳ Application Pending</div>`
+          :`<div class="ins-btn primary" onclick="toast('Accreditation form for ${ins.name} sent!')">Apply for Accreditation</div>`}
+      </div>
+    </div>`).join('');
+}
+
+let claimFilter = 'all';
+function renderClaims(data) {
+  const filtered = claimFilter==='all' ? data : data.filter(c=>c.status===claimFilter);
+  document.getElementById('claimsBody').innerHTML = filtered.map(c => `
+    <tr onclick="toast('Claim ${c.id}: ${c.status}')">
+      <td style="font-weight:700;color:var(--accent);font-size:11px">${c.id}</td>
+      <td><strong>${c.patient}</strong></td>
+      <td>${c.insurer}</td>
+      <td style="font-size:12px;color:var(--muted)">${c.drugs}</td>
+      <td style="font-weight:700">UGX ${c.amount.toLocaleString()}</td>
+      <td style="color:var(--accent2);font-weight:600">UGX ${c.fee.toLocaleString()}</td>
+      <td style="color:var(--muted);font-size:12px">${c.date}</td>
+      <td><span class="pill ${c.status}">${c.status}</span></td>
+    </tr>`).join('');
+}
+
+function setClaimFilter(btn,val) {
+  claimFilter=val;
+  document.querySelectorAll('.filter-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderClaims(claims);
+}
+
+// ══════════════════════════════════════════
+// EARNINGS
+// ══════════════════════════════════════════
+function renderEarnings() {
+  document.getElementById('earnGrid').innerHTML = earnings.map(e => `
+    <div class="earn-card">
+      <div class="earn-icon">${e.icon}</div>
+      <div class="earn-title">${e.title}</div>
+      <div class="earn-desc">${e.desc}</div>
+      <div class="earn-amount">${e.amount}</div>
+      <div class="earn-lbl">${e.lbl}</div>
+    </div>`).join('');
+
+  const breakdown = [
+    {label:'Subscriptions',amount:2350000,pct:50,color:'var(--accent)'},
+    {label:'Supplier Commissions',amount:960000,pct:20,color:'var(--accent2)'},
+    {label:'Insurance Processing',amount:780000,pct:17,color:'var(--purple)'},
+    {label:'Drug Markup',amount:620000,pct:13,color:'var(--gold)'},
+  ];
+  document.getElementById('earningBreakdown').innerHTML = breakdown.map(b => `
+    <div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:13px">
+        <span>${b.label}</span>
+        <span style="font-weight:600;font-family:var(--display)">UGX ${b.amount.toLocaleString()}</span>
+      </div>
+      <div style="height:8px;background:var(--s1);border-radius:4px;overflow:hidden">
+        <div style="height:100%;width:${b.pct}%;background:${b.color};border-radius:4px;transition:width 1s ease"></div>
+      </div>
+    </div>`).join('');
+
+  const projections = [
+    {pharmacies:50,mrr:'2.5M',arr:'30M'},{pharmacies:100,mrr:'5.2M',arr:'62M'},
+    {pharmacies:200,mrr:'11M',arr:'132M'},{pharmacies:500,mrr:'28M',arr:'336M'},
+  ];
+  document.getElementById('projections').innerHTML = `
+    <table style="width:100%;font-size:12px;border-collapse:collapse">
+      <thead><tr style="border-bottom:1px solid var(--border)"><th style="padding:8px;text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase">Pharmacies</th><th style="padding:8px;text-align:right;color:var(--muted);font-size:10px;text-transform:uppercase">Monthly</th><th style="padding:8px;text-align:right;color:var(--muted);font-size:10px;text-transform:uppercase">Annual</th></tr></thead>
+      <tbody>${projections.map((p,i)=>`<tr style="border-bottom:1px solid var(--border)${i===0?';background:rgba(0,200,150,0.04)':''}"><td style="padding:9px 8px;font-weight:600${i===0?';color:var(--accent2)':''}">${p.pharmacies}${i===0?' ← you are here':''}</td><td style="padding:9px 8px;text-align:right;font-weight:700">UGX ${p.mrr}</td><td style="padding:9px 8px;text-align:right;font-weight:700;color:var(--accent2)">UGX ${p.arr}</td></tr>`).join('')}</tbody>
+    </table>`;
+}
+
+function renderPayouts() {
+  document.getElementById('payoutHistory').innerHTML = payouts.map(p => `
+    <tr>
+      <td style="color:var(--muted);font-size:12px">${p.date}</td>
+      <td><strong>${p.source}</strong></td>
+      <td style="font-size:12px;color:var(--muted)">${p.desc}</td>
+      <td style="font-weight:700;font-family:var(--display)">UGX ${p.amount.toLocaleString()}</td>
+      <td style="font-size:12px">${p.method}</td>
+      <td><span class="pill ${p.status}">${p.status}</span></td>
+    </tr>`).join('');
+}
+
+// ══════════════════════════════════════════
+// MODALS
+// ══════════════════════════════════════════
+function openSupplierModal() {
+  document.getElementById('modal1Title').textContent = '🏭 List Your Products on MedVault';
+  document.getElementById('modal1Sub').textContent = 'Reach 47+ pharmacies across Uganda instantly';
+  document.getElementById('modal1Content').innerHTML = `
+    <div class="fg"><label class="fl">Company Name</label><input class="fi" placeholder="e.g. Cipla Quality Chemical Ltd"/></div>
+    <div class="form-row">
+      <div class="fg"><label class="fl">Company Type</label><select class="fsel"><option>Manufacturer</option><option>Distributor</option><option>Importer</option></select></div>
+      <div class="fg"><label class="fl">Contact Phone</label><input class="fi" placeholder="07XX XXX XXX"/></div>
+    </div>
+    <div class="fg"><label class="fl">Product Categories</label><input class="fi" placeholder="e.g. Generics, Antimalarials, Antibiotics"/></div>
+    <div class="form-row">
+      <div class="fg"><label class="fl">Number of Products</label><input class="fi" type="number" placeholder="e.g. 250"/></div>
+      <div class="fg"><label class="fl">Listing Fee (UGX/mo)</label><input class="fi" value="200,000" readonly style="color:var(--accent2)"/></div>
+    </div>
+    <div style="background:rgba(0,200,150,0.06);border:1px solid rgba(0,200,150,0.15);border-radius:8px;padding:12px;font-size:12px;color:var(--muted);line-height:1.6">
+      💡 <strong>How it works:</strong> You pay UGX 200,000/month to list. MedVault also takes 3–8% commission per order placed. In return, you get direct access to all pharmacies on our network with zero sales team needed.
+    </div>`;
+  document.getElementById('modal1Footer').innerHTML = `
+    <button class="btn" style="background:var(--s1);color:var(--text)" onclick="closeModal('overlay1')">Cancel</button>
+    <button class="btn btn-accent" onclick="closeModal('overlay1');toast('✅ Supplier application submitted! We will contact you within 2 days.','success')">Submit Application</button>`;
+  document.getElementById('overlay1').classList.add('open');
+}
+
+function openOrderModal() {
+  document.getElementById('modal1Title').textContent = '📦 Place Supplier Order';
+  document.getElementById('modal1Sub').textContent = 'Order drugs from verified suppliers through MedVault';
+  document.getElementById('modal1Content').innerHTML = `
+    <div class="fg"><label class="fl">Select Supplier</label><select class="fsel"><option>Cipla Quality Chemical</option><option>Novartis East Africa</option><option>Abacus Pharma</option><option>JMS Uganda</option></select></div>
+    <div class="fg"><label class="fl">Drug Name</label><input class="fi" placeholder="e.g. Paracetamol 500mg"/></div>
+    <div class="form-row">
+      <div class="fg"><label class="fl">Quantity</label><input class="fi" type="number" placeholder="e.g. 500"/></div>
+      <div class="fg"><label class="fl">Unit Cost (UGX)</label><input class="fi" type="number" placeholder="Auto-filled from catalogue"/></div>
+    </div>
+    <div class="fg"><label class="fl">Delivery Address</label><input class="fi" placeholder="Your pharmacy address"/></div>
+    <div style="background:var(--s1);border-radius:8px;padding:12px;font-size:12px;color:var(--muted);line-height:1.6">
+      📋 MedVault takes 3–8% commission. Payment via MTN MoMo or Airtel Money. Delivery 2–3 business days to Kampala.
+    </div>`;
+  document.getElementById('modal1Footer').innerHTML = `
+    <button class="btn" style="background:var(--s1);color:var(--text)" onclick="closeModal('overlay1')">Cancel</button>
+    <button class="btn btn-accent" onclick="closeModal('overlay1');toast('✅ Order placed! Supplier will confirm within 4 hours.','success')">Place Order</button>`;
+  document.getElementById('overlay1').classList.add('open');
+}
+
+function openClaimModal() {
+  document.getElementById('modal1Title').textContent = '🏥 Submit Insurance Claim';
+  document.getElementById('modal1Sub').textContent = 'Submit on behalf of an insured customer';
+  document.getElementById('modal1Content').innerHTML = `
+    <div class="form-row">
+      <div class="fg"><label class="fl">Patient Name</label><input class="fi" placeholder="Full name"/></div>
+      <div class="fg"><label class="fl">Insurance Card Number</label><input class="fi" placeholder="e.g. AAR-2024-78901"/></div>
+    </div>
+    <div class="form-row">
+      <div class="fg"><label class="fl">Insurance Company</label><select class="fsel"><option>AAR Insurance Uganda</option><option>Jubilee Insurance</option><option>ICEA Lion Uganda</option><option>UAP Old Mutual</option></select></div>
+      <div class="fg"><label class="fl">Date of Service</label><input class="fi" type="date"/></div>
+    </div>
+    <div class="fg"><label class="fl">Drugs Dispensed</label><input class="fi" placeholder="e.g. Coartem 6-tabs ×1, Paracetamol 500mg ×6"/></div>
+    <div class="form-row">
+      <div class="fg"><label class="fl">Total Amount (UGX)</label><input class="fi" type="number" placeholder="e.g. 18000"/></div>
+      <div class="fg"><label class="fl">Doctor's Prescription No.</label><input class="fi" placeholder="If available"/></div>
+    </div>
+    <div style="background:rgba(0,82,255,0.05);border:1px solid rgba(0,82,255,0.12);border-radius:8px;padding:12px;font-size:12px;color:var(--muted);line-height:1.6">
+      ℹ️ MedVault processes the claim with the insurer. You receive payment within 14–30 days, minus <strong>2–5% processing fee</strong>. Rejected claims are investigated and resubmitted once.
+    </div>`;
+  document.getElementById('modal1Footer').innerHTML = `
+    <button class="btn" style="background:var(--s1);color:var(--text)" onclick="closeModal('overlay1')">Cancel</button>
+    <button class="btn btn-accent" onclick="closeModal('overlay1');toast('✅ Claim CLM-2026-0048 submitted to insurer!','success')">Submit Claim</button>`;
+  document.getElementById('overlay1').classList.add('open');
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// TOAST
+let _tt;
+function toast(msg, type='') {
+  const t=document.getElementById('toast');
+  document.getElementById('toastMsg').textContent=msg;
+  t.className='toast '+(type==='success'?'success':type==='warn'?'warn':'');
+  t.classList.add('show');
+  clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),4000);
+}
+
+// INIT
+renderSuppliers(suppliers);
+renderMarkup();
+renderOrderHistory();
+</script>
+</body>
+</html>
