@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Page Not Found — MedVault</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+:root{--bg:#07090f;--s1:#0d1117;--s2:#131920;--border:rgba(255,255,255,0.07);--accent:#00e5b0;--accent2:#3b82f6;--text:#eef2ff;--muted:#6b7a99;--font:'Outfit',sans-serif;--display:'Syne',sans-serif;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:var(--font);background:var(--bg);color:var(--text);overflow-x:hidden;min-height:100vh;display:flex;flex-direction:column;}
+a{text-decoration:none;color:inherit;}
+
+nav{position:fixed;top:0;left:0;right:0;z-index:50;padding:0 40px;height:64px;display:flex;align-items:center;justify-content:space-between;background:rgba(7,9,15,0.85);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);}
+.nav-logo{display:flex;align-items:center;gap:10px;}
+.nav-logo-icon{width:34px;height:34px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;box-shadow:0 0 16px rgba(0,229,176,0.25);}
+.nav-logo-text{font-family:var(--display);font-weight:800;font-size:19px;letter-spacing:-0.5px;}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 20px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all 0.2s;font-family:var(--font);}
+.btn-accent{background:var(--accent);color:#000;}
+.btn-accent:hover{filter:brightness(1.1);transform:translateY(-1px);}
+.btn-ghost{background:transparent;color:var(--text);border:1px solid var(--border);}
+.btn-ghost:hover{background:var(--s2);}
+
+.error-page{flex:1;display:flex;align-items:center;justify-content:center;padding:140px 40px 100px;text-align:center;position:relative;overflow:hidden;}
+.error-page::before{content:'';position:absolute;width:600px;height:600px;background:radial-gradient(circle,rgba(0,229,176,0.08),transparent 70%);top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;}
+.error-content{position:relative;z-index:1;max-width:520px;}
+.error-code{font-family:var(--display);font-size:120px;font-weight:800;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1;margin-bottom:16px;}
+.error-title{font-family:var(--display);font-size:28px;font-weight:700;margin-bottom:12px;}
+.error-desc{color:var(--muted);font-size:16px;line-height:1.6;margin-bottom:32px;}
+.error-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;}
+
+@media(max-width:600px){
+  nav{padding:0 16px;}
+  .error-code{font-size:80px;}
+  .error-title{font-size:22px;}
+  .error-page{padding:120px 20px 60px;}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">
+    <div class="nav-logo-icon">💊</div>
+    <span class="nav-logo-text">MedVault</span>
+  </a>
+</nav>
+
+<main class="error-page">
+  <div class="error-content">
+    <div class="error-code">404</div>
+    <h1 class="error-title">Page not found</h1>
+    <p class="error-desc">The page you're looking for doesn't exist or may have been moved. Let's get you back on track.</p>
+    <div class="error-actions">
+      <a href="/" class="btn btn-accent">Back to Home</a>
+      <a href="/app" class="btn btn-ghost">Open Dashboard</a>
+      <a href="/order" class="btn btn-ghost">Order Medicines</a>
+    </div>
+  </div>
+</main>
+
+</body>
+</html>

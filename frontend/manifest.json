@@ -2,7 +2,7 @@
   "name": "MedVault Pharmacy",
   "short_name": "MedVault",
   "description": "Uganda's #1 Pharmacy Management System",
-  "start_url": "/medvault-offline.html",
+  "start_url": "/app",
   "display": "standalone",
   "background_color": "#0a0f1e",
   "theme_color": "#00d4aa",
@@ -23,7 +23,7 @@
   ],
   "screenshots": [
     {
-      "src": "/medvault-offline.html",
+      "src": "/app",
       "sizes": "390x844",
       "type": "text/html",
       "form_factor": "narrow",
@@ -40,21 +40,21 @@
       "name": "New Sale",
       "short_name": "Sale",
       "description": "Record a new sale",
-      "url": "/medvault-offline.html#sales",
+      "url": "/app#sales",
       "icons": [{ "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><text y='80' font-size='80'>🧾</text></svg>", "sizes": "96x96" }]
     },
     {
       "name": "Inventory",
       "short_name": "Stock",
       "description": "Check drug inventory",
-      "url": "/medvault-offline.html#inventory",
+      "url": "/app#inventory",
       "icons": [{ "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><text y='80' font-size='80'>📦</text></svg>", "sizes": "96x96" }]
     },
     {
       "name": "Orders",
       "short_name": "Orders",
       "description": "View incoming orders",
-      "url": "/medvault-offline.html#orders",
+      "url": "/app#orders",
       "icons": [{ "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><text y='80' font-size='80'>🛒</text></svg>", "sizes": "96x96" }]
     }
   ]
