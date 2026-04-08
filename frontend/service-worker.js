@@ -6,6 +6,11 @@
 
 const CACHE_NAME = 'medvault-v1';
 const CACHE_URLS = [
+  '/',
+  '/app',
+  '/order',
+  '/ai',
+  '/suppliers',
   '/app.html',
   '/order.html',
   'https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap',
