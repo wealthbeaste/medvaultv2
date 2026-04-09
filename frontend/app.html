@@ -235,6 +235,16 @@
   .overlay.open{display:flex;}
   .rmodal{background:#fff;color:#111;width:340px;max-width:90vw;border-radius:8px;overflow:hidden;animation:modalIn 0.25s ease;box-shadow:0 30px 80px rgba(0,0,0,0.6);font-family:'DM Sans',sans-serif;}
   @keyframes modalIn{from{opacity:0;transform:scale(0.95) translateY(16px)}to{opacity:1;transform:scale(1) translateY(0)}}
+  .add-drug-modal{background:var(--surface);color:var(--text);width:520px;max-width:94vw;border-radius:16px;overflow:hidden;animation:modalIn 0.25s ease;box-shadow:0 30px 80px rgba(0,0,0,0.6);max-height:90vh;overflow-y:auto;}
+  .adm-head{display:flex;justify-content:space-between;align-items:center;padding:20px 24px;border-bottom:1px solid var(--border);}
+  .adm-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:20px 24px;}
+  .adm-field{display:flex;flex-direction:column;gap:5px;}
+  .adm-field.full{grid-column:1/-1;}
+  .adm-field label{font-size:12px;font-weight:600;color:var(--muted);}
+  .adm-field input,.adm-field select{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;font-family:inherit;outline:none;transition:border-color 0.2s;}
+  .adm-field input:focus,.adm-field select:focus{border-color:var(--accent);}
+  .adm-actions{display:flex;justify-content:flex-end;gap:10px;padding:16px 24px;border-top:1px solid var(--border);}
+  @media(max-width:540px){.adm-grid{grid-template-columns:1fr;}}
   .rpaper{padding:24px 24px 16px;}
   .rtop{text-align:center;margin-bottom:14px;}
   .rlogo{font-family:'Syne',sans-serif;font-weight:800;font-size:20px;color:#0a0f1e;}
@@ -371,7 +381,7 @@
     <div class="topbar-right">
       <button class="btn btn-wa" onclick="go('whatsapp',document.querySelectorAll('.nav-item')[6])">💬 WhatsApp</button>
       <button class="btn btn-ghost" onclick="manualSync()">🔄 Sync</button>
-      <button class="btn btn-primary" onclick="handleTopBtn()">+ Add Drug</button>
+      <button class="btn btn-primary" onclick="openAddDrug()">+ Add Drug</button>
     </div>
   </div>
 
@@ -413,7 +423,7 @@
       <button class="fb" onclick="setInvF(this,'ok')">✅ In Stock</button>
       <button class="fb" onclick="setInvF(this,'low')">⚠️ Low</button>
       <button class="fb" onclick="setInvF(this,'critical')">🚨 Critical</button>
-      <button class="btn btn-primary" style="margin-left:auto;padding:8px 16px;font-size:12px" onclick="toast('Add Drug — works offline too!')">+ Add Drug</button>
+      <button class="btn btn-primary" style="margin-left:auto;padding:8px 16px;font-size:12px" onclick="openAddDrug()">+ Add Drug</button>
     </div>
     <div class="card"><table class="tbl"><thead><tr><th>Drug Name</th><th>Category</th><th>Stock</th><th>Level</th><th>Unit Price</th><th>Expiry</th><th>Status</th><th>Actions</th></tr></thead><tbody id="invBody"></tbody></table></div>
   </div>
@@ -650,6 +660,72 @@ Or open: https://app.medvault.ug</div>
 
 <div class="toast" id="toast"><span id="toastMsg"></span></div>
 
+<!-- ADD DRUG MODAL -->
+<div class="overlay" id="addDrugOverlay" onclick="if(event.target===this)closeAddDrug()">
+  <div class="add-drug-modal">
+    <div class="adm-head">
+      <h3 style="margin:0;font-family:'Syne',sans-serif;font-size:18px">💊 Add New Drug</h3>
+      <button class="ab" onclick="closeAddDrug()" style="font-size:18px">✕</button>
+    </div>
+    <form id="addDrugForm" onsubmit="submitAddDrug(event)">
+      <div class="adm-grid">
+        <div class="adm-field full">
+          <label>Drug Name <span style="color:var(--danger)">*</span></label>
+          <input type="text" id="adName" placeholder="e.g. Paracetamol 500mg" required />
+        </div>
+        <div class="adm-field">
+          <label>Category</label>
+          <select id="adCategory">
+            <option value="">Select…</option>
+            <option value="Analgesics">Analgesics</option>
+            <option value="Antibiotics">Antibiotics</option>
+            <option value="Antimalarials">Antimalarials</option>
+            <option value="Antihistamines">Antihistamines</option>
+            <option value="Vitamins">Vitamins</option>
+            <option value="Supplements">Supplements</option>
+            <option value="Antacids">Antacids</option>
+            <option value="Antifungals">Antifungals</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="adm-field">
+          <label>Quantity <span style="color:var(--danger)">*</span></label>
+          <input type="number" id="adQty" placeholder="100" min="1" required />
+        </div>
+        <div class="adm-field">
+          <label>Unit Price (UGX) <span style="color:var(--danger)">*</span></label>
+          <input type="number" id="adPrice" placeholder="5000" min="0" required />
+        </div>
+        <div class="adm-field">
+          <label>Cost Price (UGX)</label>
+          <input type="number" id="adCost" placeholder="3000" min="0" />
+        </div>
+        <div class="adm-field">
+          <label>Expiry Date</label>
+          <input type="date" id="adExpiry" />
+        </div>
+        <div class="adm-field">
+          <label>Supplier</label>
+          <input type="text" id="adSupplier" placeholder="e.g. Cipla" />
+        </div>
+        <div class="adm-field">
+          <label>Restock Threshold</label>
+          <input type="number" id="adThreshold" placeholder="20" min="0" />
+        </div>
+        <div class="adm-field">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="adRx" style="width:auto" /> Requires Prescription
+          </label>
+        </div>
+      </div>
+      <div class="adm-actions">
+        <button type="button" class="btn btn-ghost" onclick="closeAddDrug()">Cancel</button>
+        <button type="submit" class="btn btn-primary">💊 Add Drug</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
 // ═══════════════════════════════════════════════════════════
 // OFFLINE ENGINE (inline — no import needed)
@@ -684,7 +760,12 @@ const MedVaultOffline = {
         fetch(this.API_BASE+'/api/customers',{headers:h}).then(r=>r.json()),
       ]);
       const db=this.getDB();
-      if(inv.drugs) db.drugs=inv.drugs;
+      if(inv.drugs) {
+        const offlineDrugs=(db.drugs||[]).filter(d=>d._offline&&!d._synced);
+        const serverIds=new Set(inv.drugs.map(d=>d.id));
+        const mergedDrugs=[...inv.drugs,...offlineDrugs.filter(d=>!serverIds.has(d.id))];
+        db.drugs=mergedDrugs;
+      }
       if(sales.sales) db.sales=sales.sales;
       if(orders.orders) db.orders=orders.orders;
       if(customers.customers) db.customers=customers.customers;
@@ -735,6 +816,16 @@ const MedVaultOffline = {
     return drugs.map(d=>({...d,stock_status:d.stock_status||this._calcStatus(d),days_to_expiry:d.expiry_date?Math.ceil((new Date(d.expiry_date)-new Date())/86400000):999}));
   },
   _calcStatus(d){ if(d.quantity===0)return'out'; if(d.quantity<=d.threshold)return'critical'; if(d.quantity<=d.threshold*1.5)return'low'; return'ok'; },
+
+  addDrugLocal(drugData){
+    const drugs=this.getTable('drugs');
+    const newDrug={id:Date.now(),...drugData,stock_status:this._calcStatus({quantity:drugData.quantity,threshold:drugData.threshold||20}),created_at:new Date().toISOString(),_offline:true};
+    drugs.push(newDrug);
+    this.saveTable('drugs',drugs);
+    this.queueAction({type:'add_drug',method:'POST',url:'/api/inventory',body:drugData});
+    return newDrug;
+  },
+
   getSales(limit=50){ return this.getTable('sales').slice(0,limit); },
   getOrders(status=''){ const o=this.getTable('orders'); return status?o.filter(x=>x.order_status===status):o; },
   getCustomers(){ return this.getTable('customers'); },
@@ -937,7 +1028,55 @@ function loadPage(page) {
 
 function handleTopBtn() {
   if (currentPage === 'sales') { document.getElementById('drugSrch').focus(); }
-  else { showToast('Add Drug — saves locally if offline!'); }
+  else { openAddDrug(); }
+}
+
+function openAddDrug() {
+  document.getElementById('addDrugForm').reset();
+  document.getElementById('addDrugOverlay').classList.add('open');
+}
+
+function closeAddDrug() {
+  document.getElementById('addDrugOverlay').classList.remove('open');
+}
+
+function submitAddDrug(e) {
+  e.preventDefault();
+  try {
+    const name = document.getElementById('adName').value.trim();
+    const qtyVal = document.getElementById('adQty').value;
+    const priceVal = document.getElementById('adPrice').value;
+    const quantity = parseInt(qtyVal, 10);
+    const unit_price = parseFloat(priceVal);
+
+    if (!name || isNaN(quantity) || quantity < 1 || isNaN(unit_price) || unit_price <= 0) {
+      showToast('Please fill in name, quantity (min 1), and unit price', 'error');
+      return;
+    }
+
+    const drugData = {
+      name,
+      category: document.getElementById('adCategory').value || '',
+      quantity,
+      max_quantity: quantity,
+      unit_price,
+      cost_price: parseFloat(document.getElementById('adCost').value) || 0,
+      expiry_date: document.getElementById('adExpiry').value || null,
+      supplier: document.getElementById('adSupplier').value.trim(),
+      threshold: parseInt(document.getElementById('adThreshold').value, 10) || 20,
+      requires_rx: document.getElementById('adRx').checked,
+    };
+
+    MedVaultOffline.addDrugLocal(drugData);
+    closeAddDrug();
+    showToast('Drug added successfully!');
+    allDrugs = MedVaultOffline.getDrugs();
+    if (currentPage === 'inventory') loadInventory();
+    if (currentPage === 'dashboard') loadDashboard();
+  } catch (err) {
+    console.error('[AddDrug] Error:', err);
+    showToast('Error adding drug: ' + err.message, 'error');
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1343,7 +1482,21 @@ function toast(msg,type=''){showToast(msg,type);}
 // Register service worker for true offline PWA
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./service-worker.js')
-    .then(() => console.log('[App] Service Worker registered'))
+    .then(reg => {
+      console.log('[App] Service Worker registered');
+      // When a new SW is found and activates, reload to get latest code
+      reg.addEventListener('updatefound', () => {
+        const newSW = reg.installing;
+        if (newSW) {
+          newSW.addEventListener('statechange', () => {
+            if (newSW.state === 'activated' && navigator.serviceWorker.controller) {
+              console.log('[App] New SW activated — reloading for latest code');
+              window.location.reload();
+            }
+          });
+        }
+      });
+    })
     .catch(e => console.log('[App] SW registration failed:', e));
 
   // Listen for sync messages from service worker
