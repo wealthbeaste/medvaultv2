@@ -4,7 +4,7 @@
 // Save this as: service-worker.js (in the same folder as your HTML)
 // ============================================================
 
-const CACHE_NAME = 'medvault-v1';
+const CACHE_NAME = 'medvault-v4';
 const CACHE_URLS = [
   '/',
   '/app',
@@ -61,22 +61,40 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // App files: try cache first, then network
+  // HTML pages: network first so users always get latest code
+  const isHTML = url.pathname.endsWith('.html') || url.pathname === '/' ||
+    ['/app','/order','/ai','/suppliers'].includes(url.pathname);
+
+  if (isHTML) {
+    event.respondWith(
+      fetch(event.request).then(fresh => {
+        // Cache the fresh response for offline use
+        const clone = fresh.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        return fresh;
+      }).catch(() =>
+        // Offline: fall back to cache
+        caches.match(event.request).then(cached =>
+          cached || new Response('<h1>MedVault is offline</h1><p>Please reconnect to the internet.</p>', {
+            headers: { 'Content-Type': 'text/html' }
+          })
+        )
+      )
+    );
+    return;
+  }
+
+  // Static assets (fonts, images): cache first, background update
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) {
-        // Return cached version immediately
-        // Also fetch fresh version in background for next time
         fetch(event.request).then(fresh => {
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, fresh));
         }).catch(() => {});
         return cached;
       }
-      // Not in cache, try network
       return fetch(event.request).catch(() =>
-        new Response('<h1>MedVault is offline</h1><p>Please reconnect to the internet.</p>', {
-          headers: { 'Content-Type': 'text/html' }
-        })
+        new Response('', { status: 503 })
       );
     })
   );
