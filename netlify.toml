@@ -1,12 +1,11 @@
-# Netlify configuration
-# This file tells Netlify exactly how to serve MedVault
-
 [build]
   publish = "frontend"
-  command = "echo 'No build needed - pure HTML'"
+  command = ""
 
-# -- URL redirects --
-# Makes URLs cleaner - /app instead of /app.html
+[build.environment]
+  NODE_VERSION = "20"
+  NPM_FLAGS = "--no-install"
+
 [[redirects]]
   from = "/app"
   to = "/app.html"
@@ -32,7 +31,16 @@
   to = "/suppliers.html"
   status = 200
 
-# -- Security headers --
+[[redirects]]
+  from = "/medvault-connected.html"
+  to = "/app.html"
+  status = 200
+
+[[redirects]]
+  from = "/medvault-offline.html"
+  to = "/app.html"
+  status = 200
+
 [[headers]]
   for = "/*"
   [headers.values]
@@ -40,7 +48,6 @@
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
 
-# -- Cache static assets --
 [[headers]]
   for = "/service-worker.js"
   [headers.values]
