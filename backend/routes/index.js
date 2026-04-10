@@ -1,9 +1,10 @@
 // ============================================================
-// MedVault API Routes
-// All endpoints in one place — easy to read and modify
+// MedVault V2 — All API Routes
+// PostgreSQL-backed, multi-branch, real data
 // ============================================================
+'use strict';
 
-const { helpers, db } = require('../database/memdb');
+const { query, getNextReceiptNumber } = require('../database/db');
 const { hash, compare } = require('../core/password');
 const { sign } = require('../core/jwt');
 const auth = require('../middleware/auth');
@@ -13,15 +14,81 @@ module.exports = function registerRoutes(app) {
   // ══════════════════════════════════════════════════════════
   // HEALTH CHECK
   // ══════════════════════════════════════════════════════════
-
   app.get('/health', async (req, res) => {
-    res.json({ status: 'ok', service: 'MedVault API', time: new Date() });
+    try {
+      await query('SELECT 1');
+      res.json({ status: 'ok', service: 'MedVault API v2', db: 'connected', time: new Date() });
+    } catch (e) {
+      res.json({ status: 'ok', service: 'MedVault API v2', db: 'error: ' + e.message, time: new Date() });
+    }
   });
 
+  // ══════════════════════════════════════════════════════════
+  // AUTH — Register & Login
+  // ══════════════════════════════════════════════════════════
 
-  // ══════════════════════════════════════════════════════════
-  // AUTH — Login & Register
-  // ══════════════════════════════════════════════════════════
+  // POST /api/auth/register
+  app.post('/api/auth/register', async (req, res) => {
+    const { orgName, ownerName, email, phone, password, plan } = req.body;
+    if (!orgName || !ownerName || !email || !phone || !password)
+      return res.json({ error: 'All fields required: orgName, ownerName, email, phone, password' }, 400);
+
+    try {
+      // Check email not taken
+      const exists = await query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
+      if (exists.rows.length > 0)
+        return res.json({ error: 'Email already registered. Please log in.' }, 409);
+
+      const pwHash = await hash(password);
+      const selectedPlan = plan || 'single';
+
+      // Create organisation
+      const orgRes = await query(
+        `INSERT INTO organisations (name, owner_name, email, phone, plan)
+         VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+        [orgName, ownerName, email.toLowerCase(), phone, selectedPlan]
+      );
+      const orgId = orgRes.rows[0].id;
+
+      // Create first pharmacy (head office)
+      const pharmaRes = await query(
+        `INSERT INTO pharmacies (organisation_id, name, address, phone, is_head_office)
+         VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+        [orgId, orgName, req.body.address || '', phone, true]
+      );
+      const pharmacyId = pharmaRes.rows[0].id;
+
+      // Create owner user
+      const userRes = await query(
+        `INSERT INTO users (organisation_id, pharmacy_id, name, email, password_hash, role)
+         VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, name, email, role`,
+        [orgId, pharmacyId, ownerName, email.toLowerCase(), pwHash, 'owner']
+      );
+      const user = userRes.rows[0];
+
+      // Create trial subscription
+      const prices = { drug_shop: 20000, single: 50000, branch: 40000, chain: 30000, enterprise: 20000 };
+      await query(
+        `INSERT INTO subscriptions (organisation_id, plan, branch_count, amount_ugx, status)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [orgId, selectedPlan, 1, prices[selectedPlan] || 50000, 'trial']
+      );
+
+      const token = sign({ userId: user.id, orgId, pharmacyId, role: user.role });
+
+      res.json({
+        message: '✅ Account created! 14-day free trial started.',
+        token,
+        user: {
+          id: user.id, name: user.name, email: user.email, role: user.role,
+          orgId, orgName, pharmacyId, plan: selectedPlan,
+        },
+      });
+    } catch (e) {
+      console.error('Register error:', e.message);
+      res.json({ error: 'Registration failed: ' + e.message }, 500);
+    }
+  });
 
   // POST /api/auth/login
   app.post('/api/auth/login', async (req, res) => {
@@ -29,365 +96,633 @@ module.exports = function registerRoutes(app) {
     if (!email || !password)
       return res.json({ error: 'Email and password required' }, 400);
 
-    const user = helpers.findOne('users', { email: email.toLowerCase(), is_active: true });
-    if (!user || !compare(password, user.password_hash))
-      return res.json({ error: 'Invalid email or password' }, 401);
+    try {
+      const result = await query(
+        `SELECT u.id, u.name, u.email, u.password_hash, u.role,
+                u.organisation_id, u.pharmacy_id, u.is_active,
+                o.name as org_name, o.plan,
+                p.name as pharmacy_name
+         FROM users u
+         JOIN organisations o ON o.id = u.organisation_id
+         LEFT JOIN pharmacies p ON p.id = u.pharmacy_id
+         WHERE u.email = $1`,
+        [email.toLowerCase()]
+      );
 
-    const pharmacy = helpers.findOne('pharmacies', { id: user.pharmacy_id });
-    user.last_login = new Date();
+      if (!result.rows.length)
+        return res.json({ error: 'No account found with this email' }, 401);
 
-    const token = sign({
-      userId: user.id,
-      pharmacyId: user.pharmacy_id,
-      role: user.role,
-      name: user.name,
-    });
+      const user = result.rows[0];
+      if (!user.is_active)
+        return res.json({ error: 'Account suspended. Contact support.' }, 403);
 
-    res.json({
-      message: 'Login successful! Welcome back, ' + user.name,
-      token,
-      user: {
-        id: user.id, name: user.name, email: user.email,
-        role: user.role, pharmacyId: user.pharmacy_id,
-        pharmacyName: pharmacy?.name, plan: pharmacy?.plan,
-      },
-    });
+      const valid = await compare(password, user.password_hash);
+      if (!valid)
+        return res.json({ error: 'Incorrect password' }, 401);
+
+      const token = sign({
+        userId: user.id, orgId: user.organisation_id,
+        pharmacyId: user.pharmacy_id, role: user.role,
+      });
+
+      res.json({
+        token,
+        user: {
+          id: user.id, name: user.name, email: user.email, role: user.role,
+          orgId: user.organisation_id, orgName: user.org_name,
+          pharmacyId: user.pharmacy_id, pharmacyName: user.pharmacy_name,
+          plan: user.plan,
+        },
+      });
+    } catch (e) {
+      console.error('Login error:', e.message);
+      res.json({ error: 'Login failed: ' + e.message }, 500);
+    }
   });
 
-  // POST /api/auth/register
-  app.post('/api/auth/register', async (req, res) => {
-    const { pharmacyName, address, phone, email, password } = req.body;
-    if (!pharmacyName || !email || !password)
-      return res.json({ error: 'Pharmacy name, email and password required' }, 400);
-    if (password.length < 6)
-      return res.json({ error: 'Password must be at least 6 characters' }, 400);
-    if (helpers.findOne('users', { email: email.toLowerCase() }))
-      return res.json({ error: 'Account with this email already exists' }, 409);
-
-    const pharmacy = helpers.insert('pharmacies', {
-      name: pharmacyName, address, phone,
-      email: email.toLowerCase(), plan: 'basic', is_active: true,
-    });
-
-    const user = helpers.insert('users', {
-      pharmacy_id: pharmacy.id,
-      name: pharmacyName + ' Admin',
-      email: email.toLowerCase(),
-      password_hash: hash(password),
-      role: 'admin', is_active: true,
-    });
-
-    helpers.insert('subscriptions', {
-      pharmacy_id: pharmacy.id, plan: 'basic',
-      amount: 20000, status: 'trial',
-      next_billing: new Date(Date.now() + 14*86400000),
-    });
-
-    const token = sign({ userId: user.id, pharmacyId: pharmacy.id, role: 'admin', name: user.name });
-    res.json({ message: '14-day free trial started!', token, user: { ...user, pharmacyName } });
-  });
-
-  // GET /api/auth/me  (protected)
+  // GET /api/auth/me
   app.get('/api/auth/me', auth, async (req, res) => {
-    const user = helpers.findOne('users', { id: req.user.userId });
-    const pharmacy = helpers.findOne('pharmacies', { id: req.user.pharmacyId });
-    if (!user) return res.json({ error: 'User not found' }, 404);
-    res.json({ ...user, password_hash: undefined, pharmacy });
+    try {
+      const result = await query(
+        `SELECT u.id, u.name, u.email, u.role,
+                u.organisation_id, u.pharmacy_id,
+                o.name as org_name, o.plan,
+                p.name as pharmacy_name, p.address, p.is_head_office,
+                s.status as sub_status, s.trial_ends_at, s.next_billing
+         FROM users u
+         JOIN organisations o ON o.id = u.organisation_id
+         LEFT JOIN pharmacies p ON p.id = u.pharmacy_id
+         LEFT JOIN subscriptions s ON s.organisation_id = u.organisation_id
+         WHERE u.id = $1
+         ORDER BY s.created_at DESC LIMIT 1`,
+        [req.user.userId]
+      );
+      if (!result.rows.length) return res.json({ error: 'User not found' }, 404);
+      res.json({ user: result.rows[0] });
+    } catch (e) {
+      res.json({ error: e.message }, 500);
+    }
   });
 
-
   // ══════════════════════════════════════════════════════════
-  // DASHBOARD — Stats & Charts
+  // DASHBOARD
   // ══════════════════════════════════════════════════════════
-
-  // GET /api/dashboard
   app.get('/api/dashboard', auth, async (req, res) => {
     const { pharmacyId } = req.user;
-    const allDrugs = helpers.find('drugs', { pharmacy_id: pharmacyId });
-    const recentSales = helpers.find('sales', { pharmacy_id: pharmacyId })
-      .sort((a,b) => new Date(b.created_at) - new Date(a.created_at))
-      .slice(0, 5);
+    try {
+      const today = new Date().toISOString().split('T')[0];
 
-    const today = new Date().toDateString();
-    const todaySales = helpers.find('sales', { pharmacy_id: pharmacyId })
-      .filter(s => new Date(s.created_at).toDateString() === today);
+      const [revRes, txRes, lowRes, expRes, weekRes, recentRes] = await Promise.all([
+        query(`SELECT COALESCE(SUM(total_amount),0) as rev FROM sales WHERE pharmacy_id=$1 AND DATE(created_at)=CURRENT_DATE`, [pharmacyId]),
+        query(`SELECT COUNT(*) as cnt FROM sales WHERE pharmacy_id=$1 AND DATE(created_at)=CURRENT_DATE`, [pharmacyId]),
+        query(`SELECT COUNT(*) as cnt FROM drugs WHERE pharmacy_id=$1 AND quantity <= threshold`, [pharmacyId]),
+        query(`SELECT COUNT(*) as cnt FROM drugs WHERE pharmacy_id=$1 AND expiry_date IS NOT NULL AND expiry_date <= CURRENT_DATE + INTERVAL '30 days' AND expiry_date >= CURRENT_DATE`, [pharmacyId]),
+        query(`SELECT DATE(created_at) as day, COALESCE(SUM(total_amount),0) as revenue FROM sales WHERE pharmacy_id=$1 AND created_at >= CURRENT_DATE - INTERVAL '6 days' GROUP BY DATE(created_at) ORDER BY day`, [pharmacyId]),
+        query(`SELECT id, customer_name, total_amount, payment_method, created_at FROM sales WHERE pharmacy_id=$1 ORDER BY created_at DESC LIMIT 5`, [pharmacyId]),
+      ]);
 
-    res.json({
-      revenueToday: todaySales.reduce((s,x) => s + x.total_amount, 0),
-      transactionsToday: todaySales.length,
-      lowStockCount: allDrugs.filter(d => d.quantity <= d.threshold).length,
-      expiringCount: allDrugs.filter(d => helpers.daysToExpiry(d) <= 30 && helpers.daysToExpiry(d) >= 0).length,
-      totalDrugs: allDrugs.length,
-      recentSales,
-    });
+      res.json({
+        revenueToday:      parseFloat(revRes.rows[0].rev),
+        transactionsToday: parseInt(txRes.rows[0].cnt),
+        lowStockCount:     parseInt(lowRes.rows[0].cnt),
+        expiringCount:     parseInt(expRes.rows[0].cnt),
+        weeklyRevenue:     weekRes.rows,
+        recentSales:       recentRes.rows,
+      });
+    } catch (e) {
+      res.json({ error: e.message }, 500);
+    }
   });
 
-  // GET /api/dashboard/weekly
-  app.get('/api/dashboard/weekly', auth, async (req, res) => {
-    res.json({ weekly: helpers.weeklyRevenue(req.user.pharmacyId) });
-  });
-
-
   // ══════════════════════════════════════════════════════════
-  // INVENTORY — Drugs Management
+  // INVENTORY
   // ══════════════════════════════════════════════════════════
-
-  // GET /api/inventory?search=para&category=Analgesic&status=low
   app.get('/api/inventory', auth, async (req, res) => {
     const { pharmacyId } = req.user;
     const { search, category, status } = req.query;
+    try {
+      let sql = `SELECT *, 
+        CASE WHEN quantity = 0 THEN 'out'
+             WHEN quantity <= threshold THEN 'critical'
+             WHEN quantity <= threshold * 1.5 THEN 'low'
+             ELSE 'ok' END as stock_status,
+        CASE WHEN expiry_date IS NOT NULL 
+             THEN (expiry_date - CURRENT_DATE)::int 
+             ELSE 999 END as days_to_expiry
+        FROM drugs WHERE pharmacy_id = $1`;
+      const params = [pharmacyId];
+      let i = 2;
+      if (search) { sql += ` AND name ILIKE $${i++}`; params.push(`%${search}%`); }
+      if (category) { sql += ` AND category = $${i++}`; params.push(category); }
+      if (status === 'low')      sql += ` AND quantity <= threshold * 1.5 AND quantity > 0`;
+      if (status === 'critical') sql += ` AND quantity <= threshold`;
+      if (status === 'out')      sql += ` AND quantity = 0`;
+      sql += ` ORDER BY name`;
 
-    let drugs = helpers.find('drugs', { pharmacy_id: pharmacyId });
-
-    if (search) drugs = drugs.filter(d => d.name.toLowerCase().includes(search.toLowerCase()));
-    if (category) drugs = drugs.filter(d => d.category === category);
-    if (status) {
-      if (status === 'low')      drugs = drugs.filter(d => helpers.stockStatus(d) === 'low');
-      if (status === 'critical') drugs = drugs.filter(d => helpers.stockStatus(d) === 'critical');
-      if (status === 'ok')       drugs = drugs.filter(d => helpers.stockStatus(d) === 'ok');
-      if (status === 'expiring') drugs = drugs.filter(d => helpers.daysToExpiry(d) <= 30);
+      const result = await query(sql, params);
+      res.json({ drugs: result.rows, total: result.rows.length });
+    } catch (e) {
+      res.json({ error: e.message }, 500);
     }
-
-    drugs = drugs.map(d => ({
-      ...d,
-      stock_status: helpers.stockStatus(d),
-      days_to_expiry: helpers.daysToExpiry(d),
-    }));
-
-    res.json({ drugs, total: drugs.length });
   });
 
-  // GET /api/inventory/alerts
   app.get('/api/inventory/alerts', auth, async (req, res) => {
     const { pharmacyId } = req.user;
-    const all = helpers.find('drugs', { pharmacy_id: pharmacyId });
-    res.json({
-      lowStock: all.filter(d => d.quantity <= d.threshold).sort((a,b) => a.quantity - b.quantity),
-      expiring: all.filter(d => helpers.daysToExpiry(d) <= 30 && helpers.daysToExpiry(d) >= 0)
-                   .sort((a,b) => helpers.daysToExpiry(a) - helpers.daysToExpiry(b)),
-    });
+    try {
+      const [lowStock, expiring] = await Promise.all([
+        query(`SELECT * FROM drugs WHERE pharmacy_id=$1 AND quantity <= threshold ORDER BY quantity ASC`, [pharmacyId]),
+        query(`SELECT *, (expiry_date - CURRENT_DATE)::int as days_left FROM drugs WHERE pharmacy_id=$1 AND expiry_date <= CURRENT_DATE + INTERVAL '30 days' AND expiry_date >= CURRENT_DATE ORDER BY expiry_date`, [pharmacyId]),
+      ]);
+      res.json({ lowStock: lowStock.rows, expiring: expiring.rows });
+    } catch (e) {
+      res.json({ error: e.message }, 500);
+    }
   });
 
-  // GET /api/inventory/:id
   app.get('/api/inventory/:id', auth, async (req, res) => {
-    const drug = helpers.findOne('drugs', { id: parseInt(req.params.id), pharmacy_id: req.user.pharmacyId });
-    if (!drug) return res.json({ error: 'Drug not found' }, 404);
-    res.json({ drug });
+    const { pharmacyId } = req.user;
+    try {
+      const result = await query(
+        `SELECT * FROM drugs WHERE id=$1 AND pharmacy_id=$2`,
+        [req.params.id, pharmacyId]
+      );
+      if (!result.rows.length) return res.json({ error: 'Drug not found' }, 404);
+      res.json({ drug: result.rows[0] });
+    } catch (e) {
+      res.json({ error: e.message }, 500);
+    }
   });
 
-  // POST /api/inventory
+  // POST /api/inventory — ADD DRUG
   app.post('/api/inventory', auth, async (req, res) => {
     const { pharmacyId } = req.user;
-    const { name, category, quantity, unit_price, cost_price, expiry_date, supplier, threshold, requires_rx } = req.body;
-    if (!name || !quantity || !unit_price)
+    const { name, generic_name, category, quantity, unit_price, cost_price,
+            expiry_date, supplier, barcode, threshold, requires_rx } = req.body;
+    if (!name || quantity === undefined || !unit_price)
       return res.json({ error: 'Name, quantity, and unit price are required' }, 400);
-    const drug = helpers.insert('drugs', {
-      pharmacy_id: pharmacyId, name, category, quantity: parseInt(quantity),
-      max_quantity: parseInt(quantity), unit_price: parseFloat(unit_price),
-      cost_price: parseFloat(cost_price || 0),
-      expiry_date: expiry_date ? new Date(expiry_date) : null,
-      supplier, threshold: parseInt(threshold || 20),
-      requires_rx: Boolean(requires_rx),
-    });
-    res.json({ message: '✅ Drug added to inventory!', drug });
+    try {
+      const result = await query(
+        `INSERT INTO drugs
+          (pharmacy_id, name, generic_name, category, quantity, max_quantity,
+           unit_price, cost_price, expiry_date, supplier, barcode, threshold, requires_rx)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+         RETURNING *`,
+        [
+          pharmacyId, name, generic_name || null, category || 'General',
+          parseInt(quantity), parseInt(quantity),
+          parseFloat(unit_price), parseFloat(cost_price || 0),
+          expiry_date || null, supplier || null, barcode || null,
+          parseInt(threshold || 20), requires_rx === true || requires_rx === 'true',
+        ]
+      );
+      res.json({ message: '✅ Drug added!', drug: result.rows[0] });
+    } catch (e) {
+      res.json({ error: 'Failed to add drug: ' + e.message }, 500);
+    }
   });
 
-  // PUT /api/inventory/:id
+  // PUT /api/inventory/:id — UPDATE DRUG
   app.put('/api/inventory/:id', auth, async (req, res) => {
     const { pharmacyId } = req.user;
-    const id = parseInt(req.params.id);
-    const drug = helpers.findOne('drugs', { id, pharmacy_id: pharmacyId });
-    if (!drug) return res.json({ error: 'Drug not found' }, 404);
-    const { name, category, quantity, unit_price, cost_price, expiry_date, supplier, threshold, requires_rx } = req.body;
-    Object.assign(drug, {
-      name: name || drug.name,
-      category: category || drug.category,
-      quantity: quantity !== undefined ? parseInt(quantity) : drug.quantity,
-      unit_price: unit_price !== undefined ? parseFloat(unit_price) : drug.unit_price,
-      cost_price: cost_price !== undefined ? parseFloat(cost_price) : drug.cost_price,
-      expiry_date: expiry_date ? new Date(expiry_date) : drug.expiry_date,
-      supplier: supplier || drug.supplier,
-      threshold: threshold !== undefined ? parseInt(threshold) : drug.threshold,
-      requires_rx: requires_rx !== undefined ? Boolean(requires_rx) : drug.requires_rx,
-      updated_at: new Date(),
-    });
-    res.json({ message: '✅ Drug updated!', drug });
+    const { name, generic_name, category, quantity, unit_price, cost_price,
+            expiry_date, supplier, threshold, requires_rx } = req.body;
+    try {
+      const result = await query(
+        `UPDATE drugs SET
+          name=$1, generic_name=$2, category=$3, quantity=$4,
+          unit_price=$5, cost_price=$6, expiry_date=$7, supplier=$8,
+          threshold=$9, requires_rx=$10, updated_at=NOW()
+         WHERE id=$11 AND pharmacy_id=$12 RETURNING *`,
+        [name, generic_name, category, parseInt(quantity),
+         parseFloat(unit_price), parseFloat(cost_price || 0),
+         expiry_date || null, supplier, parseInt(threshold || 20),
+         Boolean(requires_rx), req.params.id, pharmacyId]
+      );
+      if (!result.rows.length) return res.json({ error: 'Drug not found' }, 404);
+      res.json({ message: '✅ Drug updated!', drug: result.rows[0] });
+    } catch (e) {
+      res.json({ error: e.message }, 500);
+    }
   });
 
   // DELETE /api/inventory/:id
   app.delete('/api/inventory/:id', auth, async (req, res) => {
-    const removed = helpers.remove('drugs', { id: parseInt(req.params.id), pharmacy_id: req.user.pharmacyId });
-    if (!removed) return res.json({ error: 'Drug not found' }, 404);
-    res.json({ message: '🗑 Drug removed from inventory' });
+    const { pharmacyId } = req.user;
+    try {
+      const result = await query(
+        `DELETE FROM drugs WHERE id=$1 AND pharmacy_id=$2 RETURNING id`,
+        [req.params.id, pharmacyId]
+      );
+      if (!result.rows.length) return res.json({ error: 'Drug not found' }, 404);
+      res.json({ message: '✅ Drug deleted' });
+    } catch (e) {
+      res.json({ error: e.message }, 500);
+    }
   });
 
-
   // ══════════════════════════════════════════════════════════
-  // SALES — Record Sales & Receipts
+  // SALES
   // ══════════════════════════════════════════════════════════
-
-  // GET /api/sales
   app.get('/api/sales', auth, async (req, res) => {
     const { pharmacyId } = req.user;
-    const sales = helpers.find('sales', { pharmacy_id: pharmacyId })
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-      .slice(0, parseInt(req.query.limit || 50));
-    res.json({ sales, total: sales.length });
+    const limit = parseInt(req.query.limit) || 50;
+    try {
+      const result = await query(
+        `SELECT s.*, 
+          json_agg(json_build_object('drug_name',si.drug_name,'quantity',si.quantity,'unit_price',si.unit_price,'total_price',si.total_price)) as items
+         FROM sales s
+         LEFT JOIN sale_items si ON si.sale_id = s.id
+         WHERE s.pharmacy_id = $1
+         GROUP BY s.id
+         ORDER BY s.created_at DESC LIMIT $2`,
+        [pharmacyId, limit]
+      );
+      res.json({ sales: result.rows, total: result.rows.length });
+    } catch (e) {
+      res.json({ error: e.message }, 500);
+    }
   });
 
-  // GET /api/sales/:id
-  app.get('/api/sales/:id', auth, async (req, res) => {
-    const sale = helpers.findOne('sales', { id: parseInt(req.params.id), pharmacy_id: req.user.pharmacyId });
-    if (!sale) return res.json({ error: 'Sale not found' }, 404);
-    const items = helpers.find('saleItems', { sale_id: sale.id });
-    res.json({ sale, items });
-  });
-
-  // POST /api/sales  — record a new sale
   app.post('/api/sales', auth, async (req, res) => {
     const { pharmacyId, userId } = req.user;
-    const { customer_name, customer_phone, items, discount_pct = 0, payment_method } = req.body;
+    const { customer_name, customer_phone, items, discount_pct, payment_method, subtotal, discount_amount, total_amount } = req.body;
     if (!items || !items.length)
-      return res.json({ error: 'Sale must have at least one item' }, 400);
+      return res.json({ error: 'No items in sale' }, 400);
+    try {
+      const receiptNum = await getNextReceiptNumber(pharmacyId);
 
-    // Calculate totals
-    let subtotal = items.reduce((s, i) => s + (i.unit_price * i.quantity), 0);
-    const discount_amount = Math.round(subtotal * discount_pct / 100);
-    const total_amount = subtotal - discount_amount;
+      const saleRes = await query(
+        `INSERT INTO sales (pharmacy_id, user_id, receipt_number, customer_name, customer_phone,
+          subtotal, discount_pct, discount_amount, total_amount, payment_method)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+        [pharmacyId, userId || null, receiptNum,
+         customer_name || 'Walk-in', customer_phone || null,
+         parseFloat(subtotal || 0), parseFloat(discount_pct || 0),
+         parseFloat(discount_amount || 0), parseFloat(total_amount || 0),
+         payment_method || 'cash']
+      );
+      const sale = saleRes.rows[0];
 
-    // Generate receipt number
-    const saleCount = helpers.find('sales', { pharmacy_id: pharmacyId }).length;
-    const receipt_number = `RCP-${new Date().getFullYear()}-${String(saleCount + 1).padStart(4, '0')}`;
+      // Insert sale items and reduce stock
+      for (const item of items) {
+        await query(
+          `INSERT INTO sale_items (sale_id, drug_id, drug_name, quantity, unit_price, total_price)
+           VALUES ($1,$2,$3,$4,$5,$6)`,
+          [sale.id, item.drug_id || null, item.drug_name,
+           item.quantity, item.unit_price, item.unit_price * item.quantity]
+        );
+        if (item.drug_id) {
+          await query(
+            `UPDATE drugs SET quantity = GREATEST(0, quantity - $1), updated_at = NOW()
+             WHERE id = $2 AND pharmacy_id = $3`,
+            [item.quantity, item.drug_id, pharmacyId]
+          );
+        }
+      }
 
-    const sale = helpers.insert('sales', {
-      pharmacy_id: pharmacyId, user_id: userId,
-      customer_name: customer_name || 'Walk-in',
-      customer_phone, subtotal, discount_pct,
-      discount_amount, total_amount, payment_method, receipt_number,
-    });
+      // Update customer record
+      if (customer_phone) {
+        await query(
+          `INSERT INTO customers (pharmacy_id, name, phone, total_spent, visit_count)
+           VALUES ($1,$2,$3,$4,1)
+           ON CONFLICT (phone) DO UPDATE SET
+             total_spent = customers.total_spent + $4,
+             visit_count = customers.visit_count + 1`,
+          [pharmacyId, customer_name || 'Customer', customer_phone, parseFloat(total_amount || 0)]
+        ).catch(() => {}); // ignore if no unique constraint
+      }
 
-    // Save items + deduct from stock
-    for (const item of items) {
-      helpers.insert('saleItems', {
-        sale_id: sale.id, drug_id: item.drug_id,
-        drug_name: item.drug_name, quantity: item.quantity,
-        unit_price: item.unit_price,
-        total_price: item.unit_price * item.quantity,
-      });
-      // Reduce stock
-      const drug = helpers.findOne('drugs', { id: item.drug_id, pharmacy_id: pharmacyId });
-      if (drug) drug.quantity = Math.max(0, drug.quantity - item.quantity);
+      res.json({ message: '✅ Sale recorded!', sale, receipt_number: receiptNum });
+    } catch (e) {
+      console.error('Sale error:', e.message);
+      res.json({ error: 'Sale failed: ' + e.message }, 500);
     }
-
-    res.json({ message: '✅ Sale recorded!', sale, receipt_number });
   });
 
-
   // ══════════════════════════════════════════════════════════
-  // ORDERS — Online Customer Orders
+  // ORDERS (customer-facing)
   // ══════════════════════════════════════════════════════════
-
-  // POST /api/orders/public/:pharmacyId  — customer places order (no login)
-  app.post('/api/orders/public/:pharmacyId', async (req, res) => {
-    const pharmacyId = parseInt(req.params.pharmacyId);
-    const pharmacy = helpers.findOne('pharmacies', { id: pharmacyId });
-    if (!pharmacy) return res.json({ error: 'Pharmacy not found' }, 404);
-
-    const { customer_name, customer_phone, delivery_address, delivery_type, payment_method, items } = req.body;
-    if (!customer_name || !customer_phone || !items?.length)
-      return res.json({ error: 'Name, phone, and items are required' }, 400);
-
-    const subtotal = items.reduce((s, i) => s + (i.unit_price * i.quantity), 0);
-    const delivery_fee = delivery_type === 'pickup' ? 0 : 5000;
-    const total_amount = subtotal + delivery_fee;
-
-    const order = helpers.insert('orders', {
-      pharmacy_id: pharmacyId, customer_name, customer_phone,
-      delivery_address, delivery_type, payment_method,
-      payment_status: 'pending', order_status: 'pending',
-      subtotal, delivery_fee, total_amount,
-    });
-
-    items.forEach(item => helpers.insert('orderItems', {
-      order_id: order.id, drug_id: item.drug_id,
-      drug_name: item.drug_name, quantity: item.quantity,
-      unit_price: item.unit_price, total_price: item.unit_price * item.quantity,
-    }));
-
-    res.json({
-      message: '🎉 Order placed! Preparing your medicines.',
-      order_id: `ORD-${new Date().getFullYear()}-${String(order.id).padStart(4, '0')}`,
-      order_number: order.id,
-      estimated_delivery: '25–35 minutes',
-    });
-  });
-
-  // GET /api/orders  — pharmacy views all orders (protected)
   app.get('/api/orders', auth, async (req, res) => {
     const { pharmacyId } = req.user;
-    let orders = helpers.find('orders', { pharmacy_id: pharmacyId })
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    if (req.query.status) orders = orders.filter(o => o.order_status === req.query.status);
-    res.json({ orders, total: orders.length });
+    const { status } = req.query;
+    try {
+      let sql = `SELECT o.*, 
+        json_agg(json_build_object('drug_name',oi.drug_name,'quantity',oi.quantity,'unit_price',oi.unit_price)) as items
+        FROM orders o
+        LEFT JOIN order_items oi ON oi.order_id = o.id
+        WHERE o.pharmacy_id = $1`;
+      const params = [pharmacyId];
+      if (status) { sql += ` AND o.order_status = $2`; params.push(status); }
+      sql += ` GROUP BY o.id ORDER BY o.created_at DESC`;
+      const result = await query(sql, params);
+      res.json({ orders: result.rows });
+    } catch (e) {
+      res.json({ error: e.message }, 500);
+    }
   });
 
-  // PATCH /api/orders/:id/status
+  // Public order (customer places order — no auth needed)
+  app.post('/api/orders/public/:pharmacyId', async (req, res) => {
+    const pharmacyId = parseInt(req.params.pharmacyId);
+    const { customer_name, customer_phone, delivery_address, delivery_type, payment_method, items, total_amount, notes } = req.body;
+    if (!customer_name || !customer_phone || !items?.length)
+      return res.json({ error: 'Name, phone, and items are required' }, 400);
+    try {
+      const orderRes = await query(
+        `INSERT INTO orders (pharmacy_id, customer_name, customer_phone, delivery_address,
+          delivery_type, payment_method, total_amount, notes)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+        [pharmacyId, customer_name, customer_phone, delivery_address || '',
+         delivery_type || 'delivery', payment_method || 'cash',
+         parseFloat(total_amount || 0), notes || null]
+      );
+      const order = orderRes.rows[0];
+      for (const item of items) {
+        await query(
+          `INSERT INTO order_items (order_id, drug_id, drug_name, quantity, unit_price)
+           VALUES ($1,$2,$3,$4,$5)`,
+          [order.id, item.drug_id || null, item.drug_name, item.quantity, item.unit_price]
+        );
+      }
+      res.json({ message: '✅ Order placed! Pharmacy will contact you soon.', order });
+    } catch (e) {
+      res.json({ error: e.message }, 500);
+    }
+  });
+
   app.patch('/api/orders/:id/status', auth, async (req, res) => {
+    const { pharmacyId } = req.user;
     const { status } = req.body;
-    const valid = ['pending','processing','ready','delivered','cancelled'];
-    if (!valid.includes(status)) return res.json({ error: 'Invalid status' }, 400);
-    const order = helpers.findOne('orders', { id: parseInt(req.params.id), pharmacy_id: req.user.pharmacyId });
-    if (!order) return res.json({ error: 'Order not found' }, 404);
-    order.order_status = status;
-    order.updated_at = new Date();
-    res.json({ message: `✅ Order marked as ${status}`, order });
+    const validStatuses = ['pending','processing','ready','delivered','cancelled'];
+    if (!validStatuses.includes(status))
+      return res.json({ error: 'Invalid status' }, 400);
+    try {
+      const result = await query(
+        `UPDATE orders SET order_status=$1 WHERE id=$2 AND pharmacy_id=$3 RETURNING *`,
+        [status, req.params.id, pharmacyId]
+      );
+      if (!result.rows.length) return res.json({ error: 'Order not found' }, 404);
+      res.json({ message: '✅ Order updated!', order: result.rows[0] });
+    } catch (e) {
+      res.json({ error: e.message }, 500);
+    }
   });
-
 
   // ══════════════════════════════════════════════════════════
   // CUSTOMERS
   // ══════════════════════════════════════════════════════════
-
   app.get('/api/customers', auth, async (req, res) => {
-    const customers = helpers.find('customers', { pharmacy_id: req.user.pharmacyId })
-      .sort((a, b) => b.total_spent - a.total_spent);
-    res.json({ customers, total: customers.length });
+    const { pharmacyId } = req.user;
+    try {
+      const result = await query(
+        `SELECT * FROM customers WHERE pharmacy_id=$1 ORDER BY total_spent DESC`,
+        [pharmacyId]
+      );
+      res.json({ customers: result.rows });
+    } catch (e) {
+      res.json({ error: e.message }, 500);
+    }
   });
 
-  app.post('/api/customers', auth, async (req, res) => {
-    const { name, phone, email, address } = req.body;
-    if (!name) return res.json({ error: 'Name required' }, 400);
-    const customer = helpers.insert('customers', {
-      pharmacy_id: req.user.pharmacyId, name, phone, email, address,
-      total_spent: 0, order_count: 0,
-    });
-    res.json({ message: '✅ Customer added!', customer });
+  // ══════════════════════════════════════════════════════════
+  // MULTI-BRANCH — Organisation & Branches
+  // ══════════════════════════════════════════════════════════
+
+  // GET all branches for this organisation
+  app.get('/api/branches', auth, async (req, res) => {
+    const { orgId } = req.user;
+    try {
+      const result = await query(
+        `SELECT p.*,
+          (SELECT COUNT(*) FROM drugs d WHERE d.pharmacy_id = p.id) as drug_count,
+          (SELECT COALESCE(SUM(s.total_amount),0) FROM sales s WHERE s.pharmacy_id = p.id AND DATE(s.created_at) = CURRENT_DATE) as revenue_today
+         FROM pharmacies p WHERE p.organisation_id = $1 ORDER BY p.is_head_office DESC, p.name`,
+        [orgId]
+      );
+      res.json({ branches: result.rows });
+    } catch (e) {
+      res.json({ error: e.message }, 500);
+    }
   });
 
+  // POST /api/branches — add a new branch
+  app.post('/api/branches', auth, async (req, res) => {
+    const { orgId, role } = req.user;
+    if (!['owner','super_admin'].includes(role))
+      return res.json({ error: 'Only owners can add branches' }, 403);
+    const { name, address, phone, nda_number } = req.body;
+    if (!name) return res.json({ error: 'Branch name is required' }, 400);
+    try {
+      const result = await query(
+        `INSERT INTO pharmacies (organisation_id, name, address, phone, nda_number)
+         VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+        [orgId, name, address || '', phone || '', nda_number || null]
+      );
+      // Update branch count in subscription
+      await query(
+        `UPDATE subscriptions SET branch_count = (
+          SELECT COUNT(*) FROM pharmacies WHERE organisation_id = $1
+         ) WHERE organisation_id = $1`,
+        [orgId]
+      );
+      res.json({ message: '✅ Branch added!', branch: result.rows[0] });
+    } catch (e) {
+      res.json({ error: e.message }, 500);
+    }
+  });
+
+  // GET cross-branch summary (head office view)
+  app.get('/api/org/summary', auth, async (req, res) => {
+    const { orgId, role } = req.user;
+    if (!['owner','super_admin'].includes(role))
+      return res.json({ error: 'Owner access required' }, 403);
+    try {
+      const [branches, totalRev, totalDrugs, lowStock, transfers] = await Promise.all([
+        query(`SELECT COUNT(*) as cnt FROM pharmacies WHERE organisation_id=$1`, [orgId]),
+        query(`SELECT COALESCE(SUM(s.total_amount),0) as total FROM sales s JOIN pharmacies p ON p.id=s.pharmacy_id WHERE p.organisation_id=$1 AND DATE(s.created_at)=CURRENT_DATE`, [orgId]),
+        query(`SELECT COUNT(*) as cnt FROM drugs d JOIN pharmacies p ON p.id=d.pharmacy_id WHERE p.organisation_id=$1`, [orgId]),
+        query(`SELECT COUNT(*) as cnt FROM drugs d JOIN pharmacies p ON p.id=d.pharmacy_id WHERE p.organisation_id=$1 AND d.quantity <= d.threshold`, [orgId]),
+        query(`SELECT COUNT(*) as cnt FROM stock_transfers WHERE organisation_id=$1 AND status='pending'`, [orgId]),
+      ]);
+      res.json({
+        branchCount:        parseInt(branches.rows[0].cnt),
+        totalRevenueToday:  parseFloat(totalRev.rows[0].total),
+        totalDrugs:         parseInt(totalDrugs.rows[0].cnt),
+        lowStockCount:      parseInt(lowStock.rows[0].cnt),
+        pendingTransfers:   parseInt(transfers.rows[0].cnt),
+      });
+    } catch (e) {
+      res.json({ error: e.message }, 500);
+    }
+  });
 
   // ══════════════════════════════════════════════════════════
-  // SUBSCRIPTION
+  // STOCK TRANSFERS (between branches)
   // ══════════════════════════════════════════════════════════
 
+  app.get('/api/transfers', auth, async (req, res) => {
+    const { orgId } = req.user;
+    try {
+      const result = await query(
+        `SELECT st.*, 
+          fp.name as from_branch, tp.name as to_branch,
+          d.name as drug_name
+         FROM stock_transfers st
+         JOIN pharmacies fp ON fp.id = st.from_pharmacy_id
+         JOIN pharmacies tp ON tp.id = st.to_pharmacy_id
+         LEFT JOIN drugs d ON d.id = st.drug_id
+         WHERE st.organisation_id = $1
+         ORDER BY st.created_at DESC LIMIT 50`,
+        [orgId]
+      );
+      res.json({ transfers: result.rows });
+    } catch (e) {
+      res.json({ error: e.message }, 500);
+    }
+  });
+
+  app.post('/api/transfers', auth, async (req, res) => {
+    const { orgId, userId } = req.user;
+    const { from_pharmacy_id, to_pharmacy_id, drug_id, quantity, notes } = req.body;
+    if (!from_pharmacy_id || !to_pharmacy_id || !drug_id || !quantity)
+      return res.json({ error: 'from_pharmacy_id, to_pharmacy_id, drug_id, quantity required' }, 400);
+    try {
+      // Check drug exists and has enough stock
+      const drugRes = await query(
+        `SELECT * FROM drugs WHERE id=$1 AND pharmacy_id=$2`,
+        [drug_id, from_pharmacy_id]
+      );
+      if (!drugRes.rows.length) return res.json({ error: 'Drug not found in source branch' }, 404);
+      const drug = drugRes.rows[0];
+      if (drug.quantity < quantity) return res.json({ error: `Only ${drug.quantity} units available` }, 400);
+
+      const result = await query(
+        `INSERT INTO stock_transfers
+          (organisation_id, from_pharmacy_id, to_pharmacy_id, drug_id, drug_name, quantity, requested_by, notes)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+        [orgId, from_pharmacy_id, to_pharmacy_id, drug_id, drug.name, quantity, userId, notes || null]
+      );
+      res.json({ message: '✅ Transfer requested! Awaiting approval.', transfer: result.rows[0] });
+    } catch (e) {
+      res.json({ error: e.message }, 500);
+    }
+  });
+
+  app.patch('/api/transfers/:id/approve', auth, async (req, res) => {
+    const { orgId, userId, role } = req.user;
+    if (!['owner','super_admin','manager'].includes(role))
+      return res.json({ error: 'Manager access required to approve transfers' }, 403);
+    try {
+      const txRes = await query(
+        `SELECT * FROM stock_transfers WHERE id=$1 AND organisation_id=$2 AND status='pending'`,
+        [req.params.id, orgId]
+      );
+      if (!txRes.rows.length) return res.json({ error: 'Transfer not found or already processed' }, 404);
+      const tx = txRes.rows[0];
+
+      // Deduct from source
+      await query(
+        `UPDATE drugs SET quantity = GREATEST(0, quantity - $1), updated_at=NOW() WHERE id=$2 AND pharmacy_id=$3`,
+        [tx.quantity, tx.drug_id, tx.from_pharmacy_id]
+      );
+      // Add to destination (find matching drug or create)
+      const destDrug = await query(
+        `SELECT id FROM drugs WHERE pharmacy_id=$1 AND name=$2`,
+        [tx.to_pharmacy_id, tx.drug_name]
+      );
+      if (destDrug.rows.length) {
+        await query(
+          `UPDATE drugs SET quantity = quantity + $1, updated_at=NOW() WHERE id=$2`,
+          [tx.quantity, destDrug.rows[0].id]
+        );
+      } else {
+        // Copy drug to destination branch
+        const srcDrug = await query(`SELECT * FROM drugs WHERE id=$1`, [tx.drug_id]);
+        if (srcDrug.rows.length) {
+          const d = srcDrug.rows[0];
+          await query(
+            `INSERT INTO drugs (pharmacy_id,name,generic_name,category,quantity,max_quantity,unit_price,cost_price,threshold)
+             VALUES ($1,$2,$3,$4,$5,$5,$6,$7,$8)`,
+            [tx.to_pharmacy_id, d.name, d.generic_name, d.category, tx.quantity, d.unit_price, d.cost_price, d.threshold]
+          );
+        }
+      }
+
+      // Mark approved
+      await query(
+        `UPDATE stock_transfers SET status='approved', approved_by=$1 WHERE id=$2`,
+        [userId, tx.id]
+      );
+      res.json({ message: '✅ Transfer approved! Stock moved.' });
+    } catch (e) {
+      res.json({ error: e.message }, 500);
+    }
+  });
+
+  // ══════════════════════════════════════════════════════════
+  // SUPER ADMIN — sees ALL pharmacies
+  // ══════════════════════════════════════════════════════════
+  app.get('/api/admin/pharmacies', auth, async (req, res) => {
+    if (req.user.role !== 'super_admin')
+      return res.json({ error: 'Super admin only' }, 403);
+    try {
+      const result = await query(
+        `SELECT o.id as org_id, o.name as org_name, o.email, o.phone, o.plan, o.created_at,
+          COUNT(p.id) as branch_count,
+          s.status as sub_status, s.amount_ugx, s.trial_ends_at,
+          (SELECT COALESCE(SUM(sa.total_amount),0) FROM sales sa JOIN pharmacies bp ON bp.id=sa.pharmacy_id WHERE bp.organisation_id=o.id) as total_revenue
+         FROM organisations o
+         LEFT JOIN pharmacies p ON p.organisation_id = o.id
+         LEFT JOIN subscriptions s ON s.organisation_id = o.id
+         GROUP BY o.id, s.status, s.amount_ugx, s.trial_ends_at
+         ORDER BY o.created_at DESC`
+      );
+      res.json({ organisations: result.rows });
+    } catch (e) {
+      res.json({ error: e.message }, 500);
+    }
+  });
+
+  app.get('/api/admin/stats', auth, async (req, res) => {
+    if (req.user.role !== 'super_admin')
+      return res.json({ error: 'Super admin only' }, 403);
+    try {
+      const [orgs, active, trial, revenue] = await Promise.all([
+        query(`SELECT COUNT(*) as cnt FROM organisations`),
+        query(`SELECT COUNT(*) as cnt FROM subscriptions WHERE status='active'`),
+        query(`SELECT COUNT(*) as cnt FROM subscriptions WHERE status='trial'`),
+        query(`SELECT COALESCE(SUM(amount_ugx),0) as mrr FROM subscriptions WHERE status='active'`),
+      ]);
+      res.json({
+        totalOrganisations: parseInt(orgs.rows[0].cnt),
+        activeSubscriptions: parseInt(active.rows[0].cnt),
+        onTrial: parseInt(trial.rows[0].cnt),
+        mrr: parseFloat(revenue.rows[0].mrr),
+      });
+    } catch (e) {
+      res.json({ error: e.message }, 500);
+    }
+  });
+
+  // ══════════════════════════════════════════════════════════
+  // SUBSCRIPTION INFO
+  // ══════════════════════════════════════════════════════════
   app.get('/api/subscription', auth, async (req, res) => {
-    const subs = helpers.find('subscriptions', { pharmacy_id: req.user.pharmacyId })
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    res.json({ current: subs[0] || null, history: subs });
-  });
-
-  app.post('/api/subscription/upgrade', auth, async (req, res) => {
-    const { plan, payment_method } = req.body;
-    const prices = { basic: 20000, pro: 50000, enterprise: 150000 };
-    if (!prices[plan]) return res.json({ error: 'Invalid plan' }, 400);
-    const pharmacy = helpers.findOne('pharmacies', { id: req.user.pharmacyId });
-    pharmacy.plan = plan;
-    helpers.insert('subscriptions', {
-      pharmacy_id: req.user.pharmacyId, plan,
-      amount: prices[plan], payment_method, status: 'active',
-      billing_date: new Date(),
-      next_billing: new Date(Date.now() + 30*86400000),
-    });
-    res.json({ message: `🎉 Upgraded to ${plan} plan!` });
+    const { orgId } = req.user;
+    try {
+      const result = await query(
+        `SELECT s.*, o.name as org_name, o.plan,
+          (SELECT COUNT(*) FROM pharmacies WHERE organisation_id=$1) as branch_count
+         FROM subscriptions s
+         JOIN organisations o ON o.id = s.organisation_id
+         WHERE s.organisation_id = $1
+         ORDER BY s.created_at DESC LIMIT 1`,
+        [orgId]
+      );
+      res.json({ subscription: result.rows[0] || null });
+    } catch (e) {
+      res.json({ error: e.message }, 500);
+    }
   });
 
 };
