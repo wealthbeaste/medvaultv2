@@ -1,11 +1,11 @@
 {
-  "name": "medvault",
-  "version": "1.0.0",
-  "description": "MedVault Pharmacy Management System",
+  "name": "medvault-api",
+  "version": "2.0.0",
+  "description": "MedVault Pharmacy API — PostgreSQL + Multi-branch",
   "main": "backend/server.js",
   "scripts": {
     "start": "node backend/server.js",
-    "dev": "node --watch backend/server.js"
+    "dev":   "node --watch backend/server.js"
   },
   "engines": {
     "node": ">=18.0.0"
