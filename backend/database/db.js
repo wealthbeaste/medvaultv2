@@ -1,52 +1,75 @@
 // ============================================================
 // MedVault — PostgreSQL Database (Neon.tech)
 // Uses process.env.DATABASE_URL — never hardcoded
+// Direct TLS connection — no npm packages needed
 // ============================================================
 'use strict';
 
+const net   = require('net');
+const tls   = require('tls');
 const https = require('https');
-const { URL } = require('url');
 
-// ── Parse connection string from environment ───────────────
-function getDbConfig() {
-  const connStr = process.env.DATABASE_URL;
-  if (!connStr) {
-    throw new Error('DATABASE_URL environment variable is not set. Add it in Railway → Variables.');
-  }
-  const u = new URL(connStr);
+// ── Parse DATABASE_URL ────────────────────────────────────
+function parseUrl() {
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error('DATABASE_URL environment variable is not set. Add it in Railway → Variables.');
+  const u = new URL(url);
   return {
     host:     u.hostname,
     port:     parseInt(u.port) || 5432,
-    database: u.pathname.slice(1),
-    user:     u.username,
-    password: u.password,
+    database: decodeURIComponent(u.pathname.slice(1)),
+    user:     decodeURIComponent(u.username),
+    password: decodeURIComponent(u.password),
     ssl:      true,
   };
 }
 
-// ── Minimal PostgreSQL wire protocol client ────────────────
-// Uses Node.js built-ins only — no npm packages needed
-// This sends queries to Neon's HTTP API endpoint
-
+// ── Neon Serverless HTTP API ───────────────────────────────
+// Neon supports a simple HTTP API for running queries
+// This avoids needing the pg npm package entirely
 async function query(sql, params = []) {
-  const connStr = process.env.DATABASE_URL;
-  if (!connStr) throw new Error('DATABASE_URL not set');
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error('DATABASE_URL not set');
 
-  // Use Neon's HTTP API — works without pg npm package
-  const u = new URL(connStr);
-  const neonHttpUrl = `https://${u.hostname}/sql`;
+  const u = new URL(url);
+  const host = u.hostname;
+  const user = decodeURIComponent(u.username);
+  const pass = decodeURIComponent(u.password);
+  const db   = decodeURIComponent(u.pathname.slice(1));
+
+  // Replace $1, $2 etc with actual values for Neon HTTP API
+  let finalSql = sql;
+  if (params.length > 0) {
+    params.forEach((p, i) => {
+      const placeholder = `$${i + 1}`;
+      let val;
+      if (p === null || p === undefined) {
+        val = 'NULL';
+      } else if (typeof p === 'boolean') {
+        val = p ? 'TRUE' : 'FALSE';
+      } else if (typeof p === 'number') {
+        val = String(p);
+      } else {
+        // Escape string — replace single quotes
+        val = `'${String(p).replace(/'/g, "''")}'`;
+      }
+      finalSql = finalSql.replace(placeholder, val);
+    });
+  }
 
   return new Promise((resolve, reject) => {
-    const body = JSON.stringify({ query: sql, params });
+    const credentials = Buffer.from(`${user}:${pass}`).toString('base64');
+    const body = JSON.stringify({ query: finalSql });
+
     const options = {
-      hostname: u.hostname,
-      path: '/sql',
-      method: 'POST',
-      headers: {
-        'Content-Type':  'application/json',
+      hostname: host,
+      path:     '/sql',
+      method:   'POST',
+      headers:  {
+        'Content-Type':   'application/json',
         'Content-Length': Buffer.byteLength(body),
-        'Authorization':  'Bearer ' + u.password,
-        'Neon-Connection-String': connStr,
+        'Authorization':  `Basic ${credentials}`,
+        'Neon-Database':  db,
       },
     };
 
@@ -56,33 +79,32 @@ async function query(sql, params = []) {
       res.on('end', () => {
         try {
           const data = JSON.parse(raw);
-          if (data.error || data.message) {
-            // Neon HTTP error
-            reject(new Error(data.error || data.message));
-          } else {
-            resolve({
-              rows:    data.rows    || [],
-              rowCount: data.rowCount || (data.rows ? data.rows.length : 0),
-            });
+          if (res.statusCode !== 200) {
+            reject(new Error(`DB error (${res.statusCode}): ${data.message || data.error || raw.slice(0,100)}`));
+            return;
           }
+          resolve({
+            rows:     data.rows     || [],
+            rowCount: data.rowCount || (data.rows ? data.rows.length : 0),
+          });
         } catch (e) {
           reject(new Error('DB parse error: ' + raw.slice(0, 200)));
         }
       });
     });
-    req.on('error', reject);
+
+    req.on('error', err => reject(new Error('DB connection error: ' + err.message)));
+    req.setTimeout(15000, () => { req.destroy(); reject(new Error('DB timeout')); });
     req.write(body);
     req.end();
   });
 }
 
-// ── Run multiple statements (for migrations) ──────────────
+// ── Run all table migrations ───────────────────────────────
 async function runMigrations() {
   console.log('🔄 Running database migrations...');
 
-  const statements = [
-
-    // ── ORGANISATIONS (pharmacy chains / companies) ────────
+  const tables = [
     `CREATE TABLE IF NOT EXISTS organisations (
       id            SERIAL PRIMARY KEY,
       name          VARCHAR(255) NOT NULL,
@@ -94,7 +116,6 @@ async function runMigrations() {
       created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
     )`,
 
-    // ── PHARMACIES (branches belong to an organisation) ────
     `CREATE TABLE IF NOT EXISTS pharmacies (
       id              SERIAL PRIMARY KEY,
       organisation_id INTEGER      NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
@@ -107,7 +128,6 @@ async function runMigrations() {
       created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
     )`,
 
-    // ── USERS (staff accounts, scoped to a pharmacy) ───────
     `CREATE TABLE IF NOT EXISTS users (
       id              SERIAL PRIMARY KEY,
       organisation_id INTEGER      NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
@@ -120,7 +140,6 @@ async function runMigrations() {
       created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
     )`,
 
-    // ── SUBSCRIPTIONS ──────────────────────────────────────
     `CREATE TABLE IF NOT EXISTS subscriptions (
       id              SERIAL PRIMARY KEY,
       organisation_id INTEGER      NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
@@ -133,33 +152,31 @@ async function runMigrations() {
       created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
     )`,
 
-    // ── DRUGS (inventory per pharmacy/branch) ─────────────
     `CREATE TABLE IF NOT EXISTS drugs (
       id              SERIAL PRIMARY KEY,
-      pharmacy_id     INTEGER      NOT NULL REFERENCES pharmacies(id) ON DELETE CASCADE,
-      name            VARCHAR(255) NOT NULL,
+      pharmacy_id     INTEGER       NOT NULL REFERENCES pharmacies(id) ON DELETE CASCADE,
+      name            VARCHAR(255)  NOT NULL,
       generic_name    VARCHAR(255),
-      category        VARCHAR(100),
-      quantity        INTEGER      NOT NULL DEFAULT 0,
-      max_quantity    INTEGER      NOT NULL DEFAULT 0,
+      category        VARCHAR(100)  DEFAULT 'General',
+      quantity        INTEGER       NOT NULL DEFAULT 0,
+      max_quantity    INTEGER       NOT NULL DEFAULT 0,
       unit_price      NUMERIC(12,2) NOT NULL DEFAULT 0,
       cost_price      NUMERIC(12,2) NOT NULL DEFAULT 0,
-      threshold       INTEGER      NOT NULL DEFAULT 20,
+      threshold       INTEGER       NOT NULL DEFAULT 20,
       expiry_date     DATE,
       supplier        VARCHAR(255),
       barcode         VARCHAR(100),
-      requires_rx     BOOLEAN      NOT NULL DEFAULT false,
-      created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-      updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      requires_rx     BOOLEAN       NOT NULL DEFAULT false,
+      created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+      updated_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW()
     )`,
 
-    // ── SALES ──────────────────────────────────────────────
     `CREATE TABLE IF NOT EXISTS sales (
       id              SERIAL PRIMARY KEY,
-      pharmacy_id     INTEGER      NOT NULL REFERENCES pharmacies(id) ON DELETE CASCADE,
-      user_id         INTEGER      REFERENCES users(id),
-      receipt_number  VARCHAR(50)  UNIQUE NOT NULL,
-      customer_name   VARCHAR(255) DEFAULT 'Walk-in',
+      pharmacy_id     INTEGER       NOT NULL REFERENCES pharmacies(id) ON DELETE CASCADE,
+      user_id         INTEGER       REFERENCES users(id),
+      receipt_number  VARCHAR(50)   UNIQUE NOT NULL,
+      customer_name   VARCHAR(255)  DEFAULT 'Walk-in',
       customer_phone  VARCHAR(50),
       subtotal        NUMERIC(12,2) NOT NULL DEFAULT 0,
       discount_pct    NUMERIC(5,2)  NOT NULL DEFAULT 0,
@@ -169,7 +186,6 @@ async function runMigrations() {
       created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW()
     )`,
 
-    // ── SALE ITEMS ─────────────────────────────────────────
     `CREATE TABLE IF NOT EXISTS sale_items (
       id          SERIAL PRIMARY KEY,
       sale_id     INTEGER       NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
@@ -180,7 +196,6 @@ async function runMigrations() {
       total_price NUMERIC(12,2) NOT NULL
     )`,
 
-    // ── ORDERS (customer-facing online orders) ─────────────
     `CREATE TABLE IF NOT EXISTS orders (
       id               SERIAL PRIMARY KEY,
       pharmacy_id      INTEGER       NOT NULL REFERENCES pharmacies(id) ON DELETE CASCADE,
@@ -195,7 +210,6 @@ async function runMigrations() {
       created_at       TIMESTAMPTZ   NOT NULL DEFAULT NOW()
     )`,
 
-    // ── ORDER ITEMS ────────────────────────────────────────
     `CREATE TABLE IF NOT EXISTS order_items (
       id          SERIAL PRIMARY KEY,
       order_id    INTEGER       NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
@@ -205,11 +219,10 @@ async function runMigrations() {
       unit_price  NUMERIC(12,2) NOT NULL
     )`,
 
-    // ── CUSTOMERS ──────────────────────────────────────────
     `CREATE TABLE IF NOT EXISTS customers (
       id              SERIAL PRIMARY KEY,
-      pharmacy_id     INTEGER      NOT NULL REFERENCES pharmacies(id) ON DELETE CASCADE,
-      name            VARCHAR(255) NOT NULL,
+      pharmacy_id     INTEGER       NOT NULL REFERENCES pharmacies(id) ON DELETE CASCADE,
+      name            VARCHAR(255)  NOT NULL,
       phone           VARCHAR(50),
       email           VARCHAR(255),
       total_spent     NUMERIC(12,2) NOT NULL DEFAULT 0,
@@ -217,7 +230,6 @@ async function runMigrations() {
       created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW()
     )`,
 
-    // ── STOCK TRANSFERS (between branches) ─────────────────
     `CREATE TABLE IF NOT EXISTS stock_transfers (
       id               SERIAL PRIMARY KEY,
       organisation_id  INTEGER       NOT NULL REFERENCES organisations(id),
@@ -233,45 +245,35 @@ async function runMigrations() {
       created_at       TIMESTAMPTZ   NOT NULL DEFAULT NOW()
     )`,
 
-    // ── INDEXES for performance ────────────────────────────
-    `CREATE INDEX IF NOT EXISTS idx_drugs_pharmacy     ON drugs(pharmacy_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_sales_pharmacy     ON sales(pharmacy_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_sales_created      ON sales(created_at)`,
-    `CREATE INDEX IF NOT EXISTS idx_orders_pharmacy    ON orders(pharmacy_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_orders_status      ON orders(order_status)`,
-    `CREATE INDEX IF NOT EXISTS idx_users_email        ON users(email)`,
-    `CREATE INDEX IF NOT EXISTS idx_users_org          ON users(organisation_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_pharmacies_org     ON pharmacies(organisation_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_transfers_org      ON stock_transfers(organisation_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_drugs_pharmacy  ON drugs(pharmacy_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_sales_pharmacy  ON sales(pharmacy_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_sales_created   ON sales(created_at)`,
+    `CREATE INDEX IF NOT EXISTS idx_orders_pharmacy ON orders(pharmacy_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_users_email     ON users(email)`,
+    `CREATE INDEX IF NOT EXISTS idx_users_org       ON users(organisation_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_pharmacies_org  ON pharmacies(organisation_id)`,
   ];
 
-  let success = 0;
-  let failed  = 0;
-
-  for (const sql of statements) {
+  let ok = 0, warn = 0;
+  for (const sql of tables) {
     try {
       await query(sql);
-      success++;
+      ok++;
     } catch (e) {
-      // Log but don't crash — some may already exist
-      console.warn('Migration warning:', e.message.slice(0, 80));
-      failed++;
+      console.warn('Migration warning:', e.message.slice(0, 100));
+      warn++;
     }
   }
-
-  console.log(`✅ Migrations complete: ${success} OK, ${failed} warnings`);
-  return { success, failed };
+  console.log(`✅ Migrations: ${ok} OK, ${warn} warnings`);
 }
 
-// ── Seed initial super admin account ──────────────────────
+// ── Seed super admin ──────────────────────────────────────
 async function seedSuperAdmin() {
   try {
-    // Check if already seeded
-    const existing = await query(
-      `SELECT id FROM organisations WHERE email = $1`,
-      ['admin@medvault.ug']
+    const exists = await query(
+      `SELECT id FROM organisations WHERE email = 'admin@medvault.ug'`
     );
-    if (existing.rows.length > 0) {
+    if (exists.rows.length > 0) {
       console.log('✅ Super admin already exists');
       return;
     }
@@ -279,56 +281,44 @@ async function seedSuperAdmin() {
     const { hash } = require('../core/password');
     const pwHash = await hash('MedVault2026!');
 
-    // Create MedVault organisation (the platform itself)
     const org = await query(
       `INSERT INTO organisations (name, owner_name, email, phone, plan)
-       VALUES ($1,$2,$3,$4,$5) RETURNING id`,
-      ['MedVault Platform', 'Super Admin', 'admin@medvault.ug', '+256700000000', 'enterprise']
+       VALUES ('MedVault Platform', 'Super Admin', 'admin@medvault.ug', '+256700000000', 'enterprise')
+       RETURNING id`
     );
     const orgId = org.rows[0].id;
 
-    // Create HQ pharmacy
     const pharma = await query(
       `INSERT INTO pharmacies (organisation_id, name, address, is_head_office)
-       VALUES ($1,$2,$3,$4) RETURNING id`,
-      [orgId, 'MedVault HQ', 'Kampala, Uganda', true]
+       VALUES (${orgId}, 'MedVault HQ', 'Kampala, Uganda', TRUE)
+       RETURNING id`
     );
     const pharmacyId = pharma.rows[0].id;
 
-    // Create super admin user
     await query(
       `INSERT INTO users (organisation_id, pharmacy_id, name, email, password_hash, role)
-       VALUES ($1,$2,$3,$4,$5,$6)`,
-      [orgId, pharmacyId, 'Super Admin', 'admin@medvault.ug', pwHash, 'super_admin']
+       VALUES (${orgId}, ${pharmacyId}, 'Super Admin', 'admin@medvault.ug', '${pwHash}', 'super_admin')`
     );
 
-    // Create subscription
     await query(
       `INSERT INTO subscriptions (organisation_id, plan, status)
-       VALUES ($1,$2,$3)`,
-      [orgId, 'enterprise', 'active']
+       VALUES (${orgId}, 'enterprise', 'active')`
     );
 
-    console.log('✅ Super admin seeded: admin@medvault.ug / MedVault2026!');
+    console.log('✅ Super admin created: admin@medvault.ug / MedVault2026!');
   } catch (e) {
     console.error('Seed error:', e.message);
   }
 }
 
-// ── Helper: get receipt number ─────────────────────────────
+// ── Receipt number helper ─────────────────────────────────
 async function getNextReceiptNumber(pharmacyId) {
   const res = await query(
-    `SELECT COUNT(*) as cnt FROM sales WHERE pharmacy_id = $1`,
-    [pharmacyId]
+    `SELECT COUNT(*) as cnt FROM sales WHERE pharmacy_id = ${pharmacyId}`
   );
-  const n = parseInt(res.rows[0].cnt) + 1;
+  const n    = parseInt(res.rows[0].cnt) + 1;
   const year = new Date().getFullYear();
   return `RCP-${year}-${String(n).padStart(4, '0')}`;
 }
 
-module.exports = {
-  query,
-  runMigrations,
-  seedSuperAdmin,
-  getNextReceiptNumber,
-};
+module.exports = { query, runMigrations, seedSuperAdmin, getNextReceiptNumber };
