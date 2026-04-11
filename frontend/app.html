@@ -1375,42 +1375,35 @@ function closeAddDrug() {
   document.getElementById('addDrugOverlay').classList.remove('open');
 }
 
-function submitAddDrug(e) {
+async function submitAddDrug(e) {
   e.preventDefault();
+  
+  const drugData = { 
+    name: document.getElementById('adName').value,
+    quantity: parseInt(document.getElementById('adQty').value),
+    unit_price: parseFloat(document.getElementById('adPrice').value),
+    // ... other fields
+  };
+
   try {
-    const name = document.getElementById('adName').value.trim();
-    const qtyVal = document.getElementById('adQty').value;
-    const priceVal = document.getElementById('adPrice').value;
-    const quantity = parseInt(qtyVal, 10);
-    const unit_price = parseFloat(priceVal);
-
-    if (!name || isNaN(quantity) || quantity < 1 || isNaN(unit_price) || unit_price <= 0) {
-      showToast('Please fill in name, quantity (min 1), and unit price', 'error');
-      return;
-    }
-
-    const drugData = {
-      name,
-      category: document.getElementById('adCategory').value || '',
-      quantity,
-      max_quantity: quantity,
-      unit_price,
-      cost_price: parseFloat(document.getElementById('adCost').value) || 0,
-      expiry_date: document.getElementById('adExpiry').value || null,
-      supplier: document.getElementById('adSupplier').value.trim(),
-      threshold: parseInt(document.getElementById('adThreshold').value, 10) || 20,
-      requires_rx: document.getElementById('adRx').checked,
-    };
-
-    MedVaultOffline.addDrugLocal(drugData);
+    // Call the backend API
+    const res = await fetch(MedVaultOffline.API_BASE + '/api/inventory', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + currentToken  // assuming token is stored
+      },
+      body: JSON.stringify(drugData)
+    });
+    
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error);
+    
+    showToast('✅ Drug added!');
     closeAddDrug();
-    showToast('Drug added successfully!');
-    allDrugs = MedVaultOffline.getDrugs();
-    if (currentPage === 'inventory') loadInventory();
-    if (currentPage === 'dashboard') loadDashboard();
+    loadInventory(); // Refresh the list
   } catch (err) {
-    console.error('[AddDrug] Error:', err);
-    showToast('Error adding drug: ' + err.message, 'error');
+    showToast('❌ ' + err.message, 'error');
   }
 }
 
