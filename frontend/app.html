@@ -300,6 +300,60 @@
   .toast.warn{border-left-color:var(--warn);}
   .toast.err{border-left-color:var(--danger);}
   .toast.wa{border-left-color:#25d366;}
+
+  /* STAFF / BRANCHES / ORG SETTINGS */
+  .section-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+  .section-hd-title{font-family:'Syne',sans-serif;font-weight:700;font-size:18px;}
+  .role-badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;}
+  .role-badge.owner{background:rgba(0,212,170,0.15);color:var(--accent);}
+  .role-badge.manager{background:rgba(59,130,246,0.15);color:#93c5fd;}
+  .role-badge.staff{background:rgba(107,122,153,0.2);color:var(--muted);}
+  .staff-row{display:grid;grid-template-columns:40px 1fr auto auto;gap:14px;align-items:center;padding:14px 20px;border-bottom:1px solid var(--border);transition:background 0.15s;}
+  .staff-row:hover{background:rgba(255,255,255,0.02);}
+  .staff-row:last-child{border-bottom:none;}
+  .branch-card{background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:20px;transition:all 0.2s;cursor:pointer;position:relative;}
+  .branch-card:hover{border-color:rgba(0,212,170,0.3);transform:translateY(-2px);}
+  .branch-card.active-branch{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 8px 24px rgba(0,212,170,0.1);}
+  .branch-card-hd{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;}
+  .branch-name{font-family:'Syne',sans-serif;font-weight:700;font-size:15px;}
+  .branch-meta{font-size:12px;color:var(--muted);margin-top:3px;}
+  .branch-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;}
+  .branch-stat{background:var(--surface);border-radius:10px;padding:10px 12px;}
+  .branch-stat-val{font-family:'Syne',sans-serif;font-weight:700;font-size:16px;color:var(--accent);}
+  .branch-stat-lbl{font-size:11px;color:var(--muted);margin-top:2px;}
+  .branches-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:24px;}
+  .form-panel{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;margin-bottom:24px;}
+  .form-panel-title{font-family:'Syne',sans-serif;font-weight:700;font-size:15px;margin-bottom:18px;display:flex;align-items:center;gap:8px;}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .form-grid .full{grid-column:1/-1;}
+  .fld{display:flex;flex-direction:column;gap:5px;}
+  .fld label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;font-weight:500;}
+  .fld input,.fld select{background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 13px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;transition:border-color 0.2s;width:100%;}
+  .fld input:focus,.fld select:focus{border-color:rgba(0,212,170,0.4);}
+  .fld input::placeholder{color:var(--muted);}
+  .org-info-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;}
+  .org-info-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;}
+  .org-info-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;}
+  .org-info-value{font-family:'Syne',sans-serif;font-weight:700;font-size:18px;}
+  .org-info-sub{font-size:12px;color:var(--muted);margin-top:4px;}
+  .trial-banner{background:linear-gradient(135deg,rgba(245,158,11,0.12),rgba(239,68,68,0.08));border:1px solid rgba(245,158,11,0.25);border-radius:14px;padding:18px 22px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+  .trial-banner-left{display:flex;align-items:center;gap:12px;}
+  .trial-icon{font-size:28px;}
+  .trial-title{font-family:'Syne',sans-serif;font-weight:700;font-size:15px;color:var(--warn);}
+  .trial-sub{font-size:12px;color:var(--muted);margin-top:3px;}
+  .active-banner{background:linear-gradient(135deg,rgba(0,212,170,0.08),rgba(59,130,246,0.06));border:1px solid rgba(0,212,170,0.2);}
+  .active-banner .trial-title{color:var(--accent);}
+  .switch-branch-btn{padding:6px 14px;border-radius:8px;background:rgba(0,212,170,0.1);border:1px solid rgba(0,212,170,0.25);color:var(--accent);font-size:12px;font-weight:600;cursor:pointer;transition:all 0.2s;font-family:'DM Sans',sans-serif;}
+  .switch-branch-btn:hover{background:rgba(0,212,170,0.2);}
+  .deactivate-btn{padding:5px 12px;border-radius:7px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);color:var(--danger);font-size:11px;font-weight:600;cursor:pointer;transition:all 0.2s;font-family:'DM Sans',sans-serif;}
+  .deactivate-btn:hover{background:rgba(239,68,68,0.2);}
+  .owner-only{display:none;}
+  .is-owner .owner-only{display:block;}
+  .is-owner .owner-only-flex{display:flex;}
+  .owner-only-flex{display:none;}
+  .branch-switcher{background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:7px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;cursor:pointer;min-width:160px;}
+  .branch-switcher:focus{border-color:rgba(0,212,170,0.4);}
+  @media(max-width:640px){.form-grid{grid-template-columns:1fr;}.org-info-grid{grid-template-columns:1fr 1fr;}.branches-grid{grid-template-columns:1fr;}}
 </style>
 </head>
 <body>
@@ -357,14 +411,25 @@
     <div class="nav-item" onclick="go('sales',this)"><span class="nav-icon">🧾</span>Sales & Receipts</div>
     <div class="nav-item" onclick="go('orders',this)"><span class="nav-icon">🛒</span>Orders<span class="nbadge r" id="orderBadge">0</span></div>
     <div class="nav-item" onclick="go('customers',this)"><span class="nav-icon">👥</span>Customers</div>
+    <div class="nav-label">Organisation</div>
+    <div class="nav-item owner-only" id="navStaff" onclick="go('staff',this)"><span class="nav-icon">🧑‍💼</span>Staff Accounts</div>
+    <div class="nav-item" id="navBranches" onclick="go('branches',this)"><span class="nav-icon">🏪</span>Branches</div>
+    <div class="nav-item owner-only" id="navOrgSettings" onclick="go('org-settings',this)"><span class="nav-icon">🏢</span>Org Settings</div>
     <div class="nav-label">Communication</div>
     <div class="nav-item" onclick="go('whatsapp',this)"><span class="nav-icon">💬</span>WhatsApp Reports</div>
     <div class="nav-label">Settings</div>
     <div class="nav-item" onclick="go('subscription',this)"><span class="nav-icon">💳</span>Subscription</div>
     <div class="nav-item" onclick="go('offline-settings',this)"><span class="nav-icon">📴</span>Offline & Sync</div>
+    <div class="nav-item" onclick="doLogout()" style="margin-top:auto;color:var(--danger)"><span class="nav-icon">🚪</span>Logout</div>
   </nav>
   <div class="sidebar-footer">
-    <div class="user-card">
+    <div style="padding:0 12px 10px">
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Active Branch</div>
+      <select class="branch-switcher" id="branchSwitcher" onchange="switchBranch(this.value)">
+        <option value="">Loading…</option>
+      </select>
+    </div>
+    <div class="user-card" onclick="go('org-settings',document.getElementById('navOrgSettings'))">
       <div class="avatar" id="userAvatar">KP</div>
       <div class="user-info">
         <div class="uname" id="userName">Loading…</div>
@@ -379,7 +444,12 @@
   <div class="topbar">
     <div id="tbTitle"><div class="page-title">Loading…</div></div>
     <div class="topbar-right">
-      <button class="btn btn-wa" onclick="go('whatsapp',document.querySelectorAll('.nav-item')[6])">💬 WhatsApp</button>
+      <div id="topbarContext" style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)">
+        <span id="topbarBranch" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:5px 10px;font-weight:500;color:var(--text)"></span>
+        <span id="topbarRole" class="role-badge"></span>
+        <span id="topbarSubStatus" style="font-size:11px"></span>
+      </div>
+      <button class="btn btn-wa" onclick="go('whatsapp',null)">💬 WhatsApp</button>
       <button class="btn btn-ghost" onclick="manualSync()">🔄 Sync</button>
       <button class="btn btn-primary" onclick="openAddDrug()">+ Add Drug</button>
     </div>
@@ -387,6 +457,8 @@
 
   <!-- DASHBOARD -->
   <div class="page active" id="page-dashboard">
+    <!-- Org summary banner (owners only) -->
+    <div id="orgSummaryBanner" class="owner-only" style="margin-bottom:20px;display:none"></div>
     <div class="stats-grid" id="dashStats">
       <div class="stat-card g"><div class="sh"><div class="sl">Today's Revenue</div><div class="si ig">💰</div></div><div class="sv" id="dRev">—</div><div class="sc" id="dRevSub">from local data</div></div>
       <div class="stat-card b"><div class="sh"><div class="sl">Transactions</div><div class="si ib">🧾</div></div><div class="sv" id="dTx">—</div><div class="sc">today</div></div>
@@ -628,6 +700,171 @@ Or open: https://app.medvault.ug</div>
           <div><strong style="color:var(--text)">On iPhone (Safari):</strong><br>1. Open MedVault in Safari<br>2. Tap the Share button (□↑)<br>3. Scroll to "Add to Home Screen"<br>4. Tap "Add"</div>
           <button class="btn btn-primary" style="margin-top:14px;width:100%" onclick="toast('Open MedVault in Chrome or Safari to install as an app!')">📲 Install App Guide</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STAFF ACCOUNTS -->
+  <div class="page" id="page-staff">
+    <!-- Add Staff Form (owners only) -->
+    <div class="form-panel owner-only" id="addStaffPanel">
+      <div class="form-panel-title">🧑‍💼 Invite New Staff Member</div>
+      <div class="form-grid">
+        <div class="fld">
+          <label>Full Name <span style="color:var(--danger)">*</span></label>
+          <input type="text" id="staffName" placeholder="e.g. Sarah Nambi" />
+        </div>
+        <div class="fld">
+          <label>Email Address <span style="color:var(--danger)">*</span></label>
+          <input type="email" id="staffEmail" placeholder="sarah@pharmacy.ug" />
+        </div>
+        <div class="fld">
+          <label>Phone Number</label>
+          <input type="tel" id="staffPhone" placeholder="07XX XXX XXX" />
+        </div>
+        <div class="fld">
+          <label>Role <span style="color:var(--danger)">*</span></label>
+          <select id="staffRole">
+            <option value="staff">Staff — basic access</option>
+            <option value="manager">Manager — can approve transfers</option>
+            <option value="owner">Owner — full access</option>
+          </select>
+        </div>
+        <div class="fld">
+          <label>Assign to Branch</label>
+          <select id="staffBranch">
+            <option value="">Loading branches…</option>
+          </select>
+        </div>
+        <div class="fld">
+          <label>Temporary Password <span style="color:var(--danger)">*</span></label>
+          <input type="text" id="staffTempPass" placeholder="Min 6 characters" />
+        </div>
+      </div>
+      <div style="margin-top:16px;display:flex;gap:10px">
+        <button class="btn btn-primary" onclick="inviteStaff()">🧑‍💼 Add Staff Member</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('addStaffPanel').style.display='none'">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Staff List -->
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <div class="card-title">Team Members</div>
+          <div class="card-sub" id="staffCountSub">Loading…</div>
+        </div>
+        <button class="btn btn-primary owner-only" onclick="document.getElementById('addStaffPanel').style.display='block';document.getElementById('addStaffPanel').scrollIntoView({behavior:'smooth'})">+ Add Staff</button>
+      </div>
+      <div id="staffList">
+        <div style="text-align:center;padding:40px;color:var(--muted)">Loading staff…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BRANCHES -->
+  <div class="page" id="page-branches">
+    <!-- Add Branch Form (owners only) -->
+    <div class="form-panel owner-only" id="addBranchPanel" style="display:none">
+      <div class="form-panel-title">🏪 Add New Branch</div>
+      <div class="form-grid">
+        <div class="fld full">
+          <label>Branch Name <span style="color:var(--danger)">*</span></label>
+          <input type="text" id="branchName" placeholder="e.g. Kato Pharma — Ntinda Branch" />
+        </div>
+        <div class="fld full">
+          <label>Address</label>
+          <input type="text" id="branchAddress" placeholder="e.g. Plot 12, Ntinda Road, Kampala" />
+        </div>
+        <div class="fld">
+          <label>Phone Number</label>
+          <input type="tel" id="branchPhone" placeholder="07XX XXX XXX" />
+        </div>
+        <div class="fld">
+          <label>NDA Registration Number</label>
+          <input type="text" id="branchNDA" placeholder="e.g. NDA/PH/2024/001" />
+        </div>
+      </div>
+      <div style="margin-top:16px;display:flex;gap:10px">
+        <button class="btn btn-primary" onclick="addBranch()">🏪 Add Branch</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('addBranchPanel').style.display='none'">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Branches Grid -->
+    <div class="section-hd">
+      <div class="section-hd-title">All Branches</div>
+      <button class="btn btn-primary owner-only" onclick="document.getElementById('addBranchPanel').style.display='block';document.getElementById('addBranchPanel').scrollIntoView({behavior:'smooth'})">+ Add Branch</button>
+    </div>
+    <div class="branches-grid" id="branchesGrid">
+      <div style="text-align:center;padding:40px;color:var(--muted)">Loading branches…</div>
+    </div>
+  </div>
+
+  <!-- ORG SETTINGS -->
+  <div class="page" id="page-org-settings">
+    <!-- Subscription status banner -->
+    <div id="subBanner" style="margin-bottom:24px"></div>
+
+    <!-- Org info cards -->
+    <div class="org-info-grid" id="orgInfoGrid">
+      <div class="org-info-card">
+        <div class="org-info-label">Organisation</div>
+        <div class="org-info-value" id="orgName">—</div>
+        <div class="org-info-sub" id="orgPlan">—</div>
+      </div>
+      <div class="org-info-card">
+        <div class="org-info-label">Branches</div>
+        <div class="org-info-value" id="orgBranchCount">—</div>
+        <div class="org-info-sub">active locations</div>
+      </div>
+      <div class="org-info-card">
+        <div class="org-info-label">Subscription</div>
+        <div class="org-info-value" id="orgSubStatus">—</div>
+        <div class="org-info-sub" id="orgTrialEnd">—</div>
+      </div>
+    </div>
+
+    <!-- Multi-branch summary (owners only) -->
+    <div class="owner-only">
+      <div class="section-hd" style="margin-bottom:16px">
+        <div class="section-hd-title">📊 Organisation Summary — Today</div>
+        <button class="btn btn-ghost" onclick="loadOrgSettings()">🔄 Refresh</button>
+      </div>
+      <div class="stats-grid" id="orgSummaryStats" style="margin-bottom:24px">
+        <div class="stat-card g"><div class="sh"><div class="sl">Total Revenue Today</div><div class="si ig">💰</div></div><div class="sv" id="orgTotalRev">—</div><div class="sc">across all branches</div></div>
+        <div class="stat-card b"><div class="sh"><div class="sl">Total Drugs</div><div class="si ib">💊</div></div><div class="sv" id="orgTotalDrugs">—</div><div class="sc">across all branches</div></div>
+        <div class="stat-card w"><div class="sh"><div class="sl">Low Stock Items</div><div class="si iw">⚠️</div></div><div class="sv" id="orgLowStock">—</div><div class="sc">need restocking</div></div>
+        <div class="stat-card r"><div class="sh"><div class="sl">Pending Transfers</div><div class="si ir">🔄</div></div><div class="sv" id="orgPendingTransfers">—</div><div class="sc">awaiting approval</div></div>
+      </div>
+    </div>
+
+    <!-- Branch performance table (owners only) -->
+    <div class="card owner-only" style="margin-bottom:24px">
+      <div class="card-head">
+        <div class="card-title">Branch Performance</div>
+        <a class="see-all" onclick="go('branches',document.getElementById('navBranches'))">Manage →</a>
+      </div>
+      <table class="tbl">
+        <thead><tr><th>Branch</th><th>Drugs</th><th>Revenue Today</th><th>Status</th></tr></thead>
+        <tbody id="orgBranchTable"><tr><td colspan="4" style="text-align:center;padding:20px;color:var(--muted)">Loading…</td></tr></tbody>
+      </table>
+    </div>
+
+    <!-- Account info -->
+    <div class="card">
+      <div class="card-head"><div class="card-title">Account Details</div></div>
+      <table class="tbl">
+        <tbody id="orgAccountTable">
+          <tr><td style="color:var(--muted)">Name</td><td id="orgUserName">—</td></tr>
+          <tr><td style="color:var(--muted)">Email</td><td id="orgUserEmail">—</td></tr>
+          <tr><td style="color:var(--muted)">Role</td><td id="orgUserRole">—</td></tr>
+          <tr><td style="color:var(--muted)">Current Branch</td><td id="orgCurrentBranch">—</td></tr>
+          <tr><td style="color:var(--muted)">Plan</td><td id="orgCurrentPlan">—</td></tr>
+        </tbody>
+      </table>
+      <div style="padding:16px 22px;border-top:1px solid var(--border)">
+        <button class="btn btn-ghost" style="color:var(--danger);border-color:rgba(239,68,68,0.3)" onclick="doLogout()">🚪 Sign Out</button>
       </div>
     </div>
   </div>
@@ -912,6 +1149,7 @@ let token = localStorage.getItem('mv_token') || '';
 let currentUser = JSON.parse(localStorage.getItem('mv_user') || 'null');
 let cart = [];
 let allDrugs = [];
+let allBranches = [];
 let payMethod = 'cash';
 let currentPage = 'dashboard';
 const avatarColors=['linear-gradient(135deg,#6366f1,#8b5cf6)','linear-gradient(135deg,#f59e0b,#ef4444)','linear-gradient(135deg,#10b981,#3b82f6)','linear-gradient(135deg,#ec4899,#8b5cf6)','linear-gradient(135deg,#00d4aa,#3b82f6)','linear-gradient(135deg,#f97316,#eab308)'];
@@ -969,12 +1207,29 @@ async function doLogin() {
 
 async function boot(data) {
   const user = data.user || currentUser;
-  document.getElementById('userName').textContent    = user.name || user.pharmacyName || 'Pharmacy';
-  document.getElementById('userRole').textContent    = (user.pharmacyName||'') + ' · ' + (user.plan||'pro');
-  document.getElementById('userAvatar').textContent  = (user.name||'KP').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-  document.getElementById('rPharmAddr').textContent  = (user.pharmacyName||'MedVault') + ' · Kampala, Uganda';
-  document.getElementById('loginScreen').classList.add('hidden');
+  currentUser = user;
 
+  // Sidebar user card
+  document.getElementById('userName').textContent   = user.name || 'Pharmacy';
+  document.getElementById('userRole').textContent   = (user.pharmacyName || user.orgName || '') + ' · ' + (user.role || 'staff');
+  document.getElementById('userAvatar').textContent = (user.name||'KP').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  document.getElementById('rPharmAddr').textContent = (user.pharmacyName || user.orgName || 'MedVault') + ' · Kampala, Uganda';
+
+  // Topbar context
+  const branchEl = document.getElementById('topbarBranch');
+  const roleEl   = document.getElementById('topbarRole');
+  if (branchEl) branchEl.textContent = user.pharmacyName || user.orgName || 'MedVault';
+  if (roleEl) {
+    roleEl.textContent = user.role || 'staff';
+    roleEl.className = 'role-badge ' + (user.role || 'staff');
+  }
+
+  // Role-based UI: add is-owner class to body for CSS-driven visibility
+  if (user.role === 'owner' || user.role === 'super_admin') {
+    document.body.classList.add('is-owner');
+  }
+
+  document.getElementById('loginScreen').classList.add('hidden');
   MedVaultOffline.init(token);
 
   // Pull latest data from server
@@ -987,7 +1242,81 @@ async function boot(data) {
   }
 
   allDrugs = MedVaultOffline.getDrugs();
+
+  // Load branches for switcher
+  await loadBranchSwitcher();
+
+  // Fetch /api/auth/me for full subscription/org data
+  fetchMeData();
+
   go('dashboard', document.querySelector('.nav-item.active'));
+}
+
+async function fetchMeData() {
+  if (!token || !navigator.onLine) return;
+  try {
+    const res = await fetch(MedVaultOffline.API_BASE + '/api/auth/me', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    if (data.user) {
+      // Update currentUser with full server data
+      currentUser = { ...currentUser, ...data.user };
+      localStorage.setItem('mv_user', JSON.stringify(currentUser));
+
+      // Update subscription status in topbar
+      const subEl = document.getElementById('topbarSubStatus');
+      if (subEl && data.user.sub_status) {
+        const isTrialing = data.user.sub_status === 'trial';
+        subEl.textContent = isTrialing ? '🕐 Trial' : '✅ Active';
+        subEl.style.color = isTrialing ? 'var(--warn)' : 'var(--success)';
+      }
+    }
+  } catch(e) { /* offline */ }
+}
+
+async function loadBranchSwitcher() {
+  if (!token || !navigator.onLine) return;
+  try {
+    const res = await fetch(MedVaultOffline.API_BASE + '/api/branches', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    if (data.branches) {
+      allBranches = data.branches;
+      const sel = document.getElementById('branchSwitcher');
+      const activePharmaId = currentUser?.pharmacyId || currentUser?.pharmacy_id;
+      sel.innerHTML = data.branches.map(b =>
+        `<option value="${b.id}" ${b.id == activePharmaId ? 'selected' : ''}>${b.name}${b.is_head_office ? ' 🏠' : ''}</option>`
+      ).join('');
+    }
+  } catch(e) {
+    document.getElementById('branchSwitcher').innerHTML = '<option value="">—</option>';
+  }
+}
+
+function switchBranch(pharmacyId) {
+  if (!pharmacyId) return;
+  const branch = allBranches.find(b => b.id == pharmacyId);
+  if (!branch) return;
+  // Update local user context
+  currentUser.pharmacyId = parseInt(pharmacyId);
+  currentUser.pharmacyName = branch.name;
+  localStorage.setItem('mv_user', JSON.stringify(currentUser));
+  // Update topbar
+  const branchEl = document.getElementById('topbarBranch');
+  if (branchEl) branchEl.textContent = branch.name;
+  document.getElementById('rPharmAddr').textContent = branch.name + ' · Kampala, Uganda';
+  showToast('🏪 Switched to ' + branch.name);
+  // Reload current page data
+  loadPage(currentPage);
+}
+
+function doLogout() {
+  if (!confirm('Sign out of MedVault?')) return;
+  localStorage.removeItem('mv_token');
+  localStorage.removeItem('mv_user');
+  window.location.reload();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -999,6 +1328,9 @@ const pageMeta = {
   sales:             {t:'🧾 Sales & Receipts',       s:'Record sales — saves offline if no internet ✅'},
   orders:            {t:'🛒 Orders',                 s:'Online & in-store order management'},
   customers:         {t:'👥 Customers',              s:'Customer data from local storage'},
+  staff:             {t:'🧑‍💼 Staff Accounts',        s:'Manage your team members and roles'},
+  branches:          {t:'🏪 Branches',               s:'All pharmacy locations in your organisation'},
+  'org-settings':    {t:'🏢 Organisation Settings',  s:'Account, subscription, and multi-branch overview'},
   whatsapp:          {t:'💬 WhatsApp Reports',       s:'Automated daily reports & alerts'},
   subscription:      {t:'💳 Subscription',           s:'Your MedVault plan'},
   'offline-settings':{t:'📴 Offline & Sync',        s:'Storage, sync status & app installation'},
@@ -1021,6 +1353,9 @@ function loadPage(page) {
   if (page === 'sales')              loadSalesHistory();
   if (page === 'orders')             loadOrders();
   if (page === 'customers')          loadCustomers();
+  if (page === 'staff')              loadStaff();
+  if (page === 'branches')           loadBranches();
+  if (page === 'org-settings')       loadOrgSettings();
   if (page === 'whatsapp')           loadWAPreview();
   if (page === 'subscription')       loadSubscription();
   if (page === 'offline-settings')   loadStorageInfo();
@@ -1080,11 +1415,46 @@ function submitAddDrug(e) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// DASHBOARD — reads from local storage
+// DASHBOARD — reads from local storage + org summary for owners
 // ═══════════════════════════════════════════════════════════
-function loadDashboard() {
+async function loadDashboard() {
   const stats = MedVaultOffline.getDashboardStats();
   const drugs = MedVaultOffline.getDrugs();
+
+  // Org summary banner for owners
+  const banner = document.getElementById('orgSummaryBanner');
+  if (banner && (currentUser?.role === 'owner' || currentUser?.role === 'super_admin')) {
+    banner.style.display = 'block';
+    if (token && navigator.onLine) {
+      try {
+        const res = await fetch(MedVaultOffline.API_BASE + '/api/org/summary', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        const d = await res.json();
+        if (d.branchCount !== undefined) {
+          banner.innerHTML = `
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+              <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px">
+                <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Branches</div>
+                <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:22px;color:var(--accent)">${d.branchCount}</div>
+              </div>
+              <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px">
+                <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Org Revenue Today</div>
+                <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:22px;color:var(--accent)">UGX ${Math.round(d.totalRevenueToday||0).toLocaleString()}</div>
+              </div>
+              <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px">
+                <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Total Drugs</div>
+                <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:22px;color:var(--accent2)">${d.totalDrugs}</div>
+              </div>
+              <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px">
+                <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Low Stock (Org)</div>
+                <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:22px;color:var(--warn)">${d.lowStockCount}</div>
+              </div>
+            </div>`;
+        }
+      } catch(e) { banner.style.display = 'none'; }
+    }
+  }
 
   document.getElementById('dRev').textContent  = 'UGX ' + Math.round(stats.revenueToday).toLocaleString();
   document.getElementById('dTx').textContent   = stats.transactionsToday;
@@ -1394,20 +1764,343 @@ async function sendStockAlertNow() {
 }
 
 // ═══════════════════════════════════════════════════════════
+// STAFF MANAGEMENT
+// ═══════════════════════════════════════════════════════════
+async function loadStaff() {
+  const listEl = document.getElementById('staffList');
+  const countEl = document.getElementById('staffCountSub');
+  if (!token || !navigator.onLine) {
+    listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted)">📴 Staff list requires an internet connection</div>';
+    return;
+  }
+  listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted)">Loading…</div>';
+  try {
+    const res = await fetch(MedVaultOffline.API_BASE + '/api/staff', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    const staff = data.staff || [];
+    if (countEl) countEl.textContent = `${staff.length} member${staff.length !== 1 ? 's' : ''} in your organisation`;
+
+    // Populate branch dropdown in add-staff form
+    const branchSel = document.getElementById('staffBranch');
+    if (branchSel && allBranches.length) {
+      branchSel.innerHTML = allBranches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+    }
+
+    if (!staff.length) {
+      listEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">No staff members yet. Add your first team member above.</div>';
+      return;
+    }
+    listEl.innerHTML = staff.map(s => {
+      const initials = (s.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+      const colorIdx = s.id % avatarColors.length;
+      const isMe = s.id === currentUser?.id;
+      return `<div class="staff-row">
+        <div class="avatar" style="background:${avatarColors[colorIdx]};width:36px;height:36px;font-size:13px">${initials}</div>
+        <div>
+          <div style="font-size:13px;font-weight:500">${s.name}${isMe ? ' <span style="font-size:11px;color:var(--muted)">(you)</span>' : ''}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">${s.email} · ${s.pharmacy_name || 'All branches'}</div>
+        </div>
+        <span class="role-badge ${s.role}">${s.role}</span>
+        ${!isMe && (currentUser?.role === 'owner') ? `<button class="deactivate-btn" onclick="deactivateStaff(${s.id},'${s.name}')">Deactivate</button>` : '<div></div>'}
+      </div>`;
+    }).join('');
+  } catch(e) {
+    listEl.innerHTML = `<div style="text-align:center;padding:30px;color:var(--muted)">Failed to load staff: ${e.message}</div>`;
+  }
+}
+
+async function inviteStaff() {
+  const name     = document.getElementById('staffName').value.trim();
+  const email    = document.getElementById('staffEmail').value.trim();
+  const phone    = document.getElementById('staffPhone').value.trim();
+  const role     = document.getElementById('staffRole').value;
+  const branchId = document.getElementById('staffBranch').value;
+  const pass     = document.getElementById('staffTempPass').value.trim();
+
+  if (!name || !email || !pass) {
+    showToast('Please fill in name, email, and temporary password', 'warn');
+    return;
+  }
+  if (pass.length < 6) {
+    showToast('Password must be at least 6 characters', 'warn');
+    return;
+  }
+
+  try {
+    const res = await fetch(MedVaultOffline.API_BASE + '/api/staff/invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ name, email, phone, role, pharmacy_id: branchId || undefined, password: pass })
+    });
+    const data = await res.json();
+    if (data.error) { showToast('❌ ' + data.error, 'err'); return; }
+    showToast('✅ ' + (data.message || 'Staff member added!'));
+    // Clear form
+    ['staffName','staffEmail','staffPhone','staffTempPass'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('addStaffPanel').style.display = 'none';
+    loadStaff();
+  } catch(e) {
+    showToast('❌ Failed to add staff: ' + e.message, 'err');
+  }
+}
+
+async function deactivateStaff(id, name) {
+  if (!confirm(`Deactivate ${name}? They will no longer be able to log in.`)) return;
+  try {
+    const res = await fetch(MedVaultOffline.API_BASE + '/api/staff/' + id, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ is_active: false })
+    });
+    const data = await res.json();
+    if (data.error) { showToast('❌ ' + data.error, 'err'); return; }
+    showToast('✅ ' + name + ' has been deactivated');
+    loadStaff();
+  } catch(e) {
+    showToast('❌ Failed: ' + e.message, 'err');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// BRANCH MANAGEMENT
+// ═══════════════════════════════════════════════════════════
+async function loadBranches() {
+  const gridEl = document.getElementById('branchesGrid');
+  if (!token || !navigator.onLine) {
+    gridEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">📴 Branch list requires an internet connection</div>';
+    return;
+  }
+  gridEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">Loading…</div>';
+  try {
+    const res = await fetch(MedVaultOffline.API_BASE + '/api/branches', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    const branches = data.branches || [];
+    allBranches = branches;
+
+    if (!branches.length) {
+      gridEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">No branches yet. Add your first branch above.</div>';
+      return;
+    }
+
+    const activePharmaId = currentUser?.pharmacyId || currentUser?.pharmacy_id;
+    gridEl.innerHTML = branches.map(b => `
+      <div class="branch-card ${b.id == activePharmaId ? 'active-branch' : ''}" onclick="switchBranch(${b.id})">
+        <div class="branch-card-hd">
+          <div>
+            <div class="branch-name">${b.name}${b.is_head_office ? ' 🏠' : ''}</div>
+            <div class="branch-meta">${b.address || 'No address set'}</div>
+          </div>
+          ${b.id == activePharmaId ? '<span style="font-size:11px;color:var(--accent);font-weight:600">● Active</span>' : '<button class="switch-branch-btn" onclick="event.stopPropagation();switchBranch('+b.id+')">Switch</button>'}
+        </div>
+        ${b.phone ? `<div style="font-size:12px;color:var(--muted);margin-bottom:4px">📞 ${b.phone}</div>` : ''}
+        ${b.nda_number ? `<div style="font-size:12px;color:var(--muted)">NDA: ${b.nda_number}</div>` : ''}
+        <div class="branch-stats">
+          <div class="branch-stat">
+            <div class="branch-stat-val">${b.drug_count || 0}</div>
+            <div class="branch-stat-lbl">Drug Types</div>
+          </div>
+          <div class="branch-stat">
+            <div class="branch-stat-val">UGX ${Math.round(b.revenue_today || 0).toLocaleString()}</div>
+            <div class="branch-stat-lbl">Revenue Today</div>
+          </div>
+        </div>
+      </div>`).join('');
+  } catch(e) {
+    gridEl.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted)">Failed to load branches: ${e.message}</div>`;
+  }
+}
+
+async function addBranch() {
+  const name    = document.getElementById('branchName').value.trim();
+  const address = document.getElementById('branchAddress').value.trim();
+  const phone   = document.getElementById('branchPhone').value.trim();
+  const nda     = document.getElementById('branchNDA').value.trim();
+
+  if (!name) { showToast('Branch name is required', 'warn'); return; }
+
+  try {
+    const res = await fetch(MedVaultOffline.API_BASE + '/api/branches', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ name, address, phone, nda_number: nda })
+    });
+    const data = await res.json();
+    if (data.error) { showToast('❌ ' + data.error, 'err'); return; }
+    showToast('✅ ' + (data.message || 'Branch added!'));
+    ['branchName','branchAddress','branchPhone','branchNDA'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('addBranchPanel').style.display = 'none';
+    await loadBranchSwitcher();
+    loadBranches();
+  } catch(e) {
+    showToast('❌ Failed to add branch: ' + e.message, 'err');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// ORG SETTINGS
+// ═══════════════════════════════════════════════════════════
+async function loadOrgSettings() {
+  // Populate account details from cached user
+  const u = currentUser || {};
+  const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val || '—'; };
+  setEl('orgUserName', u.name);
+  setEl('orgUserEmail', u.email);
+  setEl('orgUserRole', u.role);
+  setEl('orgCurrentBranch', u.pharmacyName || u.pharmacy_name);
+  setEl('orgCurrentPlan', u.plan);
+  setEl('orgName', u.orgName || u.org_name);
+  setEl('orgPlan', 'Plan: ' + (u.plan || '—'));
+
+  if (!token || !navigator.onLine) {
+    document.getElementById('subBanner').innerHTML = '<div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.2);border-radius:12px;padding:14px 18px;font-size:13px;color:var(--warn)">📴 Offline — subscription details unavailable</div>';
+    return;
+  }
+
+  try {
+    // Fetch /api/auth/me for subscription data
+    const meRes = await fetch(MedVaultOffline.API_BASE + '/api/auth/me', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const meData = await meRes.json();
+    const user = meData.user || {};
+
+    // Update fields with fresh data
+    setEl('orgUserName', user.name);
+    setEl('orgUserEmail', user.email);
+    setEl('orgUserRole', user.role);
+    setEl('orgCurrentBranch', user.pharmacy_name);
+    setEl('orgCurrentPlan', user.plan);
+    setEl('orgName', user.org_name);
+    setEl('orgPlan', 'Plan: ' + (user.plan || '—'));
+
+    // Subscription banner
+    const banner = document.getElementById('subBanner');
+    const isTrialing = user.sub_status === 'trial';
+    const trialEnd = user.trial_ends_at ? new Date(user.trial_ends_at) : null;
+    const daysLeft = trialEnd ? Math.ceil((trialEnd - new Date()) / 86400000) : null;
+
+    if (isTrialing) {
+      banner.innerHTML = `<div class="trial-banner">
+        <div class="trial-banner-left">
+          <div class="trial-icon">🕐</div>
+          <div>
+            <div class="trial-title">Free Trial Active</div>
+            <div class="trial-sub">${daysLeft !== null ? `${daysLeft} day${daysLeft !== 1 ? 's' : ''} remaining` : 'Trial period active'} · Upgrade anytime to keep access</div>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="go('subscription',null)">Upgrade Plan →</button>
+      </div>`;
+    } else {
+      banner.innerHTML = `<div class="trial-banner active-banner">
+        <div class="trial-banner-left">
+          <div class="trial-icon">✅</div>
+          <div>
+            <div class="trial-title">Subscription Active</div>
+            <div class="trial-sub">Plan: ${user.plan || '—'} · ${user.next_billing ? 'Next billing: ' + new Date(user.next_billing).toLocaleDateString('en-UG') : 'Billing managed by admin'}</div>
+          </div>
+        </div>
+        <button class="btn btn-ghost" onclick="go('subscription',null)">Manage Plan</button>
+      </div>`;
+    }
+
+    setEl('orgSubStatus', isTrialing ? '🕐 Trial' : '✅ Active');
+    setEl('orgTrialEnd', trialEnd ? 'Ends ' + trialEnd.toLocaleDateString('en-UG', {day:'numeric',month:'long',year:'numeric'}) : '');
+
+    // Fetch org summary for owners
+    if (user.role === 'owner' || user.role === 'super_admin') {
+      const [summaryRes, branchesRes] = await Promise.all([
+        fetch(MedVaultOffline.API_BASE + '/api/org/summary', { headers: { 'Authorization': 'Bearer ' + token } }),
+        fetch(MedVaultOffline.API_BASE + '/api/branches', { headers: { 'Authorization': 'Bearer ' + token } }),
+      ]);
+      const summary = await summaryRes.json();
+      const branchData = await branchesRes.json();
+
+      setEl('orgBranchCount', summary.branchCount || 0);
+      setEl('orgTotalRev', 'UGX ' + Math.round(summary.totalRevenueToday || 0).toLocaleString());
+      setEl('orgTotalDrugs', summary.totalDrugs || 0);
+      setEl('orgLowStock', summary.lowStockCount || 0);
+      setEl('orgPendingTransfers', summary.pendingTransfers || 0);
+
+      // Branch performance table
+      const branches = branchData.branches || [];
+      const tableEl = document.getElementById('orgBranchTable');
+      if (tableEl) {
+        tableEl.innerHTML = branches.map(b => `
+          <tr>
+            <td><strong>${b.name}</strong>${b.is_head_office ? ' <span style="font-size:10px;color:var(--accent)">HQ</span>' : ''}<div style="font-size:11px;color:var(--muted)">${b.address || '—'}</div></td>
+            <td>${b.drug_count || 0}</td>
+            <td style="font-family:'Syne',sans-serif;font-weight:700">UGX ${Math.round(b.revenue_today || 0).toLocaleString()}</td>
+            <td><span class="pill ok">Active</span></td>
+          </tr>`).join('') || '<tr><td colspan="4" style="text-align:center;padding:16px;color:var(--muted)">No branches</td></tr>';
+      }
+    }
+  } catch(e) {
+    document.getElementById('subBanner').innerHTML = `<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:12px;padding:14px 18px;font-size:13px;color:var(--danger)">Failed to load settings: ${e.message}</div>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
 // SUBSCRIPTION
 // ═══════════════════════════════════════════════════════════
 async function loadSubscription() {
+  const planPrices = { drug_shop: 20000, single: 50000, branch: 40000, chain: 30000, enterprise: 150000, basic: 20000, pro: 50000 };
+
+  // Show cached data immediately
+  const plan = currentUser?.plan || 'pro';
   document.getElementById('subDetails').innerHTML = `
     <table class="tbl"><tbody>
-      <tr><td style="color:var(--muted)">Plan</td><td><strong style="color:var(--accent)">${currentUser?.plan||'pro'} ⭐</strong></td></tr>
-      <tr><td style="color:var(--muted)">Amount</td><td><strong>UGX 50,000 / month</strong></td></tr>
-      <tr><td style="color:var(--muted)">Next Billing</td><td>April 22, 2026</td></tr>
-      <tr><td style="color:var(--muted)">Payment</td><td>📱 MTN MoMo</td></tr>
-      <tr><td style="color:var(--muted)">Status</td><td><span class="pill ok">Active</span></td></tr>
+      <tr><td style="color:var(--muted)">Plan</td><td><strong style="color:var(--accent)">${plan} ⭐</strong></td></tr>
+      <tr><td style="color:var(--muted)">Amount</td><td><strong>UGX ${(planPrices[plan]||50000).toLocaleString()} / month</strong></td></tr>
+      <tr><td style="color:var(--muted)">Status</td><td id="subStatusCell"><span class="pill ok">Loading…</span></td></tr>
+      <tr><td style="color:var(--muted)">Trial Ends</td><td id="subTrialCell">—</td></tr>
+      <tr><td style="color:var(--muted)">Next Billing</td><td id="subBillingCell">—</td></tr>
     </tbody></table>`;
-  document.getElementById('subHistory').innerHTML = `
-    <tr><td>Mar 22, 2026</td><td>pro</td><td>UGX 50,000</td><td><span class="pill ok">Paid</span></td></tr>
-    <tr><td>Feb 22, 2026</td><td>pro</td><td>UGX 50,000</td><td><span class="pill ok">Paid</span></td></tr>`;
+  document.getElementById('subHistory').innerHTML = `<tr><td colspan="4" style="text-align:center;padding:16px;color:var(--muted)">Loading payment history…</td></tr>`;
+
+  if (!token || !navigator.onLine) {
+    document.getElementById('subStatusCell').innerHTML = '<span class="pill ok">Offline — cached data</span>';
+    return;
+  }
+
+  try {
+    const res = await fetch(MedVaultOffline.API_BASE + '/api/subscription', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    const sub = data.subscription;
+    if (!sub) return;
+
+    const isTrialing = sub.status === 'trial';
+    const trialEnd = sub.trial_ends_at ? new Date(sub.trial_ends_at) : null;
+    const daysLeft = trialEnd ? Math.ceil((trialEnd - new Date()) / 86400000) : null;
+
+    const statusEl = document.getElementById('subStatusCell');
+    const trialEl  = document.getElementById('subTrialCell');
+    const billEl   = document.getElementById('subBillingCell');
+
+    if (statusEl) statusEl.innerHTML = isTrialing
+      ? `<span class="pill low">🕐 Trial — ${daysLeft !== null ? daysLeft + ' days left' : 'active'}</span>`
+      : `<span class="pill ok">✅ Active</span>`;
+    if (trialEl) trialEl.textContent = trialEnd ? trialEnd.toLocaleDateString('en-UG', {day:'numeric',month:'long',year:'numeric'}) : '—';
+    if (billEl) billEl.textContent = sub.next_billing ? new Date(sub.next_billing).toLocaleDateString('en-UG') : (isTrialing ? 'After trial ends' : '—');
+
+    // Update plan display
+    document.getElementById('subDetails').querySelector('table').rows[0].cells[1].innerHTML =
+      `<strong style="color:var(--accent)">${sub.plan || plan} ⭐</strong>`;
+    document.getElementById('subDetails').querySelector('table').rows[1].cells[1].innerHTML =
+      `<strong>UGX ${parseInt(sub.amount_ugx || planPrices[plan] || 50000).toLocaleString()} / month</strong>`;
+
+    // Payment history placeholder (no payment history table in DB yet)
+    document.getElementById('subHistory').innerHTML = isTrialing
+      ? `<tr><td colspan="4" style="text-align:center;padding:16px;color:var(--muted)">No payments yet — you're on a free trial</td></tr>`
+      : `<tr><td colspan="4" style="text-align:center;padding:16px;color:var(--muted)">Payment history coming soon</td></tr>`;
+  } catch(e) {
+    document.getElementById('subStatusCell').innerHTML = '<span class="pill ok">Offline</span>';
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
