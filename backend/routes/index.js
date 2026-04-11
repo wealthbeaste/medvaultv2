@@ -725,4 +725,128 @@ module.exports = function registerRoutes(app) {
     }
   });
 
+  // ══════════════════════════════════════════════════════════
+  // STAFF MANAGEMENT
+  // ══════════════════════════════════════════════════════════
+
+  // GET /api/staff — list all staff in the organisation
+  app.get('/api/staff', auth, async (req, res) => {
+    const { orgId } = req.user;
+    try {
+      const result = await query(
+        `SELECT u.id, u.name, u.email, u.role, u.is_active,
+                p.name as pharmacy_name, u.created_at
+         FROM users u
+         LEFT JOIN pharmacies p ON p.id = u.pharmacy_id
+         WHERE u.organisation_id = $1
+         ORDER BY u.role, u.name`,
+        [orgId]
+      );
+      res.json({ staff: result.rows });
+    } catch (e) {
+      res.json({ error: e.message }, 500);
+    }
+  });
+
+  // POST /api/staff/invite — create a new staff account (owner only)
+  app.post('/api/staff/invite', auth, async (req, res) => {
+    const { orgId, role: callerRole } = req.user;
+    if (!['owner', 'super_admin'].includes(callerRole))
+      return res.json({ error: 'Only owners can add staff members' }, 403);
+
+    const { name, email, phone, role, pharmacy_id, password } = req.body;
+    if (!name || !email || !password)
+      return res.json({ error: 'Name, email, and password are required' }, 400);
+
+    const allowedRoles = ['staff', 'manager', 'owner'];
+    if (role && !allowedRoles.includes(role))
+      return res.json({ error: 'Invalid role. Must be: staff, manager, or owner' }, 400);
+
+    try {
+      // Check email not already taken
+      const exists = await query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
+      if (exists.rows.length > 0)
+        return res.json({ error: 'A user with this email already exists' }, 409);
+
+      // Validate pharmacy belongs to this org (if provided)
+      let assignedPharmacyId = null;
+      if (pharmacy_id) {
+        const pharmaCheck = await query(
+          'SELECT id FROM pharmacies WHERE id = $1 AND organisation_id = $2',
+          [pharmacy_id, orgId]
+        );
+        if (!pharmaCheck.rows.length)
+          return res.json({ error: 'Branch not found in your organisation' }, 404);
+        assignedPharmacyId = pharmacy_id;
+      } else {
+        // Default to head office
+        const hq = await query(
+          'SELECT id FROM pharmacies WHERE organisation_id = $1 AND is_head_office = true LIMIT 1',
+          [orgId]
+        );
+        assignedPharmacyId = hq.rows[0]?.id || null;
+      }
+
+      const pwHash = await hash(password);
+      const result = await query(
+        `INSERT INTO users (organisation_id, pharmacy_id, name, email, password_hash, role)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING id, name, email, role`,
+        [orgId, assignedPharmacyId, name, email.toLowerCase(), pwHash, role || 'staff']
+      );
+
+      res.json({
+        message: `✅ Staff member ${name} added successfully!`,
+        staff: result.rows[0],
+      });
+    } catch (e) {
+      console.error('Staff invite error:', e.message);
+      res.json({ error: 'Failed to add staff: ' + e.message }, 500);
+    }
+  });
+
+  // PATCH /api/staff/:id — update staff (deactivate, change role, etc.)
+  app.patch('/api/staff/:id', auth, async (req, res) => {
+    const { orgId, role: callerRole, userId } = req.user;
+    if (!['owner', 'super_admin'].includes(callerRole))
+      return res.json({ error: 'Only owners can modify staff accounts' }, 403);
+
+    const staffId = parseInt(req.params.id);
+    if (staffId === userId)
+      return res.json({ error: 'You cannot modify your own account this way' }, 400);
+
+    const { is_active, role } = req.body;
+    try {
+      // Verify staff belongs to this org
+      const check = await query(
+        'SELECT id FROM users WHERE id = $1 AND organisation_id = $2',
+        [staffId, orgId]
+      );
+      if (!check.rows.length)
+        return res.json({ error: 'Staff member not found in your organisation' }, 404);
+
+      const updates = [];
+      const params = [];
+      let i = 1;
+      if (is_active !== undefined) { updates.push(`is_active = $${i++}`); params.push(is_active); }
+      if (role !== undefined) { updates.push(`role = $${i++}`); params.push(role); }
+
+      if (!updates.length)
+        return res.json({ error: 'No fields to update' }, 400);
+
+      updates.push(`updated_at = NOW()`);
+      params.push(staffId, orgId);
+
+      const result = await query(
+        `UPDATE users SET ${updates.join(', ')} WHERE id = $${i++} AND organisation_id = $${i++} RETURNING id, name, email, role, is_active`,
+        params
+      );
+
+
+      res.json({ message: '✅ Staff member updated', staff: result.rows[0] });
+    } catch (e) {
+      res.json({ error: e.message }, 500);
+    }
+  });
+
 };
