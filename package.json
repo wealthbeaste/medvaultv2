@@ -5,7 +5,10 @@
   "main": "backend/server.js",
   "scripts": {
     "start": "node backend/server.js",
-    "dev":   "node --watch backend/server.js"
+    "dev": "node --watch backend/server.js"
+  },
+  "dependencies": {
+    "pg": "^8.11.3"
   },
   "engines": {
     "node": ">=18.0.0"
