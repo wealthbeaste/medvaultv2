@@ -166,6 +166,24 @@ async function runMigrations() {
     `CREATE INDEX IF NOT EXISTS idx_orders_pharmacy ON orders(pharmacy_id)`,
     `CREATE INDEX IF NOT EXISTS idx_users_email     ON users(email)`,
     `CREATE INDEX IF NOT EXISTS idx_pharmacies_org  ON pharmacies(organisation_id)`,
+    `CREATE TABLE IF NOT EXISTS credit_sales (
+      id                SERIAL PRIMARY KEY,
+      pharmacy_id       INTEGER       NOT NULL REFERENCES pharmacies(id) ON DELETE CASCADE,
+      user_id           INTEGER       REFERENCES users(id),
+      customer_name     VARCHAR(255)  NOT NULL,
+      customer_phone    VARCHAR(50),
+      items_description TEXT,
+      amount_owed       NUMERIC(12,2) NOT NULL DEFAULT 0,
+      amount_paid       NUMERIC(12,2) NOT NULL DEFAULT 0,
+      due_date          DATE,
+      status            VARCHAR(50)   NOT NULL DEFAULT 'pending',
+      notes             TEXT,
+      last_reminded     TIMESTAMPTZ,
+      paid_at           TIMESTAMPTZ,
+      created_at        TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_credit_pharmacy ON credit_sales(pharmacy_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_credit_status   ON credit_sales(status)`,
   ];
 
   let ok = 0, warn = 0;
