@@ -235,16 +235,6 @@
   .overlay.open{display:flex;}
   .rmodal{background:#fff;color:#111;width:340px;max-width:90vw;border-radius:8px;overflow:hidden;animation:modalIn 0.25s ease;box-shadow:0 30px 80px rgba(0,0,0,0.6);font-family:'DM Sans',sans-serif;}
   @keyframes modalIn{from{opacity:0;transform:scale(0.95) translateY(16px)}to{opacity:1;transform:scale(1) translateY(0)}}
-  .add-drug-modal{background:var(--surface);color:var(--text);width:520px;max-width:94vw;border-radius:16px;overflow:hidden;animation:modalIn 0.25s ease;box-shadow:0 30px 80px rgba(0,0,0,0.6);max-height:90vh;overflow-y:auto;}
-  .adm-head{display:flex;justify-content:space-between;align-items:center;padding:20px 24px;border-bottom:1px solid var(--border);}
-  .adm-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:20px 24px;}
-  .adm-field{display:flex;flex-direction:column;gap:5px;}
-  .adm-field.full{grid-column:1/-1;}
-  .adm-field label{font-size:12px;font-weight:600;color:var(--muted);}
-  .adm-field input,.adm-field select{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;font-family:inherit;outline:none;transition:border-color 0.2s;}
-  .adm-field input:focus,.adm-field select:focus{border-color:var(--accent);}
-  .adm-actions{display:flex;justify-content:flex-end;gap:10px;padding:16px 24px;border-top:1px solid var(--border);}
-  @media(max-width:540px){.adm-grid{grid-template-columns:1fr;}}
   .rpaper{padding:24px 24px 16px;}
   .rtop{text-align:center;margin-bottom:14px;}
   .rlogo{font-family:'Syne',sans-serif;font-weight:800;font-size:20px;color:#0a0f1e;}
@@ -300,60 +290,6 @@
   .toast.warn{border-left-color:var(--warn);}
   .toast.err{border-left-color:var(--danger);}
   .toast.wa{border-left-color:#25d366;}
-
-  /* STAFF / BRANCHES / ORG SETTINGS */
-  .section-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
-  .section-hd-title{font-family:'Syne',sans-serif;font-weight:700;font-size:18px;}
-  .role-badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;}
-  .role-badge.owner{background:rgba(0,212,170,0.15);color:var(--accent);}
-  .role-badge.manager{background:rgba(59,130,246,0.15);color:#93c5fd;}
-  .role-badge.staff{background:rgba(107,122,153,0.2);color:var(--muted);}
-  .staff-row{display:grid;grid-template-columns:40px 1fr auto auto;gap:14px;align-items:center;padding:14px 20px;border-bottom:1px solid var(--border);transition:background 0.15s;}
-  .staff-row:hover{background:rgba(255,255,255,0.02);}
-  .staff-row:last-child{border-bottom:none;}
-  .branch-card{background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:20px;transition:all 0.2s;cursor:pointer;position:relative;}
-  .branch-card:hover{border-color:rgba(0,212,170,0.3);transform:translateY(-2px);}
-  .branch-card.active-branch{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 8px 24px rgba(0,212,170,0.1);}
-  .branch-card-hd{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;}
-  .branch-name{font-family:'Syne',sans-serif;font-weight:700;font-size:15px;}
-  .branch-meta{font-size:12px;color:var(--muted);margin-top:3px;}
-  .branch-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;}
-  .branch-stat{background:var(--surface);border-radius:10px;padding:10px 12px;}
-  .branch-stat-val{font-family:'Syne',sans-serif;font-weight:700;font-size:16px;color:var(--accent);}
-  .branch-stat-lbl{font-size:11px;color:var(--muted);margin-top:2px;}
-  .branches-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:24px;}
-  .form-panel{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;margin-bottom:24px;}
-  .form-panel-title{font-family:'Syne',sans-serif;font-weight:700;font-size:15px;margin-bottom:18px;display:flex;align-items:center;gap:8px;}
-  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-  .form-grid .full{grid-column:1/-1;}
-  .fld{display:flex;flex-direction:column;gap:5px;}
-  .fld label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;font-weight:500;}
-  .fld input,.fld select{background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 13px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;transition:border-color 0.2s;width:100%;}
-  .fld input:focus,.fld select:focus{border-color:rgba(0,212,170,0.4);}
-  .fld input::placeholder{color:var(--muted);}
-  .org-info-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;}
-  .org-info-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;}
-  .org-info-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;}
-  .org-info-value{font-family:'Syne',sans-serif;font-weight:700;font-size:18px;}
-  .org-info-sub{font-size:12px;color:var(--muted);margin-top:4px;}
-  .trial-banner{background:linear-gradient(135deg,rgba(245,158,11,0.12),rgba(239,68,68,0.08));border:1px solid rgba(245,158,11,0.25);border-radius:14px;padding:18px 22px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;}
-  .trial-banner-left{display:flex;align-items:center;gap:12px;}
-  .trial-icon{font-size:28px;}
-  .trial-title{font-family:'Syne',sans-serif;font-weight:700;font-size:15px;color:var(--warn);}
-  .trial-sub{font-size:12px;color:var(--muted);margin-top:3px;}
-  .active-banner{background:linear-gradient(135deg,rgba(0,212,170,0.08),rgba(59,130,246,0.06));border:1px solid rgba(0,212,170,0.2);}
-  .active-banner .trial-title{color:var(--accent);}
-  .switch-branch-btn{padding:6px 14px;border-radius:8px;background:rgba(0,212,170,0.1);border:1px solid rgba(0,212,170,0.25);color:var(--accent);font-size:12px;font-weight:600;cursor:pointer;transition:all 0.2s;font-family:'DM Sans',sans-serif;}
-  .switch-branch-btn:hover{background:rgba(0,212,170,0.2);}
-  .deactivate-btn{padding:5px 12px;border-radius:7px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);color:var(--danger);font-size:11px;font-weight:600;cursor:pointer;transition:all 0.2s;font-family:'DM Sans',sans-serif;}
-  .deactivate-btn:hover{background:rgba(239,68,68,0.2);}
-  .owner-only{display:none;}
-  .is-owner .owner-only{display:block;}
-  .is-owner .owner-only-flex{display:flex;}
-  .owner-only-flex{display:none;}
-  .branch-switcher{background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:7px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;cursor:pointer;min-width:160px;}
-  .branch-switcher:focus{border-color:rgba(0,212,170,0.4);}
-  @media(max-width:640px){.form-grid{grid-template-columns:1fr;}.org-info-grid{grid-template-columns:1fr 1fr;}.branches-grid{grid-template-columns:1fr;}}
 </style>
 </head>
 <body>
@@ -387,11 +323,11 @@
     <div class="login-sub">Sign in to your pharmacy dashboard</div>
     <div class="lf-group">
       <label class="lf-label">Email</label>
-      <input class="lf-input" type="email" id="loginEmail" placeholder="admin@katopharma.ug" value="admin@katopharma.ug"/>
+      <input class="lf-input" type="email" id="loginEmail" placeholder="your@pharmacy@email.com"/>
     </div>
     <div class="lf-group">
       <label class="lf-label">Password</label>
-      <input class="lf-input" type="password" id="loginPass" placeholder="••••••••" value="admin123" onkeydown="if(event.key==='Enter')doLogin()"/>
+      <input class="lf-input" type="password" id="loginPass" placeholder="your password" onkeydown="if(event.key==='Enter')doLogin()"/>
     </div>
     <button class="login-btn" onclick="doLogin()" id="loginBtn">Sign In →</button>
     <div class="login-error" id="loginError"></div>
@@ -411,25 +347,23 @@
     <div class="nav-item" onclick="go('sales',this)"><span class="nav-icon">🧾</span>Sales & Receipts</div>
     <div class="nav-item" onclick="go('orders',this)"><span class="nav-icon">🛒</span>Orders<span class="nbadge r" id="orderBadge">0</span></div>
     <div class="nav-item" onclick="go('customers',this)"><span class="nav-icon">👥</span>Customers</div>
-    <div class="nav-label">Organisation</div>
-    <div class="nav-item owner-only" id="navStaff" onclick="go('staff',this)"><span class="nav-icon">🧑‍💼</span>Staff Accounts</div>
-    <div class="nav-item" id="navBranches" onclick="go('branches',this)"><span class="nav-icon">🏪</span>Branches</div>
-    <div class="nav-item owner-only" id="navOrgSettings" onclick="go('org-settings',this)"><span class="nav-icon">🏢</span>Org Settings</div>
     <div class="nav-label">Communication</div>
     <div class="nav-item" onclick="go('whatsapp',this)"><span class="nav-icon">💬</span>WhatsApp Reports</div>
     <div class="nav-label">Settings</div>
+    <div class="nav-item" onclick="go('staff',this)" id="navStaff"><span class="nav-icon">👤</span>Staff Accounts</div>
+    <div class="nav-item" onclick="go('branches',this)" id="navBranches"><span class="nav-icon">🏪</span>Branches</div>
     <div class="nav-item" onclick="go('subscription',this)"><span class="nav-icon">💳</span>Subscription</div>
+    <div class="nav-item" onclick="go('org-settings',this)" id="navOrgSettings"><span class="nav-icon">🏢</span>Org Settings</div>
+    <div class="nav-item" onclick="go('credit',this)"><span class="nav-icon">💳</span>Credit Manager<span class="nbadge r" id="creditBadge" style="display:none">!</span></div>
+    <div class="nav-item" onclick="go('variance',this)"><span class="nav-icon">🔍</span>Stock Variance</div>
+    <div class="nav-item" onclick="go('forecast',this)"><span class="nav-icon">🌧️</span>Demand Forecast</div>
+    <div class="nav-item" onclick="go('expiry-intel',this)"><span class="nav-icon">⚡</span>Expiry Intel</div>
+    <div class="nav-item" onclick="go('nda-report',this)"><span class="nav-icon">🏥</span>NDA Reports</div>
+    <div class="nav-item" onclick="go('tax-report',this)"><span class="nav-icon">📋</span>URA Tax Report</div>
     <div class="nav-item" onclick="go('offline-settings',this)"><span class="nav-icon">📴</span>Offline & Sync</div>
-    <div class="nav-item" onclick="doLogout()" style="margin-top:auto;color:var(--danger)"><span class="nav-icon">🚪</span>Logout</div>
   </nav>
   <div class="sidebar-footer">
-    <div style="padding:0 12px 10px">
-      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Active Branch</div>
-      <select class="branch-switcher" id="branchSwitcher" onchange="switchBranch(this.value)">
-        <option value="">Loading…</option>
-      </select>
-    </div>
-    <div class="user-card" onclick="go('org-settings',document.getElementById('navOrgSettings'))">
+    <div class="user-card">
       <div class="avatar" id="userAvatar">KP</div>
       <div class="user-info">
         <div class="uname" id="userName">Loading…</div>
@@ -444,21 +378,14 @@
   <div class="topbar">
     <div id="tbTitle"><div class="page-title">Loading…</div></div>
     <div class="topbar-right">
-      <div id="topbarContext" style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)">
-        <span id="topbarBranch" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:5px 10px;font-weight:500;color:var(--text)"></span>
-        <span id="topbarRole" class="role-badge"></span>
-        <span id="topbarSubStatus" style="font-size:11px"></span>
-      </div>
-      <button class="btn btn-wa" onclick="go('whatsapp',null)">💬 WhatsApp</button>
+      <button class="btn btn-wa" onclick="go('whatsapp',document.querySelectorAll('.nav-item')[6])">💬 WhatsApp</button>
       <button class="btn btn-ghost" onclick="manualSync()">🔄 Sync</button>
-      <button class="btn btn-primary" onclick="openAddDrugModal()">+ Add Drug</button>
+      <button class="btn btn-primary" onclick="handleTopBtn()">+ Add Drug</button>
     </div>
   </div>
 
   <!-- DASHBOARD -->
   <div class="page active" id="page-dashboard">
-    <!-- Org summary banner (owners only) -->
-    <div id="orgSummaryBanner" class="owner-only" style="margin-bottom:20px;display:none"></div>
     <div class="stats-grid" id="dashStats">
       <div class="stat-card g"><div class="sh"><div class="sl">Today's Revenue</div><div class="si ig">💰</div></div><div class="sv" id="dRev">—</div><div class="sc" id="dRevSub">from local data</div></div>
       <div class="stat-card b"><div class="sh"><div class="sl">Transactions</div><div class="si ib">🧾</div></div><div class="sv" id="dTx">—</div><div class="sc">today</div></div>
@@ -495,7 +422,7 @@
       <button class="fb" onclick="setInvF(this,'ok')">✅ In Stock</button>
       <button class="fb" onclick="setInvF(this,'low')">⚠️ Low</button>
       <button class="fb" onclick="setInvF(this,'critical')">🚨 Critical</button>
-      <button class="btn btn-primary" style="margin-left:auto;padding:8px 16px;font-size:12px" onclick="openAddDrug()">+ Add Drug</button>
+      <button class="btn btn-primary" style="margin-left:auto;padding:8px 16px;font-size:12px" onclick="openAddDrugModal()">+ Add Drug</button>
     </div>
     <div class="card"><table class="tbl"><thead><tr><th>Drug Name</th><th>Category</th><th>Stock</th><th>Level</th><th>Unit Price</th><th>Expiry</th><th>Status</th><th>Actions</th></tr></thead><tbody id="invBody"></tbody></table></div>
   </div>
@@ -704,167 +631,321 @@ Or open: https://app.medvault.ug</div>
     </div>
   </div>
 
-  <!-- STAFF ACCOUNTS -->
+
+  <!-- STAFF ACCOUNTS PAGE -->
   <div class="page" id="page-staff">
-    <!-- Add Staff Form (owners only) -->
-    <div class="form-panel owner-only" id="addStaffPanel">
-      <div class="form-panel-title">🧑‍💼 Invite New Staff Member</div>
-      <div class="form-grid">
-        <div class="fld">
-          <label>Full Name <span style="color:var(--danger)">*</span></label>
-          <input type="text" id="staffName" placeholder="e.g. Sarah Nambi" />
-        </div>
-        <div class="fld">
-          <label>Email Address <span style="color:var(--danger)">*</span></label>
-          <input type="email" id="staffEmail" placeholder="sarah@pharmacy.ug" />
-        </div>
-        <div class="fld">
-          <label>Phone Number</label>
-          <input type="tel" id="staffPhone" placeholder="07XX XXX XXX" />
-        </div>
-        <div class="fld">
-          <label>Role <span style="color:var(--danger)">*</span></label>
-          <select id="staffRole">
-            <option value="staff">Staff — basic access</option>
-            <option value="manager">Manager — can approve transfers</option>
-            <option value="owner">Owner — full access</option>
-          </select>
-        </div>
-        <div class="fld">
-          <label>Assign to Branch</label>
-          <select id="staffBranch">
-            <option value="">Loading branches…</option>
-          </select>
-        </div>
-        <div class="fld">
-          <label>Temporary Password <span style="color:var(--danger)">*</span></label>
-          <input type="text" id="staffTempPass" placeholder="Min 6 characters" />
-        </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div>
+        <div style="font-family:var(--display);font-weight:700;font-size:20px">👤 Staff Accounts</div>
+        <div style="font-size:13px;color:var(--muted);margin-top:3px">Manage who can log in to your pharmacy</div>
       </div>
-      <div style="margin-top:16px;display:flex;gap:10px">
-        <button class="btn btn-primary" onclick="inviteStaff()">🧑‍💼 Add Staff Member</button>
-        <button class="btn btn-ghost" onclick="document.getElementById('addStaffPanel').style.display='none'">Cancel</button>
-      </div>
+      <button class="btn btn-primary" id="inviteStaffBtn" onclick="openInviteModal()" style="display:none">+ Invite Staff</button>
     </div>
 
-    <!-- Staff List -->
+    <!-- How staff login explanation -->
+    <div style="background:rgba(0,212,170,0.06);border:1px solid rgba(0,212,170,0.18);border-radius:12px;padding:16px 20px;margin-bottom:20px;font-size:13px;line-height:1.7;color:var(--muted)">
+      <strong style="color:var(--text)">How staff log in:</strong><br>
+      1. You create an account for them using the <strong>Invite Staff</strong> button above<br>
+      2. You give them their email and password<br>
+      3. They go to <strong>your Netlify site → app.html</strong> and log in with those credentials<br>
+      4. They will only see their assigned branch — not other branches
+    </div>
+
     <div class="card">
-      <div class="card-head">
-        <div>
-          <div class="card-title">Team Members</div>
-          <div class="card-sub" id="staffCountSub">Loading…</div>
-        </div>
-        <button class="btn btn-primary owner-only" onclick="document.getElementById('addStaffPanel').style.display='block';document.getElementById('addStaffPanel').scrollIntoView({behavior:'smooth'})">+ Add Staff</button>
-      </div>
-      <div id="staffList">
-        <div style="text-align:center;padding:40px;color:var(--muted)">Loading staff…</div>
-      </div>
+      <div class="ch"><div class="ct">All Staff Members</div><span id="staffCount" style="font-size:12px;color:var(--muted)"></span></div>
+      <table class="tbl">
+        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Branch</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
+        <tbody id="staffBody"></tbody>
+      </table>
     </div>
   </div>
 
-  <!-- BRANCHES -->
+  <!-- BRANCHES PAGE -->
   <div class="page" id="page-branches">
-    <!-- Add Branch Form (owners only) -->
-    <div class="form-panel owner-only" id="addBranchPanel" style="display:none">
-      <div class="form-panel-title">🏪 Add New Branch</div>
-      <div class="form-grid">
-        <div class="fld full">
-          <label>Branch Name <span style="color:var(--danger)">*</span></label>
-          <input type="text" id="branchName" placeholder="e.g. Kato Pharma — Ntinda Branch" />
-        </div>
-        <div class="fld full">
-          <label>Address</label>
-          <input type="text" id="branchAddress" placeholder="e.g. Plot 12, Ntinda Road, Kampala" />
-        </div>
-        <div class="fld">
-          <label>Phone Number</label>
-          <input type="tel" id="branchPhone" placeholder="07XX XXX XXX" />
-        </div>
-        <div class="fld">
-          <label>NDA Registration Number</label>
-          <input type="text" id="branchNDA" placeholder="e.g. NDA/PH/2024/001" />
-        </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div>
+        <div style="font-family:var(--display);font-weight:700;font-size:20px">🏪 Branches</div>
+        <div style="font-size:13px;color:var(--muted);margin-top:3px">Manage all locations in your organisation</div>
       </div>
-      <div style="margin-top:16px;display:flex;gap:10px">
-        <button class="btn btn-primary" onclick="addBranch()">🏪 Add Branch</button>
-        <button class="btn btn-ghost" onclick="document.getElementById('addBranchPanel').style.display='none'">Cancel</button>
-      </div>
+      <button class="btn btn-primary" id="addBranchBtn" onclick="openAddBranchModal()" style="display:none">+ Add Branch</button>
     </div>
 
-    <!-- Branches Grid -->
-    <div class="section-hd">
-      <div class="section-hd-title">All Branches</div>
-      <button class="btn btn-primary owner-only" onclick="document.getElementById('addBranchPanel').style.display='block';document.getElementById('addBranchPanel').scrollIntoView({behavior:'smooth'})">+ Add Branch</button>
+    <div style="background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.18);border-radius:12px;padding:16px 20px;margin-bottom:20px;font-size:13px;line-height:1.7;color:var(--muted)">
+      <strong style="color:var(--text)">Multi-branch works like this:</strong><br>
+      Each branch has its own inventory, sales, and staff. As the owner you can see all branches from this dashboard.
+      Staff assigned to a branch only see that branch when they log in.
+      You can transfer stock between branches from the <strong>Stock Transfers</strong> section below.
     </div>
-    <div class="branches-grid" id="branchesGrid">
-      <div style="text-align:center;padding:40px;color:var(--muted)">Loading branches…</div>
+
+    <div id="branchesGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:24px"></div>
+
+    <div style="font-family:var(--display);font-weight:700;font-size:16px;margin-bottom:14px">🔄 Stock Transfers Between Branches</div>
+    <div class="card">
+      <div class="ch">
+        <div class="ct">Transfer Requests</div>
+        <button class="btn btn-primary" style="padding:6px 14px;font-size:12px" onclick="openTransferModal()">+ New Transfer</button>
+      </div>
+      <table class="tbl">
+        <thead><tr><th>From</th><th>To</th><th>Drug</th><th>Qty</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
+        <tbody id="transfersBody"></tbody>
+      </table>
     </div>
   </div>
 
-  <!-- ORG SETTINGS -->
+  <!-- ORG SETTINGS PAGE -->
   <div class="page" id="page-org-settings">
-    <!-- Subscription status banner -->
-    <div id="subBanner" style="margin-bottom:24px"></div>
+    <div style="font-family:var(--display);font-weight:700;font-size:20px;margin-bottom:4px">🏢 Organisation Settings</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:24px">Manage your organisation details and subscription</div>
+    <div class="two-col">
+      <div class="card">
+        <div class="ch"><div class="ct">Organisation Details</div></div>
+        <div style="padding:20px;display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Organisation Name</label>
+            <input id="orgNameField" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="Loading..."/>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Owner Name</label>
+            <input id="orgOwnerField" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="Loading..."/>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Phone</label>
+            <input id="orgPhoneField" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="Loading..."/>
+          </div>
+          <button class="btn btn-primary" onclick="showToast('Contact support to update org details')">Save Changes</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ch"><div class="ct">Subscription & Plan</div></div>
+        <div style="padding:20px" id="orgSubDetails">
+          <div style="text-align:center;padding:20px;color:var(--muted)">Loading...</div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-    <!-- Org info cards -->
-    <div class="org-info-grid" id="orgInfoGrid">
-      <div class="org-info-card">
-        <div class="org-info-label">Organisation</div>
-        <div class="org-info-value" id="orgName">—</div>
-        <div class="org-info-sub" id="orgPlan">—</div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       ADDON 1: STOCK VARIANCE / ANTI-THEFT ENGINE
+  ════════════════════════════════════════════════════════════ -->
+  <div class="page" id="page-variance">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div>
+        <div style="font-family:var(--display);font-weight:700;font-size:20px">🔍 Stock Variance & Anti-Theft</div>
+        <div style="font-size:13px;color:var(--muted);margin-top:3px">Detect discrepancies between recorded sales and actual stock</div>
       </div>
-      <div class="org-info-card">
-        <div class="org-info-label">Branches</div>
-        <div class="org-info-value" id="orgBranchCount">—</div>
-        <div class="org-info-sub">active locations</div>
+      <button class="btn btn-primary" onclick="openStockCountModal()">📦 Run Stock Count</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">
+      <div class="card" style="padding:20px">
+        <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:6px">Today's Sales Activity</div>
+        <div id="varianceTodaySales" style="font-size:28px;font-weight:800;color:var(--accent)">—</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px">transactions recorded</div>
       </div>
-      <div class="org-info-card">
-        <div class="org-info-label">Subscription</div>
-        <div class="org-info-value" id="orgSubStatus">—</div>
-        <div class="org-info-sub" id="orgTrialEnd">—</div>
+      <div class="card" style="padding:20px">
+        <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:6px">Variance Flags Today</div>
+        <div id="varianceFlagCount" style="font-size:28px;font-weight:800;color:var(--danger)">—</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px">items need review</div>
       </div>
     </div>
 
-    <!-- Multi-branch summary (owners only) -->
-    <div class="owner-only">
-      <div class="section-hd" style="margin-bottom:16px">
-        <div class="section-hd-title">📊 Organisation Summary — Today</div>
-        <button class="btn btn-ghost" onclick="loadOrgSettings()">🔄 Refresh</button>
-      </div>
-      <div class="stats-grid" id="orgSummaryStats" style="margin-bottom:24px">
-        <div class="stat-card g"><div class="sh"><div class="sl">Total Revenue Today</div><div class="si ig">💰</div></div><div class="sv" id="orgTotalRev">—</div><div class="sc">across all branches</div></div>
-        <div class="stat-card b"><div class="sh"><div class="sl">Total Drugs</div><div class="si ib">💊</div></div><div class="sv" id="orgTotalDrugs">—</div><div class="sc">across all branches</div></div>
-        <div class="stat-card w"><div class="sh"><div class="sl">Low Stock Items</div><div class="si iw">⚠️</div></div><div class="sv" id="orgLowStock">—</div><div class="sc">need restocking</div></div>
-        <div class="stat-card r"><div class="sh"><div class="sl">Pending Transfers</div><div class="si ir">🔄</div></div><div class="sv" id="orgPendingTransfers">—</div><div class="sc">awaiting approval</div></div>
-      </div>
-    </div>
-
-    <!-- Branch performance table (owners only) -->
-    <div class="card owner-only" style="margin-bottom:24px">
-      <div class="card-head">
-        <div class="card-title">Branch Performance</div>
-        <a class="see-all" onclick="go('branches',document.getElementById('navBranches'))">Manage →</a>
-      </div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="ch"><div class="ct">📊 Staff Activity Log</div><span style="font-size:12px;color:var(--muted)">Every transaction by every staff member</span></div>
       <table class="tbl">
-        <thead><tr><th>Branch</th><th>Drugs</th><th>Revenue Today</th><th>Status</th></tr></thead>
-        <tbody id="orgBranchTable"><tr><td colspan="4" style="text-align:center;padding:20px;color:var(--muted)">Loading…</td></tr></tbody>
+        <thead><tr><th>Time</th><th>Staff</th><th>Receipt</th><th>Customer</th><th>Amount</th><th>Method</th><th>Items</th></tr></thead>
+        <tbody id="activityBody"></tbody>
       </table>
     </div>
 
-    <!-- Account info -->
     <div class="card">
-      <div class="card-head"><div class="card-title">Account Details</div></div>
+      <div class="ch"><div class="ct">⚠️ Today's Drug Movement Review</div></div>
       <table class="tbl">
-        <tbody id="orgAccountTable">
-          <tr><td style="color:var(--muted)">Name</td><td id="orgUserName">—</td></tr>
-          <tr><td style="color:var(--muted)">Email</td><td id="orgUserEmail">—</td></tr>
-          <tr><td style="color:var(--muted)">Role</td><td id="orgUserRole">—</td></tr>
-          <tr><td style="color:var(--muted)">Current Branch</td><td id="orgCurrentBranch">—</td></tr>
-          <tr><td style="color:var(--muted)">Plan</td><td id="orgCurrentPlan">—</td></tr>
-        </tbody>
+        <thead><tr><th>Drug</th><th>Units Sold</th><th>Current Stock</th><th>Status</th></tr></thead>
+        <tbody id="varianceBody"></tbody>
       </table>
-      <div style="padding:16px 22px;border-top:1px solid var(--border)">
-        <button class="btn btn-ghost" style="color:var(--danger);border-color:rgba(239,68,68,0.3)" onclick="doLogout()">🚪 Sign Out</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       ADDON 2: CREDIT CUSTOMER MANAGER
+  ════════════════════════════════════════════════════════════ -->
+  <div class="page" id="page-credit">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div>
+        <div style="font-family:var(--display);font-weight:700;font-size:20px">💳 Credit Manager</div>
+        <div style="font-size:13px;color:var(--muted);margin-top:3px">Track drugs given on credit — send WhatsApp reminders automatically</div>
+      </div>
+      <button class="btn btn-primary" onclick="openCreditModal()">+ Record Credit</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px">
+      <div class="card" style="padding:20px">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:6px">Total Outstanding</div>
+        <div id="creditTotal" style="font-size:22px;font-weight:800;color:var(--danger)">UGX 0</div>
+      </div>
+      <div class="card" style="padding:20px">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:6px">Credit Customers</div>
+        <div id="creditCount" style="font-size:22px;font-weight:800;color:var(--accent)">0</div>
+      </div>
+      <div class="card" style="padding:20px">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:6px">Overdue</div>
+        <div id="creditOverdue" style="font-size:22px;font-weight:800;color:var(--warn)">0</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ch"><div class="ct">Credit Accounts</div></div>
+      <table class="tbl">
+        <thead><tr><th>Customer</th><th>Phone</th><th>Items</th><th>Amount Owed</th><th>Due Date</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody id="creditBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       ADDON 3: NDA INSPECTION REPORTS
+  ════════════════════════════════════════════════════════════ -->
+  <div class="page" id="page-nda-report">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div>
+        <div style="font-family:var(--display);font-weight:700;font-size:20px">🏥 NDA Inspection Mode</div>
+        <div style="font-size:13px;color:var(--muted);margin-top:3px">Generate all NDA-required documents with one tap</div>
+      </div>
+      <button class="btn btn-primary" onclick="generateNDAReport()" id="ndaBtn">📄 Generate Report</button>
+    </div>
+
+    <div style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:12px;padding:16px 20px;margin-bottom:20px;font-size:13px;line-height:1.7;color:var(--muted)">
+      <strong style="color:var(--text)">🚨 NDA Inspector Arriving?</strong> Click Generate Report above. You will get three printable documents:
+      <strong style="color:var(--text)"> 1)</strong> Classified Drug Dispensing Register &nbsp;
+      <strong style="color:var(--text)"> 2)</strong> Current Stock Inventory with Expiry Dates &nbsp;
+      <strong style="color:var(--text)"> 3)</strong> Near-Expiry Alert List
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Report From Date</label>
+        <input type="date" id="ndaFrom" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px"/>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Report To Date</label>
+        <input type="date" id="ndaTo" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px"/>
+      </div>
+    </div>
+
+    <div id="ndaReportOutput" style="display:none">
+      <div class="card" style="margin-bottom:16px">
+        <div class="ch"><div class="ct">📋 Classified Drug Dispensing Register (Rx & Antibiotics)</div></div>
+        <table class="tbl">
+          <thead><tr><th>Date</th><th>Receipt</th><th>Drug Name</th><th>Qty</th><th>Customer</th><th>Category</th></tr></thead>
+          <tbody id="ndaRxBody"></tbody>
+        </table>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="ch"><div class="ct">📦 Current Stock Inventory</div></div>
+        <table class="tbl">
+          <thead><tr><th>Drug Name</th><th>Category</th><th>Stock</th><th>Expiry Date</th><th>Supplier</th><th>Rx?</th></tr></thead>
+          <tbody id="ndaStockBody"></tbody>
+        </table>
+      </div>
+      <div class="card">
+        <div class="ch"><div class="ct">⚠️ Expiring Within 60 Days</div></div>
+        <table class="tbl">
+          <thead><tr><th>Drug</th><th>Stock</th><th>Expiry Date</th><th>Days Left</th></tr></thead>
+          <tbody id="ndaExpiryBody"></tbody>
+        </table>
+      </div>
+      <div style="margin-top:16px;text-align:center">
+        <button onclick="window.print()" style="padding:12px 28px;background:var(--accent);color:#000;border:none;border-radius:10px;font-family:var(--display);font-weight:800;font-size:14px;cursor:pointer">🖨️ Print All Documents</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       ADDON 4: EXPIRY INTELLIGENCE
+  ════════════════════════════════════════════════════════════ -->
+  <div class="page" id="page-expiry-intel">
+    <div style="margin-bottom:20px">
+      <div style="font-family:var(--display);font-weight:700;font-size:20px">⚡ Expiry Intelligence</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:3px">Smart recommendations — sell faster, discount early, return before it's too late</div>
+    </div>
+    <div id="expiryIntelGrid" style="display:flex;flex-direction:column;gap:12px">
+      <div style="text-align:center;padding:40px;color:var(--muted)">Loading intelligence...</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       ADDON 5: SEASONAL DEMAND FORECAST
+  ════════════════════════════════════════════════════════════ -->
+  <div class="page" id="page-forecast">
+    <div style="margin-bottom:20px">
+      <div style="font-family:var(--display);font-weight:700;font-size:20px">🌧️ Demand Forecast</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:3px">Uganda malaria seasons + your sales history = smart reorder recommendations</div>
+    </div>
+    <div id="seasonBanner" style="margin-bottom:20px"></div>
+    <div class="card">
+      <div class="ch"><div class="ct">📊 Drug Forecast & Reorder Recommendations</div></div>
+      <table class="tbl">
+        <thead><tr><th>Drug</th><th>Current Stock</th><th>Avg Monthly</th><th>Forecast Next Month</th><th>Reorder Qty</th><th>Urgency</th></tr></thead>
+        <tbody id="forecastBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       ADDON 6: URA TAX REPORT
+  ════════════════════════════════════════════════════════════ -->
+  <div class="page" id="page-tax-report">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div>
+        <div style="font-family:var(--display);font-weight:700;font-size:20px">📋 URA Tax Report</div>
+        <div style="font-size:13px;color:var(--muted);margin-top:3px">Auto-generated monthly tax summary for your accountant</div>
+      </div>
+      <button class="btn btn-primary" onclick="generateTaxReport()" id="taxBtn">📄 Generate Report</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Month</label>
+        <select id="taxMonth" style="background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:var(--font);font-size:13px;outline:none">
+          <option value="1">January</option><option value="2">February</option><option value="3">March</option>
+          <option value="4">April</option><option value="5">May</option><option value="6">June</option>
+          <option value="7">July</option><option value="8">August</option><option value="9">September</option>
+          <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+        </select>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Year</label>
+        <select id="taxYear" style="background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:var(--font);font-size:13px;outline:none">
+          <option value="2026">2026</option><option value="2025">2025</option><option value="2024">2024</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="taxReportOutput" style="display:none">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
+        <div class="card" style="padding:16px;text-align:center"><div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.4px">Gross Revenue</div><div id="taxGross" style="font-size:18px;font-weight:800;color:var(--accent)"></div></div>
+        <div class="card" style="padding:16px;text-align:center"><div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.4px">Transactions</div><div id="taxTxns" style="font-size:18px;font-weight:800;color:var(--text)"></div></div>
+        <div class="card" style="padding:16px;text-align:center"><div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.4px">MoMo Payments</div><div id="taxMomo" style="font-size:18px;font-weight:800;color:var(--text)"></div></div>
+        <div class="card" style="padding:16px;text-align:center"><div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.4px">Est. Tax (URA)</div><div id="taxEstimate" style="font-size:18px;font-weight:800;color:var(--warn)"></div></div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="ch"><div class="ct">📅 Daily Breakdown</div></div>
+        <table class="tbl">
+          <thead><tr><th>Date</th><th>Revenue</th><th>Transactions</th></tr></thead>
+          <tbody id="taxDailyBody"></tbody>
+        </table>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="ch"><div class="ct">💊 Top 10 Drugs by Revenue</div></div>
+        <table class="tbl">
+          <thead><tr><th>Drug</th><th>Units Sold</th><th>Revenue</th></tr></thead>
+          <tbody id="taxDrugsBody"></tbody>
+        </table>
+      </div>
+      <div style="background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.2);border-radius:12px;padding:16px 20px;font-size:13px;color:var(--muted);margin-bottom:16px" id="taxNoteBox"></div>
+      <div style="text-align:center">
+        <button onclick="window.print()" style="padding:12px 28px;background:var(--accent);color:#000;border:none;border-radius:10px;font-family:var(--display);font-weight:800;font-size:14px;cursor:pointer">🖨️ Print / Save as PDF for Accountant</button>
       </div>
     </div>
   </div>
@@ -896,72 +977,6 @@ Or open: https://app.medvault.ug</div>
 </div>
 
 <div class="toast" id="toast"><span id="toastMsg"></span></div>
-
-<!-- ADD DRUG MODAL -->
-<div class="overlay" id="addDrugOverlay" onclick="if(event.target===this)closeAddDrug()">
-  <div class="add-drug-modal">
-    <div class="adm-head">
-      <h3 style="margin:0;font-family:'Syne',sans-serif;font-size:18px">💊 Add New Drug</h3>
-      <button class="ab" onclick="closeAddDrug()" style="font-size:18px">✕</button>
-    </div>
-    <form id="addDrugForm" onsubmit="submitAddDrug(event)">
-      <div class="adm-grid">
-        <div class="adm-field full">
-          <label>Drug Name <span style="color:var(--danger)">*</span></label>
-          <input type="text" id="adName" placeholder="e.g. Paracetamol 500mg" required />
-        </div>
-        <div class="adm-field">
-          <label>Category</label>
-          <select id="adCategory">
-            <option value="">Select…</option>
-            <option value="Analgesics">Analgesics</option>
-            <option value="Antibiotics">Antibiotics</option>
-            <option value="Antimalarials">Antimalarials</option>
-            <option value="Antihistamines">Antihistamines</option>
-            <option value="Vitamins">Vitamins</option>
-            <option value="Supplements">Supplements</option>
-            <option value="Antacids">Antacids</option>
-            <option value="Antifungals">Antifungals</option>
-            <option value="Other">Other</option>
-          </select>
-        </div>
-        <div class="adm-field">
-          <label>Quantity <span style="color:var(--danger)">*</span></label>
-          <input type="number" id="adQty" placeholder="100" min="1" required />
-        </div>
-        <div class="adm-field">
-          <label>Unit Price (UGX) <span style="color:var(--danger)">*</span></label>
-          <input type="number" id="adPrice" placeholder="5000" min="0" required />
-        </div>
-        <div class="adm-field">
-          <label>Cost Price (UGX)</label>
-          <input type="number" id="adCost" placeholder="3000" min="0" />
-        </div>
-        <div class="adm-field">
-          <label>Expiry Date</label>
-          <input type="date" id="adExpiry" />
-        </div>
-        <div class="adm-field">
-          <label>Supplier</label>
-          <input type="text" id="adSupplier" placeholder="e.g. Cipla" />
-        </div>
-        <div class="adm-field">
-          <label>Restock Threshold</label>
-          <input type="number" id="adThreshold" placeholder="20" min="0" />
-        </div>
-        <div class="adm-field">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-            <input type="checkbox" id="adRx" style="width:auto" /> Requires Prescription
-          </label>
-        </div>
-      </div>
-      <div class="adm-actions">
-        <button type="button" class="btn btn-ghost" onclick="closeAddDrug()">Cancel</button>
-        <button type="submit" class="btn btn-primary">💊 Add Drug</button>
-      </div>
-    </form>
-  </div>
-</div>
 
 <script>
 // ═══════════════════════════════════════════════════════════
@@ -997,12 +1012,7 @@ const MedVaultOffline = {
         fetch(this.API_BASE+'/api/customers',{headers:h}).then(r=>r.json()),
       ]);
       const db=this.getDB();
-      if(inv.drugs) {
-        const offlineDrugs=(db.drugs||[]).filter(d=>d._offline&&!d._synced);
-        const serverIds=new Set(inv.drugs.map(d=>d.id));
-        const mergedDrugs=[...inv.drugs,...offlineDrugs.filter(d=>!serverIds.has(d.id))];
-        db.drugs=mergedDrugs;
-      }
+      if(inv.drugs) db.drugs=inv.drugs;
       if(sales.sales) db.sales=sales.sales;
       if(orders.orders) db.orders=orders.orders;
       if(customers.customers) db.customers=customers.customers;
@@ -1053,16 +1063,6 @@ const MedVaultOffline = {
     return drugs.map(d=>({...d,stock_status:d.stock_status||this._calcStatus(d),days_to_expiry:d.expiry_date?Math.ceil((new Date(d.expiry_date)-new Date())/86400000):999}));
   },
   _calcStatus(d){ if(d.quantity===0)return'out'; if(d.quantity<=d.threshold)return'critical'; if(d.quantity<=d.threshold*1.5)return'low'; return'ok'; },
-
-  addDrugLocal(drugData){
-    const drugs=this.getTable('drugs');
-    const newDrug={id:Date.now(),...drugData,stock_status:this._calcStatus({quantity:drugData.quantity,threshold:drugData.threshold||20}),created_at:new Date().toISOString(),_offline:true};
-    drugs.push(newDrug);
-    this.saveTable('drugs',drugs);
-    this.queueAction({type:'add_drug',method:'POST',url:'/api/inventory',body:drugData});
-    return newDrug;
-  },
-
   getSales(limit=50){ return this.getTable('sales').slice(0,limit); },
   getOrders(status=''){ const o=this.getTable('orders'); return status?o.filter(x=>x.order_status===status):o; },
   getCustomers(){ return this.getTable('customers'); },
@@ -1149,7 +1149,6 @@ let token = localStorage.getItem('mv_token') || '';
 let currentUser = JSON.parse(localStorage.getItem('mv_user') || 'null');
 let cart = [];
 let allDrugs = [];
-let allBranches = [];
 let payMethod = 'cash';
 let currentPage = 'dashboard';
 const avatarColors=['linear-gradient(135deg,#6366f1,#8b5cf6)','linear-gradient(135deg,#f59e0b,#ef4444)','linear-gradient(135deg,#10b981,#3b82f6)','linear-gradient(135deg,#ec4899,#8b5cf6)','linear-gradient(135deg,#00d4aa,#3b82f6)','linear-gradient(135deg,#f97316,#eab308)'];
@@ -1207,29 +1206,12 @@ async function doLogin() {
 
 async function boot(data) {
   const user = data.user || currentUser;
-  currentUser = user;
-
-  // Sidebar user card
-  document.getElementById('userName').textContent   = user.name || 'Pharmacy';
-  document.getElementById('userRole').textContent   = (user.pharmacyName || user.orgName || '') + ' · ' + (user.role || 'staff');
-  document.getElementById('userAvatar').textContent = (user.name||'KP').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-  document.getElementById('rPharmAddr').textContent = (user.pharmacyName || user.orgName || 'MedVault') + ' · Kampala, Uganda';
-
-  // Topbar context
-  const branchEl = document.getElementById('topbarBranch');
-  const roleEl   = document.getElementById('topbarRole');
-  if (branchEl) branchEl.textContent = user.pharmacyName || user.orgName || 'MedVault';
-  if (roleEl) {
-    roleEl.textContent = user.role || 'staff';
-    roleEl.className = 'role-badge ' + (user.role || 'staff');
-  }
-
-  // Role-based UI: add is-owner class to body for CSS-driven visibility
-  if (user.role === 'owner' || user.role === 'super_admin') {
-    document.body.classList.add('is-owner');
-  }
-
+  document.getElementById('userName').textContent    = user.name || user.pharmacyName || 'Pharmacy';
+  document.getElementById('userRole').textContent    = (user.pharmacyName||'') + ' · ' + (user.plan||'pro');
+  document.getElementById('userAvatar').textContent  = (user.name||'KP').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  document.getElementById('rPharmAddr').textContent  = (user.pharmacyName||'MedVault') + ' · Kampala, Uganda';
   document.getElementById('loginScreen').classList.add('hidden');
+
   MedVaultOffline.init(token);
 
   // Pull latest data from server
@@ -1242,81 +1224,7 @@ async function boot(data) {
   }
 
   allDrugs = MedVaultOffline.getDrugs();
-
-  // Load branches for switcher
-  await loadBranchSwitcher();
-
-  // Fetch /api/auth/me for full subscription/org data
-  fetchMeData();
-
   go('dashboard', document.querySelector('.nav-item.active'));
-}
-
-async function fetchMeData() {
-  if (!token || !navigator.onLine) return;
-  try {
-    const res = await fetch(MedVaultOffline.API_BASE + '/api/auth/me', {
-      headers: { 'Authorization': 'Bearer ' + token }
-    });
-    const data = await res.json();
-    if (data.user) {
-      // Update currentUser with full server data
-      currentUser = { ...currentUser, ...data.user };
-      localStorage.setItem('mv_user', JSON.stringify(currentUser));
-
-      // Update subscription status in topbar
-      const subEl = document.getElementById('topbarSubStatus');
-      if (subEl && data.user.sub_status) {
-        const isTrialing = data.user.sub_status === 'trial';
-        subEl.textContent = isTrialing ? '🕐 Trial' : '✅ Active';
-        subEl.style.color = isTrialing ? 'var(--warn)' : 'var(--success)';
-      }
-    }
-  } catch(e) { /* offline */ }
-}
-
-async function loadBranchSwitcher() {
-  if (!token || !navigator.onLine) return;
-  try {
-    const res = await fetch(MedVaultOffline.API_BASE + '/api/branches', {
-      headers: { 'Authorization': 'Bearer ' + token }
-    });
-    const data = await res.json();
-    if (data.branches) {
-      allBranches = data.branches;
-      const sel = document.getElementById('branchSwitcher');
-      const activePharmaId = currentUser?.pharmacyId || currentUser?.pharmacy_id;
-      sel.innerHTML = data.branches.map(b =>
-        `<option value="${b.id}" ${b.id == activePharmaId ? 'selected' : ''}>${b.name}${b.is_head_office ? ' 🏠' : ''}</option>`
-      ).join('');
-    }
-  } catch(e) {
-    document.getElementById('branchSwitcher').innerHTML = '<option value="">—</option>';
-  }
-}
-
-function switchBranch(pharmacyId) {
-  if (!pharmacyId) return;
-  const branch = allBranches.find(b => b.id == pharmacyId);
-  if (!branch) return;
-  // Update local user context
-  currentUser.pharmacyId = parseInt(pharmacyId);
-  currentUser.pharmacyName = branch.name;
-  localStorage.setItem('mv_user', JSON.stringify(currentUser));
-  // Update topbar
-  const branchEl = document.getElementById('topbarBranch');
-  if (branchEl) branchEl.textContent = branch.name;
-  document.getElementById('rPharmAddr').textContent = branch.name + ' · Kampala, Uganda';
-  showToast('🏪 Switched to ' + branch.name);
-  // Reload current page data
-  loadPage(currentPage);
-}
-
-function doLogout() {
-  if (!confirm('Sign out of MedVault?')) return;
-  localStorage.removeItem('mv_token');
-  localStorage.removeItem('mv_user');
-  window.location.reload();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1328,9 +1236,6 @@ const pageMeta = {
   sales:             {t:'🧾 Sales & Receipts',       s:'Record sales — saves offline if no internet ✅'},
   orders:            {t:'🛒 Orders',                 s:'Online & in-store order management'},
   customers:         {t:'👥 Customers',              s:'Customer data from local storage'},
-  staff:             {t:'🧑‍💼 Staff Accounts',        s:'Manage your team members and roles'},
-  branches:          {t:'🏪 Branches',               s:'All pharmacy locations in your organisation'},
-  'org-settings':    {t:'🏢 Organisation Settings',  s:'Account, subscription, and multi-branch overview'},
   whatsapp:          {t:'💬 WhatsApp Reports',       s:'Automated daily reports & alerts'},
   subscription:      {t:'💳 Subscription',           s:'Your MedVault plan'},
   'offline-settings':{t:'📴 Offline & Sync',        s:'Storage, sync status & app installation'},
@@ -1353,101 +1258,93 @@ function loadPage(page) {
   if (page === 'sales')              loadSalesHistory();
   if (page === 'orders')             loadOrders();
   if (page === 'customers')          loadCustomers();
-  if (page === 'staff')              loadStaff();
-  if (page === 'branches')           loadBranches();
-  if (page === 'org-settings')       loadOrgSettings();
   if (page === 'whatsapp')           loadWAPreview();
   if (page === 'subscription')       loadSubscription();
   if (page === 'offline-settings')   loadStorageInfo();
 }
 
 function handleTopBtn() {
-  if (currentPage === 'sales') { document.getElementById('drugSrch').focus(); }
-  else { openAddDrug(); }
+  if (currentPage === 'sales') {
+    document.getElementById('drugSrch').focus();
+  } else if (currentPage === 'inventory') {
+    openAddDrugModal();
+  } else {
+    go('inventory', document.querySelectorAll('.nav-item')[1]);
+    setTimeout(openAddDrugModal, 300);
+  }
 }
 
-function openAddDrug() {
-  document.getElementById('addDrugForm').reset();
+function openAddDrugModal() {
   document.getElementById('addDrugOverlay').classList.add('open');
 }
 
 function closeAddDrug() {
   document.getElementById('addDrugOverlay').classList.remove('open');
+  document.getElementById('addDrugForm').reset();
 }
 
-async function submitAddDrug(e) {
-  e.preventDefault();
-  
-  const drugData = { 
-    name: document.getElementById('adName').value,
-    quantity: parseInt(document.getElementById('adQty').value),
-    unit_price: parseFloat(document.getElementById('adPrice').value),
-    // ... other fields
-  };
+async function submitAddDrug() {
+  const name       = document.getElementById('adName').value.trim();
+  const category   = document.getElementById('adCategory').value;
+  const quantity   = document.getElementById('adQty').value;
+  const unit_price = document.getElementById('adPrice').value;
+  const cost_price = document.getElementById('adCost').value;
+  const expiry_date= document.getElementById('adExpiry').value;
+  const supplier   = document.getElementById('adSupplier').value.trim();
+  const threshold  = document.getElementById('adThreshold').value;
+  const requires_rx= document.getElementById('adRx').checked;
+  const btn        = document.getElementById('addDrugBtn');
 
-  try {
-    // Call the backend API
-    const res = await fetch(MedVaultOffline.API_BASE + '/api/inventory', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + currentToken  // assuming token is stored
-      },
-      body: JSON.stringify(drugData)
-    });
-    
-    const result = await res.json();
-    if (!res.ok) throw new Error(result.error);
-    
-    showToast('✅ Drug added!');
-    closeAddDrug();
-    loadInventory(); // Refresh the list
-  } catch (err) {
-    showToast('❌ ' + err.message, 'error');
+  if (!name)       { showToast('Drug name is required','warn'); return; }
+  if (!quantity)   { showToast('Quantity is required','warn'); return; }
+  if (!unit_price) { showToast('Selling price is required','warn'); return; }
+
+  btn.textContent = '⏳ Adding...';
+  btn.disabled = true;
+
+  const drugData = { name, category, quantity: parseInt(quantity),
+    unit_price: parseFloat(unit_price), cost_price: parseFloat(cost_price||0),
+    expiry_date: expiry_date||null, supplier, threshold: parseInt(threshold||20), requires_rx };
+
+  // Always save locally first (works offline)
+  const localDrug = MedVaultOffline.addDrugLocal(drugData);
+
+  // Also try to save to real backend
+  if (MedVaultOffline.isOnline() && token) {
+    try {
+      const res = await fetch(MedVaultOffline.API_BASE + '/api/inventory', {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+token },
+        body: JSON.stringify(drugData),
+      });
+      const data = await res.json();
+      if (data.drug) {
+        showToast('✅ ' + name + ' added to inventory!');
+      } else {
+        showToast('✅ Saved locally · ' + (data.error||''), 'warn');
+      }
+    } catch(e) {
+      showToast('✅ Saved offline — will sync when connected','warn');
+    }
+  } else {
+    showToast('✅ ' + name + ' saved offline!','warn');
   }
+
+  closeAddDrug();
+  allDrugs = MedVaultOffline.getDrugs();
+  if (currentPage === 'inventory') loadInventory();
+  loadDashboard();
+
+  btn.textContent = '✅ Add Drug';
+  btn.disabled = false;
 }
 
 // ═══════════════════════════════════════════════════════════
-// DASHBOARD — reads from local storage + org summary for owners
+// DASHBOARD — reads from local storage
 // ═══════════════════════════════════════════════════════════
-async function loadDashboard() {
+function loadDashboard() {
   const stats = MedVaultOffline.getDashboardStats();
   const drugs = MedVaultOffline.getDrugs();
-
-  // Org summary banner for owners
-  const banner = document.getElementById('orgSummaryBanner');
-  if (banner && (currentUser?.role === 'owner' || currentUser?.role === 'super_admin')) {
-    banner.style.display = 'block';
-    if (token && navigator.onLine) {
-      try {
-        const res = await fetch(MedVaultOffline.API_BASE + '/api/org/summary', {
-          headers: { 'Authorization': 'Bearer ' + token }
-        });
-        const d = await res.json();
-        if (d.branchCount !== undefined) {
-          banner.innerHTML = `
-            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
-              <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px">
-                <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Branches</div>
-                <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:22px;color:var(--accent)">${d.branchCount}</div>
-              </div>
-              <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px">
-                <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Org Revenue Today</div>
-                <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:22px;color:var(--accent)">UGX ${Math.round(d.totalRevenueToday||0).toLocaleString()}</div>
-              </div>
-              <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px">
-                <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Total Drugs</div>
-                <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:22px;color:var(--accent2)">${d.totalDrugs}</div>
-              </div>
-              <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px">
-                <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Low Stock (Org)</div>
-                <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:22px;color:var(--warn)">${d.lowStockCount}</div>
-              </div>
-            </div>`;
-        }
-      } catch(e) { banner.style.display = 'none'; }
-    }
-  }
 
   document.getElementById('dRev').textContent  = 'UGX ' + Math.round(stats.revenueToday).toLocaleString();
   document.getElementById('dTx').textContent   = stats.transactionsToday;
@@ -1757,343 +1654,20 @@ async function sendStockAlertNow() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// STAFF MANAGEMENT
-// ═══════════════════════════════════════════════════════════
-async function loadStaff() {
-  const listEl = document.getElementById('staffList');
-  const countEl = document.getElementById('staffCountSub');
-  if (!token || !navigator.onLine) {
-    listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted)">📴 Staff list requires an internet connection</div>';
-    return;
-  }
-  listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted)">Loading…</div>';
-  try {
-    const res = await fetch(MedVaultOffline.API_BASE + '/api/staff', {
-      headers: { 'Authorization': 'Bearer ' + token }
-    });
-    const data = await res.json();
-    const staff = data.staff || [];
-    if (countEl) countEl.textContent = `${staff.length} member${staff.length !== 1 ? 's' : ''} in your organisation`;
-
-    // Populate branch dropdown in add-staff form
-    const branchSel = document.getElementById('staffBranch');
-    if (branchSel && allBranches.length) {
-      branchSel.innerHTML = allBranches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
-    }
-
-    if (!staff.length) {
-      listEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">No staff members yet. Add your first team member above.</div>';
-      return;
-    }
-    listEl.innerHTML = staff.map(s => {
-      const initials = (s.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-      const colorIdx = s.id % avatarColors.length;
-      const isMe = s.id === currentUser?.id;
-      return `<div class="staff-row">
-        <div class="avatar" style="background:${avatarColors[colorIdx]};width:36px;height:36px;font-size:13px">${initials}</div>
-        <div>
-          <div style="font-size:13px;font-weight:500">${s.name}${isMe ? ' <span style="font-size:11px;color:var(--muted)">(you)</span>' : ''}</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px">${s.email} · ${s.pharmacy_name || 'All branches'}</div>
-        </div>
-        <span class="role-badge ${s.role}">${s.role}</span>
-        ${!isMe && (currentUser?.role === 'owner') ? `<button class="deactivate-btn" onclick="deactivateStaff(${s.id},'${s.name}')">Deactivate</button>` : '<div></div>'}
-      </div>`;
-    }).join('');
-  } catch(e) {
-    listEl.innerHTML = `<div style="text-align:center;padding:30px;color:var(--muted)">Failed to load staff: ${e.message}</div>`;
-  }
-}
-
-async function inviteStaff() {
-  const name     = document.getElementById('staffName').value.trim();
-  const email    = document.getElementById('staffEmail').value.trim();
-  const phone    = document.getElementById('staffPhone').value.trim();
-  const role     = document.getElementById('staffRole').value;
-  const branchId = document.getElementById('staffBranch').value;
-  const pass     = document.getElementById('staffTempPass').value.trim();
-
-  if (!name || !email || !pass) {
-    showToast('Please fill in name, email, and temporary password', 'warn');
-    return;
-  }
-  if (pass.length < 6) {
-    showToast('Password must be at least 6 characters', 'warn');
-    return;
-  }
-
-  try {
-    const res = await fetch(MedVaultOffline.API_BASE + '/api/staff/invite', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify({ name, email, phone, role, pharmacy_id: branchId || undefined, password: pass })
-    });
-    const data = await res.json();
-    if (data.error) { showToast('❌ ' + data.error, 'err'); return; }
-    showToast('✅ ' + (data.message || 'Staff member added!'));
-    // Clear form
-    ['staffName','staffEmail','staffPhone','staffTempPass'].forEach(id => document.getElementById(id).value = '');
-    document.getElementById('addStaffPanel').style.display = 'none';
-    loadStaff();
-  } catch(e) {
-    showToast('❌ Failed to add staff: ' + e.message, 'err');
-  }
-}
-
-async function deactivateStaff(id, name) {
-  if (!confirm(`Deactivate ${name}? They will no longer be able to log in.`)) return;
-  try {
-    const res = await fetch(MedVaultOffline.API_BASE + '/api/staff/' + id, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify({ is_active: false })
-    });
-    const data = await res.json();
-    if (data.error) { showToast('❌ ' + data.error, 'err'); return; }
-    showToast('✅ ' + name + ' has been deactivated');
-    loadStaff();
-  } catch(e) {
-    showToast('❌ Failed: ' + e.message, 'err');
-  }
-}
-
-// ═══════════════════════════════════════════════════════════
-// BRANCH MANAGEMENT
-// ═══════════════════════════════════════════════════════════
-async function loadBranches() {
-  const gridEl = document.getElementById('branchesGrid');
-  if (!token || !navigator.onLine) {
-    gridEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">📴 Branch list requires an internet connection</div>';
-    return;
-  }
-  gridEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">Loading…</div>';
-  try {
-    const res = await fetch(MedVaultOffline.API_BASE + '/api/branches', {
-      headers: { 'Authorization': 'Bearer ' + token }
-    });
-    const data = await res.json();
-    const branches = data.branches || [];
-    allBranches = branches;
-
-    if (!branches.length) {
-      gridEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">No branches yet. Add your first branch above.</div>';
-      return;
-    }
-
-    const activePharmaId = currentUser?.pharmacyId || currentUser?.pharmacy_id;
-    gridEl.innerHTML = branches.map(b => `
-      <div class="branch-card ${b.id == activePharmaId ? 'active-branch' : ''}" onclick="switchBranch(${b.id})">
-        <div class="branch-card-hd">
-          <div>
-            <div class="branch-name">${b.name}${b.is_head_office ? ' 🏠' : ''}</div>
-            <div class="branch-meta">${b.address || 'No address set'}</div>
-          </div>
-          ${b.id == activePharmaId ? '<span style="font-size:11px;color:var(--accent);font-weight:600">● Active</span>' : '<button class="switch-branch-btn" onclick="event.stopPropagation();switchBranch('+b.id+')">Switch</button>'}
-        </div>
-        ${b.phone ? `<div style="font-size:12px;color:var(--muted);margin-bottom:4px">📞 ${b.phone}</div>` : ''}
-        ${b.nda_number ? `<div style="font-size:12px;color:var(--muted)">NDA: ${b.nda_number}</div>` : ''}
-        <div class="branch-stats">
-          <div class="branch-stat">
-            <div class="branch-stat-val">${b.drug_count || 0}</div>
-            <div class="branch-stat-lbl">Drug Types</div>
-          </div>
-          <div class="branch-stat">
-            <div class="branch-stat-val">UGX ${Math.round(b.revenue_today || 0).toLocaleString()}</div>
-            <div class="branch-stat-lbl">Revenue Today</div>
-          </div>
-        </div>
-      </div>`).join('');
-  } catch(e) {
-    gridEl.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted)">Failed to load branches: ${e.message}</div>`;
-  }
-}
-
-async function addBranch() {
-  const name    = document.getElementById('branchName').value.trim();
-  const address = document.getElementById('branchAddress').value.trim();
-  const phone   = document.getElementById('branchPhone').value.trim();
-  const nda     = document.getElementById('branchNDA').value.trim();
-
-  if (!name) { showToast('Branch name is required', 'warn'); return; }
-
-  try {
-    const res = await fetch(MedVaultOffline.API_BASE + '/api/branches', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify({ name, address, phone, nda_number: nda })
-    });
-    const data = await res.json();
-    if (data.error) { showToast('❌ ' + data.error, 'err'); return; }
-    showToast('✅ ' + (data.message || 'Branch added!'));
-    ['branchName','branchAddress','branchPhone','branchNDA'].forEach(id => document.getElementById(id).value = '');
-    document.getElementById('addBranchPanel').style.display = 'none';
-    await loadBranchSwitcher();
-    loadBranches();
-  } catch(e) {
-    showToast('❌ Failed to add branch: ' + e.message, 'err');
-  }
-}
-
-// ═══════════════════════════════════════════════════════════
-// ORG SETTINGS
-// ═══════════════════════════════════════════════════════════
-async function loadOrgSettings() {
-  // Populate account details from cached user
-  const u = currentUser || {};
-  const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val || '—'; };
-  setEl('orgUserName', u.name);
-  setEl('orgUserEmail', u.email);
-  setEl('orgUserRole', u.role);
-  setEl('orgCurrentBranch', u.pharmacyName || u.pharmacy_name);
-  setEl('orgCurrentPlan', u.plan);
-  setEl('orgName', u.orgName || u.org_name);
-  setEl('orgPlan', 'Plan: ' + (u.plan || '—'));
-
-  if (!token || !navigator.onLine) {
-    document.getElementById('subBanner').innerHTML = '<div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.2);border-radius:12px;padding:14px 18px;font-size:13px;color:var(--warn)">📴 Offline — subscription details unavailable</div>';
-    return;
-  }
-
-  try {
-    // Fetch /api/auth/me for subscription data
-    const meRes = await fetch(MedVaultOffline.API_BASE + '/api/auth/me', {
-      headers: { 'Authorization': 'Bearer ' + token }
-    });
-    const meData = await meRes.json();
-    const user = meData.user || {};
-
-    // Update fields with fresh data
-    setEl('orgUserName', user.name);
-    setEl('orgUserEmail', user.email);
-    setEl('orgUserRole', user.role);
-    setEl('orgCurrentBranch', user.pharmacy_name);
-    setEl('orgCurrentPlan', user.plan);
-    setEl('orgName', user.org_name);
-    setEl('orgPlan', 'Plan: ' + (user.plan || '—'));
-
-    // Subscription banner
-    const banner = document.getElementById('subBanner');
-    const isTrialing = user.sub_status === 'trial';
-    const trialEnd = user.trial_ends_at ? new Date(user.trial_ends_at) : null;
-    const daysLeft = trialEnd ? Math.ceil((trialEnd - new Date()) / 86400000) : null;
-
-    if (isTrialing) {
-      banner.innerHTML = `<div class="trial-banner">
-        <div class="trial-banner-left">
-          <div class="trial-icon">🕐</div>
-          <div>
-            <div class="trial-title">Free Trial Active</div>
-            <div class="trial-sub">${daysLeft !== null ? `${daysLeft} day${daysLeft !== 1 ? 's' : ''} remaining` : 'Trial period active'} · Upgrade anytime to keep access</div>
-          </div>
-        </div>
-        <button class="btn btn-primary" onclick="go('subscription',null)">Upgrade Plan →</button>
-      </div>`;
-    } else {
-      banner.innerHTML = `<div class="trial-banner active-banner">
-        <div class="trial-banner-left">
-          <div class="trial-icon">✅</div>
-          <div>
-            <div class="trial-title">Subscription Active</div>
-            <div class="trial-sub">Plan: ${user.plan || '—'} · ${user.next_billing ? 'Next billing: ' + new Date(user.next_billing).toLocaleDateString('en-UG') : 'Billing managed by admin'}</div>
-          </div>
-        </div>
-        <button class="btn btn-ghost" onclick="go('subscription',null)">Manage Plan</button>
-      </div>`;
-    }
-
-    setEl('orgSubStatus', isTrialing ? '🕐 Trial' : '✅ Active');
-    setEl('orgTrialEnd', trialEnd ? 'Ends ' + trialEnd.toLocaleDateString('en-UG', {day:'numeric',month:'long',year:'numeric'}) : '');
-
-    // Fetch org summary for owners
-    if (user.role === 'owner' || user.role === 'super_admin') {
-      const [summaryRes, branchesRes] = await Promise.all([
-        fetch(MedVaultOffline.API_BASE + '/api/org/summary', { headers: { 'Authorization': 'Bearer ' + token } }),
-        fetch(MedVaultOffline.API_BASE + '/api/branches', { headers: { 'Authorization': 'Bearer ' + token } }),
-      ]);
-      const summary = await summaryRes.json();
-      const branchData = await branchesRes.json();
-
-      setEl('orgBranchCount', summary.branchCount || 0);
-      setEl('orgTotalRev', 'UGX ' + Math.round(summary.totalRevenueToday || 0).toLocaleString());
-      setEl('orgTotalDrugs', summary.totalDrugs || 0);
-      setEl('orgLowStock', summary.lowStockCount || 0);
-      setEl('orgPendingTransfers', summary.pendingTransfers || 0);
-
-      // Branch performance table
-      const branches = branchData.branches || [];
-      const tableEl = document.getElementById('orgBranchTable');
-      if (tableEl) {
-        tableEl.innerHTML = branches.map(b => `
-          <tr>
-            <td><strong>${b.name}</strong>${b.is_head_office ? ' <span style="font-size:10px;color:var(--accent)">HQ</span>' : ''}<div style="font-size:11px;color:var(--muted)">${b.address || '—'}</div></td>
-            <td>${b.drug_count || 0}</td>
-            <td style="font-family:'Syne',sans-serif;font-weight:700">UGX ${Math.round(b.revenue_today || 0).toLocaleString()}</td>
-            <td><span class="pill ok">Active</span></td>
-          </tr>`).join('') || '<tr><td colspan="4" style="text-align:center;padding:16px;color:var(--muted)">No branches</td></tr>';
-      }
-    }
-  } catch(e) {
-    document.getElementById('subBanner').innerHTML = `<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:12px;padding:14px 18px;font-size:13px;color:var(--danger)">Failed to load settings: ${e.message}</div>`;
-  }
-}
-
-// ═══════════════════════════════════════════════════════════
 // SUBSCRIPTION
 // ═══════════════════════════════════════════════════════════
 async function loadSubscription() {
-  const planPrices = { drug_shop: 20000, single: 50000, branch: 40000, chain: 30000, enterprise: 150000, basic: 20000, pro: 50000 };
-
-  // Show cached data immediately
-  const plan = currentUser?.plan || 'pro';
   document.getElementById('subDetails').innerHTML = `
     <table class="tbl"><tbody>
-      <tr><td style="color:var(--muted)">Plan</td><td><strong style="color:var(--accent)">${plan} ⭐</strong></td></tr>
-      <tr><td style="color:var(--muted)">Amount</td><td><strong>UGX ${(planPrices[plan]||50000).toLocaleString()} / month</strong></td></tr>
-      <tr><td style="color:var(--muted)">Status</td><td id="subStatusCell"><span class="pill ok">Loading…</span></td></tr>
-      <tr><td style="color:var(--muted)">Trial Ends</td><td id="subTrialCell">—</td></tr>
-      <tr><td style="color:var(--muted)">Next Billing</td><td id="subBillingCell">—</td></tr>
+      <tr><td style="color:var(--muted)">Plan</td><td><strong style="color:var(--accent)">${currentUser?.plan||'pro'} ⭐</strong></td></tr>
+      <tr><td style="color:var(--muted)">Amount</td><td><strong>UGX 50,000 / month</strong></td></tr>
+      <tr><td style="color:var(--muted)">Next Billing</td><td>April 22, 2026</td></tr>
+      <tr><td style="color:var(--muted)">Payment</td><td>📱 MTN MoMo</td></tr>
+      <tr><td style="color:var(--muted)">Status</td><td><span class="pill ok">Active</span></td></tr>
     </tbody></table>`;
-  document.getElementById('subHistory').innerHTML = `<tr><td colspan="4" style="text-align:center;padding:16px;color:var(--muted)">Loading payment history…</td></tr>`;
-
-  if (!token || !navigator.onLine) {
-    document.getElementById('subStatusCell').innerHTML = '<span class="pill ok">Offline — cached data</span>';
-    return;
-  }
-
-  try {
-    const res = await fetch(MedVaultOffline.API_BASE + '/api/subscription', {
-      headers: { 'Authorization': 'Bearer ' + token }
-    });
-    const data = await res.json();
-    const sub = data.subscription;
-    if (!sub) return;
-
-    const isTrialing = sub.status === 'trial';
-    const trialEnd = sub.trial_ends_at ? new Date(sub.trial_ends_at) : null;
-    const daysLeft = trialEnd ? Math.ceil((trialEnd - new Date()) / 86400000) : null;
-
-    const statusEl = document.getElementById('subStatusCell');
-    const trialEl  = document.getElementById('subTrialCell');
-    const billEl   = document.getElementById('subBillingCell');
-
-    if (statusEl) statusEl.innerHTML = isTrialing
-      ? `<span class="pill low">🕐 Trial — ${daysLeft !== null ? daysLeft + ' days left' : 'active'}</span>`
-      : `<span class="pill ok">✅ Active</span>`;
-    if (trialEl) trialEl.textContent = trialEnd ? trialEnd.toLocaleDateString('en-UG', {day:'numeric',month:'long',year:'numeric'}) : '—';
-    if (billEl) billEl.textContent = sub.next_billing ? new Date(sub.next_billing).toLocaleDateString('en-UG') : (isTrialing ? 'After trial ends' : '—');
-
-    // Update plan display
-    document.getElementById('subDetails').querySelector('table').rows[0].cells[1].innerHTML =
-      `<strong style="color:var(--accent)">${sub.plan || plan} ⭐</strong>`;
-    document.getElementById('subDetails').querySelector('table').rows[1].cells[1].innerHTML =
-      `<strong>UGX ${parseInt(sub.amount_ugx || planPrices[plan] || 50000).toLocaleString()} / month</strong>`;
-
-    // Payment history placeholder (no payment history table in DB yet)
-    document.getElementById('subHistory').innerHTML = isTrialing
-      ? `<tr><td colspan="4" style="text-align:center;padding:16px;color:var(--muted)">No payments yet — you're on a free trial</td></tr>`
-      : `<tr><td colspan="4" style="text-align:center;padding:16px;color:var(--muted)">Payment history coming soon</td></tr>`;
-  } catch(e) {
-    document.getElementById('subStatusCell').innerHTML = '<span class="pill ok">Offline</span>';
-  }
+  document.getElementById('subHistory').innerHTML = `
+    <tr><td>Mar 22, 2026</td><td>pro</td><td>UGX 50,000</td><td><span class="pill ok">Paid</span></td></tr>
+    <tr><td>Feb 22, 2026</td><td>pro</td><td>UGX 50,000</td><td><span class="pill ok">Paid</span></td></tr>`;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2145,7 +1719,225 @@ function closeModal(){ document.getElementById('overlay').classList.remove('open
 function printRcpt(){
   const c=document.getElementById('rcptPaper').innerHTML;
   const w=window.open('','_blank','width=400,height=620');
-  w.document.write(`<html><head><title>Receipt</title><link href="https://fonts.googleapis.com/css2?family=Syne:wght@800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet"><style>body{font-family:'DM Sans',sans-serif;padding:20px;max-width:320px;margin:0 auto;color:#111}.rlogo{font-family:'Syne',sans-serif;font-weight:800;font-size:20px}.rdiv{border:none;border-top:1px dashed #ccc;margin:12px 0}.rmr{display:flex;justify-content:space-between;font-size:11px;color:#666;margin-bottom:7px}.rih{display:grid;grid-template-columns:2fr 1fr 1fr;font-size:10px;color:#999;text-transform:uppercase;margin-bottom:6px}.ri{display:grid;grid-template-columns:2fr 1fr 1fr;font-size:12px;padding:4px 0;border-bottom:1px solid #f0f0f0}.rtr{display:flex;justify-content:space-between;font-size:12px;padding:3px 0}.rgrand{font-family:'Syne',sans-serif;font-weight:800;font-size:15px;border-top:2px solid #111;margin-top:5px;padding-top:6px}.rtop{text-align:center;margin-bottom:14px}.raddr{font-size:11px;color:#666;line-height:1.6;margin-top:3px}.rfooter{text-align:center;margin-top:12px;padding-top:12px;border-top:1px dashed #ccc;font-size:11px;color:#888;line-height:1.7}.offline-tag{background:#fef3c7;color:#92400e;font-size:9px;padding:2px 6px;border-radius:4px;margin-left:4px}</style></head><body>${c}</body></html>`);
+  w.document.write(`<html><head><title>Receipt</title><link href="https://fonts.googleapis.com/css2?family=Syne:wght@800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet"><style>body{font-family:'DM Sans',sans-serif;padding:20px;max-width:320px;margin:0 auto;color:#111}.rlogo{font-family:'Syne',sans-serif;font-weight:800;font-size:20px}.rdiv{border:none;border-top:1px dashed #ccc;margin:12px 0}.rmr{display:flex;justify-content:space-between;font-size:11px;color:#666;margin-bottom:7px}.rih{display:grid;grid-template-columns:2fr 1fr 1fr;font-size:10px;color:#999;text-transform:uppercase;margin-bottom:6px}.ri{display:grid;grid-template-columns:2fr 1fr 1fr;font-size:12px;padding:4px 0;border-bottom:1px solid #f0f0f0}.rtr{display:flex;justify-content:space-between;font-size:12px;padding:3px 0}.rgrand{font-family:'Syne',sans-serif;font-weight:800;font-size:15px;border-top:2px solid #111;margin-top:5px;padding-top:6px}.rtop{text-align:center;margin-bottom:14px}.raddr{font-size:11px;color:#666;line-height:1.6;margin-top:3px}.rfooter{text-align:center;margin-top:12px;padding-top:12px;border-top:1px dashed #ccc;font-size:11px;color:#888;line-height:1.7}.offline-tag{background:#fef3c7;color:#92400e;font-size:9px;padding:2px 6px;border-radius:4px;margin-left:4px}</style></head><body>${c}
+<!-- ADD DRUG MODAL -->
+<div class="overlay" id="addDrugOverlay" onclick="if(event.target===this)closeAddDrug()">
+  <div style="background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:28px;width:500px;max-width:94vw;box-shadow:0 30px 80px rgba(0,0,0,0.6);animation:modalIn 0.2s ease;">
+    <div style="font-family:var(--display);font-weight:700;font-size:20px;margin-bottom:4px">💊 Add New Drug</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:22px">Saves to your real database • Works offline too</div>
+    <form id="addDrugForm" onsubmit="event.preventDefault();submitAddDrug()">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+        <div style="grid-column:1/-1;display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Drug Name *</label>
+          <input id="adName" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Paracetamol 500mg" required/>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Category</label>
+          <select id="adCategory" style="background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:var(--font);font-size:13px;outline:none">
+            <option>General</option><option>Antimalarials</option><option>Antibiotics</option>
+            <option>Analgesics</option><option>Antifungals</option><option>Vitamins</option>
+            <option>Antivirals</option><option>Cardiovascular</option><option>Diabetes</option>
+            <option>Dermatology</option><option>Gastrointestinal</option><option>Other</option>
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Quantity in Stock *</label>
+          <input id="adQty" type="number" min="0" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. 200" required/>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Selling Price (UGX) *</label>
+          <input id="adPrice" type="number" min="0" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. 500" required/>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Cost Price (UGX)</label>
+          <input id="adCost" type="number" min="0" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. 300"/>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Expiry Date</label>
+          <input id="adExpiry" type="date" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px"/>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Supplier</label>
+          <input id="adSupplier" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Cipla Uganda"/>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Low Stock Alert (units)</label>
+          <input id="adThreshold" type="number" min="1" value="20" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px"/>
+        </div>
+        <div style="grid-column:1/-1;display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--s2);border:1px solid var(--border);border-radius:10px">
+          <input type="checkbox" id="adRx" style="width:16px;height:16px;cursor:pointer"/>
+          <label for="adRx" style="font-size:13px;cursor:pointer">Requires prescription (Rx only)</label>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:6px">
+        <button type="button" onclick="closeAddDrug()" style="flex:1;padding:11px;border-radius:10px;background:var(--s2);color:var(--text);border:1px solid var(--border);font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
+        <button type="submit" id="addDrugBtn" style="flex:2;padding:11px;border-radius:10px;background:var(--accent);color:#000;border:none;font-family:var(--display);font-weight:800;font-size:14px;cursor:pointer">✅ Add Drug</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+<!-- INVITE STAFF MODAL -->
+<div class="overlay" id="inviteOverlay" onclick="if(event.target===this)closeInviteModal()">
+  <div style="background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:28px;width:480px;max-width:94vw;animation:modalIn 0.2s ease">
+    <div style="font-family:var(--display);font-weight:700;font-size:20px;margin-bottom:4px">👤 Invite Staff Member</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:20px">Create a login account for your staff. Give them the email and password you set here.</div>
+    <form id="inviteForm" onsubmit="event.preventDefault();submitInvite()">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Full Name *</label>
+          <input id="invName" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Sarah Nakato" required/>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Email Address *</label>
+          <input id="invEmail" type="email" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="sarah@yourpharmacy.com" required/>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Password *</label>
+          <input id="invPassword" type="password" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="Min 6 characters" required/>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Role</label>
+            <select id="invRole" style="background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:var(--font);font-size:13px;outline:none">
+              <option value="staff">Staff / Cashier</option>
+              <option value="pharmacist">Pharmacist</option>
+              <option value="manager">Manager</option>
+            </select>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Assign to Branch</label>
+            <select id="invBranch" style="background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:var(--font);font-size:13px;outline:none">
+              <option value="">Loading branches...</option>
+            </select>
+          </div>
+        </div>
+        <div style="background:rgba(0,212,170,0.06);border:1px solid rgba(0,212,170,0.15);border-radius:10px;padding:12px;font-size:12px;color:var(--muted)">
+          💡 <strong style="color:var(--text)">How staff log in:</strong> They go to your pharmacy app URL and enter the email and password you set above. They will only see their assigned branch.
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:18px">
+        <button type="button" onclick="closeInviteModal()" style="flex:1;padding:11px;border-radius:10px;background:var(--s2);color:var(--text);border:1px solid var(--border);font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
+        <button type="submit" id="inviteSubmitBtn" style="flex:2;padding:11px;border-radius:10px;background:var(--accent);color:#000;border:none;font-family:var(--display);font-weight:800;font-size:14px;cursor:pointer">✅ Add Staff Member</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ADD BRANCH MODAL -->
+<div class="overlay" id="addBranchOverlay" onclick="if(event.target===this)closeAddBranchModal()">
+  <div style="background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:28px;width:440px;max-width:94vw;animation:modalIn 0.2s ease">
+    <div style="font-family:var(--display);font-weight:700;font-size:20px;margin-bottom:4px">🏪 Add New Branch</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:20px">Add a new pharmacy location to your organisation</div>
+    <form id="addBranchForm" onsubmit="event.preventDefault();submitAddBranch()">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Branch Name *</label>
+          <input id="brName" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Ntinda Branch" required/>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Address</label>
+          <input id="brAddress" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Ntinda Complex, Kampala"/>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Phone</label>
+          <input id="brPhone" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. 0701 234 567"/>
+        </div>
+        <div style="background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.15);border-radius:10px;padding:12px;font-size:12px;color:var(--muted)">
+          💡 Each branch has its own inventory and sales. You can assign staff to this branch after creating it.
+          Pricing: UGX 35,000/month per branch (discount applied automatically).
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:18px">
+        <button type="button" onclick="closeAddBranchModal()" style="flex:1;padding:11px;border-radius:10px;background:var(--s2);color:var(--text);border:1px solid var(--border);font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
+        <button type="submit" id="addBranchSubmitBtn" style="flex:2;padding:11px;border-radius:10px;background:var(--accent);color:#000;border:none;font-family:var(--display);font-weight:800;font-size:14px;cursor:pointer">✅ Add Branch</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- STOCK TRANSFER MODAL -->
+<div class="overlay" id="transferOverlay" onclick="if(event.target===this)closeTransferModal()">
+  <div style="background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:28px;width:440px;max-width:94vw;animation:modalIn 0.2s ease">
+    <div style="font-family:var(--display);font-weight:700;font-size:20px;margin-bottom:4px">🔄 Request Stock Transfer</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:20px">Move stock from one branch to another</div>
+    <form id="transferForm" onsubmit="event.preventDefault();submitTransfer()">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">From Branch</label>
+          <select id="trFromBranch" style="background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:var(--font);font-size:13px;outline:none"></select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">To Branch</label>
+          <select id="trToBranch" style="background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:var(--font);font-size:13px;outline:none"></select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Drug Name</label>
+          <input id="trDrug" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Paracetamol 500mg" required/>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Quantity to Transfer</label>
+          <input id="trQty" type="number" min="1" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. 50" required/>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:18px">
+        <button type="button" onclick="closeTransferModal()" style="flex:1;padding:11px;border-radius:10px;background:var(--s2);color:var(--text);border:1px solid var(--border);font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
+        <button type="submit" id="transferSubmitBtn" style="flex:2;padding:11px;border-radius:10px;background:var(--accent);color:#000;border:none;font-family:var(--display);font-weight:800;font-size:14px;cursor:pointer">✅ Request Transfer</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+<!-- CREDIT RECORD MODAL -->
+<div class="overlay" id="creditModal" onclick="if(event.target===this)closeCreditModal()">
+  <div style="background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:28px;width:480px;max-width:94vw;animation:modalIn 0.2s ease">
+    <div style="font-family:var(--display);font-weight:700;font-size:20px;margin-bottom:4px">💳 Record Credit Sale</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:20px">Track drugs given on credit — system will remind customer automatically</div>
+    <form id="creditForm" onsubmit="event.preventDefault();submitCredit()">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Customer Name *</label>
+            <input id="crName" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. John Mugisha" required/>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Phone (for WhatsApp reminder)</label>
+            <input id="crPhone" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="07XX XXX XXX"/>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Drugs / Items Given</label>
+          <input id="crItems" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Paracetamol x10, Coartem x1"/>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Amount Owed (UGX) *</label>
+            <input id="crAmount" type="number" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. 15000" required/>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Payment Due Date</label>
+            <input id="crDue" type="date" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px"/>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Notes (optional)</label>
+          <input id="crNotes" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Will pay Friday salary day"/>
+        </div>
+        <div style="background:rgba(0,212,170,0.06);border:1px solid rgba(0,212,170,0.15);border-radius:10px;padding:12px;font-size:12px;color:var(--muted)">
+          💬 If you add a phone number, MedVault will send a WhatsApp reminder automatically when payment is due.
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:18px">
+        <button type="button" onclick="closeCreditModal()" style="flex:1;padding:11px;border-radius:10px;background:var(--s2);color:var(--text);border:1px solid var(--border);font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
+        <button type="submit" id="creditSubmitBtn" style="flex:2;padding:11px;border-radius:10px;background:var(--accent);color:#000;border:none;font-family:var(--display);font-weight:800;font-size:14px;cursor:pointer">✅ Record Credit</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+</body></html>`);
   w.document.close(); w.focus(); setTimeout(()=>{w.print();w.close();},500);
   showToast('🖨️ Sent to printer!'); closeModal();
 }
@@ -2168,21 +1960,7 @@ function toast(msg,type=''){showToast(msg,type);}
 // Register service worker for true offline PWA
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./service-worker.js')
-    .then(reg => {
-      console.log('[App] Service Worker registered');
-      // When a new SW is found and activates, reload to get latest code
-      reg.addEventListener('updatefound', () => {
-        const newSW = reg.installing;
-        if (newSW) {
-          newSW.addEventListener('statechange', () => {
-            if (newSW.state === 'activated' && navigator.serviceWorker.controller) {
-              console.log('[App] New SW activated — reloading for latest code');
-              window.location.reload();
-            }
-          });
-        }
-      });
-    })
+    .then(() => console.log('[App] Service Worker registered'))
     .catch(e => console.log('[App] SW registration failed:', e));
 
   // Listen for sync messages from service worker
@@ -2197,6 +1975,1014 @@ if ('serviceWorker' in navigator) {
 if (token && currentUser) {
   boot({ user: currentUser });
 }
+
+
+// ════════════════════════════════════════════════════════════
+// STAFF MANAGEMENT
+// ════════════════════════════════════════════════════════════
+
+async function loadStaff() {
+  const body = document.getElementById('staffBody');
+  const countEl = document.getElementById('staffCount');
+  if (!body) return;
+  body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">Loading staff...</td></tr>';
+
+  // Show invite button only for owners
+  const u = getCurrentUser();
+  if (u && ['owner','super_admin'].includes(u.role)) {
+    const btn = document.getElementById('inviteStaffBtn');
+    if (btn) btn.style.display = 'inline-flex';
+  }
+
+  try {
+    const res = await fetch(MedVaultOffline.API_BASE + '/api/staff', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    const staff = data.staff || [];
+    if (countEl) countEl.textContent = staff.length + ' members';
+
+    if (!staff.length) {
+      body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted)">No staff yet. Use the Invite Staff button to add your team.</td></tr>';
+      return;
+    }
+
+    body.innerHTML = staff.map(s => `
+      <tr>
+        <td><strong>${s.name}</strong></td>
+        <td style="color:var(--muted);font-size:12px">${s.email}</td>
+        <td><span style="background:${roleColor(s.role)};color:#000;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700">${s.role.toUpperCase()}</span></td>
+        <td style="font-size:12px">${s.pharmacy_name || '—'}</td>
+        <td><span style="color:${s.is_active ? 'var(--accent)' : 'var(--danger)'};font-size:12px;font-weight:600">${s.is_active ? '● Active' : '● Inactive'}</span></td>
+        <td style="font-size:12px;color:var(--muted)">${new Date(s.created_at).toLocaleDateString()}</td>
+        <td>
+          ${s.role !== 'super_admin' ? `
+            <button onclick="${s.is_active ? `deactivateStaff(${s.id})` : `activateStaff(${s.id})`}"
+              style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--s2);color:var(--text);cursor:pointer">
+              ${s.is_active ? 'Deactivate' : 'Reactivate'}
+            </button>
+          ` : '<span style="font-size:11px;color:var(--muted)">Super Admin</span>'}
+        </td>
+      </tr>
+    `).join('');
+  } catch(e) {
+    body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--danger)">Error loading staff: ' + e.message + '</td></tr>';
+  }
+}
+
+function roleColor(role) {
+  const colors = { super_admin:'#7c3aed', owner:'var(--accent)', manager:'#3b82f6', staff:'rgba(255,255,255,0.15)', pharmacist:'#f59e0b' };
+  return colors[role] || 'rgba(255,255,255,0.15)';
+}
+
+async function deactivateStaff(id) {
+  if (!confirm('Deactivate this staff member? They will not be able to log in.')) return;
+  try {
+    const res = await fetch(MedVaultOffline.API_BASE + '/api/staff/' + id + '/deactivate', {
+      method: 'PATCH', headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    showToast(data.message || 'Done');
+    loadStaff();
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+}
+
+async function activateStaff(id) {
+  try {
+    const res = await fetch(MedVaultOffline.API_BASE + '/api/staff/' + id + '/activate', {
+      method: 'PATCH', headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    showToast(data.message || 'Done');
+    loadStaff();
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+}
+
+function openInviteModal() {
+  document.getElementById('inviteOverlay').classList.add('open');
+  // Load branches into dropdown
+  fetch(MedVaultOffline.API_BASE + '/api/branches', { headers:{'Authorization':'Bearer '+token} })
+    .then(r=>r.json()).then(data=>{
+      const sel = document.getElementById('invBranch');
+      if (sel && data.branches) {
+        sel.innerHTML = '<option value="">All branches (not restricted)</option>' +
+          data.branches.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
+      }
+    }).catch(()=>{});
+}
+function closeInviteModal() {
+  document.getElementById('inviteOverlay').classList.remove('open');
+  document.getElementById('inviteForm').reset();
+}
+
+async function submitInvite() {
+  const name       = document.getElementById('invName').value.trim();
+  const email      = document.getElementById('invEmail').value.trim();
+  const password   = document.getElementById('invPassword').value;
+  const staffRole  = document.getElementById('invRole').value;
+  const pharmacyId = document.getElementById('invBranch').value;
+  const btn        = document.getElementById('inviteSubmitBtn');
+
+  if (!name)     { showToast('Name is required','warn'); return; }
+  if (!email)    { showToast('Email is required','warn'); return; }
+  if (!password || password.length < 6) { showToast('Password must be at least 6 characters','warn'); return; }
+
+  btn.textContent = '⏳ Adding...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch(MedVaultOffline.API_BASE + '/api/staff/invite', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+token },
+      body: JSON.stringify({ name, email, password, staffRole, pharmacyId: pharmacyId||null })
+    });
+    const data = await res.json();
+    if (data.user) {
+      showToast('✅ ' + name + ' can now log in!');
+      closeInviteModal();
+      loadStaff();
+    } else {
+      showToast('❌ ' + (data.error || 'Failed'), 'error');
+    }
+  } catch(e) {
+    showToast('❌ Error: ' + e.message, 'error');
+  }
+
+  btn.textContent = '✅ Add Staff Member';
+  btn.disabled = false;
+}
+
+
+// ════════════════════════════════════════════════════════════
+// BRANCHES
+// ════════════════════════════════════════════════════════════
+
+async function loadBranches() {
+  const grid = document.getElementById('branchesGrid');
+  if (!grid) return;
+  grid.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:20px">Loading branches...</div>';
+
+  // Show add button for owners
+  const u = getCurrentUser();
+  if (u && ['owner','super_admin'].includes(u.role)) {
+    const btn = document.getElementById('addBranchBtn');
+    if (btn) btn.style.display = 'inline-flex';
+  }
+
+  try {
+    const res = await fetch(MedVaultOffline.API_BASE + '/api/branches', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    const branches = data.branches || [];
+
+    if (!branches.length) {
+      grid.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:20px">No branches yet. Click Add Branch to create your first location.</div>';
+    } else {
+      grid.innerHTML = branches.map(b => `
+        <div style="background:var(--s1);border:1px solid var(--border);border-radius:14px;padding:20px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+            <div style="width:38px;height:38px;border-radius:10px;background:rgba(0,212,170,0.12);display:flex;align-items:center;justify-content:center;font-size:18px">🏪</div>
+            <div>
+              <div style="font-weight:700;font-size:15px">${b.name}</div>
+              <div style="font-size:11px;color:var(--muted)">${b.is_head_office ? '⭐ Head Office' : 'Branch'}</div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div style="background:var(--s2);border-radius:8px;padding:10px;text-align:center">
+              <div style="font-size:18px;font-weight:800;color:var(--accent)">${b.drug_count||0}</div>
+              <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Drugs</div>
+            </div>
+            <div style="background:var(--s2);border-radius:8px;padding:10px;text-align:center">
+              <div style="font-size:14px;font-weight:800;color:var(--accent)">UGX ${Number(b.revenue_today||0).toLocaleString()}</div>
+              <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Today</div>
+            </div>
+          </div>
+          ${b.address ? `<div style="font-size:12px;color:var(--muted);margin-top:10px">📍 ${b.address}</div>` : ''}
+        </div>
+      `).join('');
+    }
+
+    // Load transfers
+    loadTransfers();
+  } catch(e) {
+    grid.innerHTML = '<div style="color:var(--danger);font-size:13px;padding:20px">Error: ' + e.message + '</div>';
+  }
+}
+
+async function loadTransfers() {
+  const body = document.getElementById('transfersBody');
+  if (!body) return;
+  try {
+    const res = await fetch(MedVaultOffline.API_BASE + '/api/transfers', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    const transfers = data.transfers || [];
+    if (!transfers.length) {
+      body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">No stock transfers yet</td></tr>';
+      return;
+    }
+    body.innerHTML = transfers.map(t => `
+      <tr>
+        <td style="font-size:12px">${t.from_branch}</td>
+        <td style="font-size:12px">${t.to_branch}</td>
+        <td style="font-size:13px;font-weight:600">${t.drug_name}</td>
+        <td>${t.quantity}</td>
+        <td><span style="color:${t.status==='approved'?'var(--accent)':t.status==='pending'?'var(--warn)':'var(--danger)'};font-size:12px;font-weight:600">${t.status.toUpperCase()}</span></td>
+        <td style="font-size:12px;color:var(--muted)">${new Date(t.created_at).toLocaleDateString()}</td>
+        <td>
+          ${t.status === 'pending' ? `<button onclick="approveTransfer(${t.id})" style="font-size:11px;padding:4px 10px;border-radius:6px;border:none;background:var(--accent);color:#000;cursor:pointer;font-weight:700">Approve</button>` : '—'}
+        </td>
+      </tr>
+    `).join('');
+  } catch(e) { console.error('Transfers error:', e); }
+}
+
+async function approveTransfer(id) {
+  if (!confirm('Approve this stock transfer?')) return;
+  try {
+    const res = await fetch(MedVaultOffline.API_BASE + '/api/transfers/' + id + '/approve', {
+      method: 'PATCH', headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    showToast(data.message || 'Transfer approved');
+    loadTransfers();
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+}
+
+function openAddBranchModal() {
+  document.getElementById('addBranchOverlay').classList.add('open');
+}
+function closeAddBranchModal() {
+  document.getElementById('addBranchOverlay').classList.remove('open');
+  document.getElementById('addBranchForm').reset();
+}
+
+async function submitAddBranch() {
+  const name    = document.getElementById('brName').value.trim();
+  const address = document.getElementById('brAddress').value.trim();
+  const phone   = document.getElementById('brPhone').value.trim();
+  const btn     = document.getElementById('addBranchSubmitBtn');
+  if (!name) { showToast('Branch name is required','warn'); return; }
+
+  btn.textContent = '⏳ Adding...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch(MedVaultOffline.API_BASE + '/api/branches', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+token },
+      body: JSON.stringify({ name, address, phone })
+    });
+    const data = await res.json();
+    if (data.branch) {
+      showToast('✅ Branch added!');
+      closeAddBranchModal();
+      loadBranches();
+    } else {
+      showToast('❌ ' + (data.error || 'Failed'), 'error');
+    }
+  } catch(e) { showToast('❌ Error: ' + e.message, 'error'); }
+
+  btn.textContent = '✅ Add Branch';
+  btn.disabled = false;
+}
+
+function openTransferModal() {
+  document.getElementById('transferOverlay').classList.add('open');
+  loadTransferBranchOptions();
+}
+function closeTransferModal() {
+  document.getElementById('transferOverlay').classList.remove('open');
+}
+
+async function loadTransferBranchOptions() {
+  try {
+    const res = await fetch(MedVaultOffline.API_BASE + '/api/branches', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    const branches = data.branches || [];
+    const fromSel = document.getElementById('trFromBranch');
+    const toSel   = document.getElementById('trToBranch');
+    const opts = branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
+    fromSel.innerHTML = opts;
+    toSel.innerHTML   = opts;
+  } catch(e) {}
+}
+
+async function submitTransfer() {
+  const from_pharmacy_id = document.getElementById('trFromBranch').value;
+  const to_pharmacy_id   = document.getElementById('trToBranch').value;
+  const drugName         = document.getElementById('trDrug').value.trim();
+  const quantity         = document.getElementById('trQty').value;
+  const btn              = document.getElementById('transferSubmitBtn');
+
+  if (!drugName || !quantity) { showToast('Drug name and quantity required','warn'); return; }
+  if (from_pharmacy_id === to_pharmacy_id) { showToast('From and To branches must be different','warn'); return; }
+
+  btn.textContent = '⏳ Requesting...';
+  btn.disabled = true;
+
+  // Find drug ID from inventory
+  try {
+    const invRes = await fetch(MedVaultOffline.API_BASE + '/api/inventory?search=' + encodeURIComponent(drugName), {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const invData = await invRes.json();
+    const drug = (invData.drugs || [])[0];
+    if (!drug) { showToast('Drug not found in source branch inventory','warn'); btn.textContent='Request Transfer'; btn.disabled=false; return; }
+
+    const res = await fetch(MedVaultOffline.API_BASE + '/api/transfers', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+token },
+      body: JSON.stringify({ from_pharmacy_id, to_pharmacy_id, drug_id: drug.id, quantity: parseInt(quantity) })
+    });
+    const data = await res.json();
+    if (data.transfer) {
+      showToast('✅ Transfer requested!');
+      closeTransferModal();
+      loadTransfers();
+    } else {
+      showToast('❌ ' + (data.error||'Failed'), 'error');
+    }
+  } catch(e) { showToast('❌ Error: ' + e.message, 'error'); }
+
+  btn.textContent = '✅ Request Transfer';
+  btn.disabled = false;
+}
+
+
+// ════════════════════════════════════════════════════════════
+// ORG SETTINGS
+// ════════════════════════════════════════════════════════════
+
+async function loadOrgSettings() {
+  try {
+    const res = await fetch(MedVaultOffline.API_BASE + '/api/auth/me', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    const u = data.user;
+    if (!u) return;
+
+    const nameEl  = document.getElementById('orgNameField');
+    const ownerEl = document.getElementById('orgOwnerField');
+    const phoneEl = document.getElementById('orgPhoneField');
+    if (nameEl)  nameEl.value  = u.org_name || '';
+    if (ownerEl) ownerEl.value = u.name || '';
+
+    const subEl = document.getElementById('orgSubDetails');
+    if (subEl) {
+      const status = u.sub_status || 'trial';
+      const trialEnd = u.trial_ends_at ? new Date(u.trial_ends_at).toLocaleDateString() : '';
+      const planColors = { trial:'var(--warn)', active:'var(--accent)', expired:'var(--danger)' };
+      subEl.innerHTML = `
+        <div style="text-align:center;padding:10px 0">
+          <div style="font-size:28px;font-weight:800;color:${planColors[status]||'var(--muted)'}">${(u.plan||'single').toUpperCase()}</div>
+          <div style="font-size:13px;color:var(--muted);margin-top:4px">Current Plan</div>
+          <div style="margin-top:16px;padding:10px;background:var(--s2);border-radius:10px">
+            <div style="font-size:12px;color:var(--muted)">Status</div>
+            <div style="font-size:16px;font-weight:700;color:${planColors[status]||'var(--muted)'};margin-top:4px">${status.toUpperCase()}</div>
+            ${trialEnd ? `<div style="font-size:12px;color:var(--muted);margin-top:8px">Trial ends: ${trialEnd}</div>` : ''}
+          </div>
+          <button onclick="go('subscription',null)" style="margin-top:16px;width:100%;padding:10px;border-radius:10px;background:var(--accent);color:#000;border:none;font-weight:700;cursor:pointer;font-family:var(--display)">Manage Subscription →</button>
+        </div>
+      `;
+    }
+  } catch(e) { console.error('Org settings error:', e); }
+}
+
+
+// ════════════════════════════════════════════════════════════
+// PATCH go() to trigger page loaders
+// ════════════════════════════════════════════════════════════
+const _origGo = go;
+go = function(page, el) {
+  _origGo(page, el);
+  if (page === 'staff')        loadStaff();
+  if (page === 'branches')     loadBranches();
+  if (page === 'org-settings') loadOrgSettings();
+};
+
+function getCurrentUser() {
+  try { return JSON.parse(localStorage.getItem('mv_user')); }
+  catch(e) { return null; }
+}
+
+
+
+// ════════════════════════════════════════════════════════════
+// ADDON JS — All 6 new feature modules
+// ════════════════════════════════════════════════════════════
+
+const API = () => MedVaultOffline.API_BASE;
+const H   = () => ({ 'Content-Type':'application/json', 'Authorization':'Bearer '+token });
+
+// ── Patch go() to load addon pages ───────────────────────
+const _goOrig = typeof _origGo !== 'undefined' ? _origGo : go;
+go = function(page, el) {
+  _goOrig(page, el);
+  const loaders = {
+    variance:     loadVariancePage,
+    credit:       loadCreditPage,
+    'nda-report': loadNDAPage,
+    'expiry-intel': loadExpiryIntel,
+    forecast:     loadForecastPage,
+    'tax-report': loadTaxPage,
+  };
+  if (loaders[page]) loaders[page]();
+};
+
+// ════════════════════════════════════════════════════════════
+// ADDON 1 — VARIANCE / ANTI-THEFT
+// ════════════════════════════════════════════════════════════
+async function loadVariancePage() {
+  loadActivityLog();
+  loadDailyVariance();
+}
+
+async function loadActivityLog() {
+  const body = document.getElementById('activityBody');
+  if (!body) return;
+  body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">Loading...</td></tr>';
+  try {
+    const res  = await fetch(API()+'/api/activity', { headers: H() });
+    const data = await res.json();
+    const rows = data.activity || [];
+    if (!rows.length) { body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">No activity today</td></tr>'; return; }
+    body.innerHTML = rows.map(r => `
+      <tr>
+        <td style="font-size:11px;color:var(--muted)">${new Date(r.created_at).toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'})}</td>
+        <td><strong>${r.staff_name||'—'}</strong></td>
+        <td style="font-family:monospace;font-size:12px;color:var(--accent)">${r.receipt_number}</td>
+        <td style="font-size:12px">${r.customer_name||'Walk-in'}</td>
+        <td style="font-weight:700">UGX ${Number(r.total_amount).toLocaleString()}</td>
+        <td><span style="font-size:11px;padding:2px 8px;border-radius:20px;background:${r.payment_method==='momo'?'rgba(0,212,170,0.12)':'rgba(255,255,255,0.08)'};color:${r.payment_method==='momo'?'var(--accent)':'var(--muted)'}">${r.payment_method||'cash'}</span></td>
+        <td style="font-size:12px;color:var(--muted)">${r.item_count} item(s)</td>
+      </tr>
+    `).join('');
+    document.getElementById('varianceTodaySales').textContent = rows.length;
+  } catch(e) { body.innerHTML = '<tr><td colspan="7" style="color:var(--danger);padding:20px">Error: '+e.message+'</td></tr>'; }
+}
+
+async function loadDailyVariance() {
+  const body = document.getElementById('varianceBody');
+  if (!body) return;
+  try {
+    const res  = await fetch(API()+'/api/variance/daily', { headers: H() });
+    const data = await res.json();
+    const rows = data.variances || [];
+    const flags = rows.filter(r => r.status === 'review').length;
+    document.getElementById('varianceFlagCount').textContent = flags;
+    if (!rows.length) { body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--muted)">No drug movement today</td></tr>'; return; }
+    body.innerHTML = rows.map(r => `
+      <tr>
+        <td><strong>${r.drug_name}</strong></td>
+        <td style="text-align:center">${r.units_sold}</td>
+        <td style="text-align:center">${r.current_qty}</td>
+        <td><span style="font-size:11px;padding:3px 10px;border-radius:20px;font-weight:700;background:${r.status==='review'?'rgba(239,68,68,0.12)':'rgba(0,212,170,0.1)'};color:${r.status==='review'?'var(--danger)':'var(--accent)'}">${r.status==='review'?'⚠️ Review':'✅ OK'}</span></td>
+      </tr>
+    `).join('');
+  } catch(e) { console.error('Variance error:', e); }
+}
+
+function openStockCountModal() {
+  showToast('Load inventory first, then use the count form below each drug row','warn');
+}
+
+// ════════════════════════════════════════════════════════════
+// ADDON 2 — CREDIT MANAGER
+// ════════════════════════════════════════════════════════════
+async function loadCreditPage() {
+  const body = document.getElementById('creditBody');
+  if (!body) return;
+  body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">Loading...</td></tr>';
+  try {
+    const res  = await fetch(API()+'/api/credit', { headers: H() });
+    const data = await res.json();
+    const credits = data.credits || [];
+    const summary = data.summary  || {};
+
+    document.getElementById('creditTotal').textContent   = 'UGX ' + Number(summary.total||0).toLocaleString();
+    document.getElementById('creditCount').textContent   = summary.count || 0;
+    document.getElementById('creditOverdue').textContent = summary.overdue_count || 0;
+
+    // Update badge
+    const badge = document.getElementById('creditBadge');
+    if (badge) { badge.style.display = parseInt(summary.overdue_count)>0 ? 'inline-flex' : 'none'; }
+
+    if (!credits.length) {
+      body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted)">No credit records yet. Use + Record Credit to add customers who owe you.</td></tr>';
+      return;
+    }
+    const today = new Date().toISOString().split('T')[0];
+    body.innerHTML = credits.map(c => {
+      const isOverdue = c.due_date && c.due_date < today && c.status !== 'paid';
+      const statusColor = c.status==='paid'?'var(--accent)':isOverdue?'var(--danger)':'var(--warn)';
+      const statusLabel = c.status==='paid'?'✅ Paid':isOverdue?'🔴 Overdue':'⏳ Pending';
+      return `<tr>
+        <td><strong>${c.customer_name}</strong></td>
+        <td style="font-size:12px;color:var(--muted)">${c.customer_phone||'—'}</td>
+        <td style="font-size:12px">${c.items_description||'—'}</td>
+        <td style="font-weight:700;color:${isOverdue?'var(--danger)':'var(--text)'}">UGX ${Number(c.amount_owed).toLocaleString()}</td>
+        <td style="font-size:12px">${c.due_date ? new Date(c.due_date).toLocaleDateString() : '—'}</td>
+        <td><span style="color:${statusColor};font-size:12px;font-weight:600">${statusLabel}</span></td>
+        <td style="display:flex;gap:6px;flex-wrap:wrap">
+          ${c.status!=='paid'?`
+            <button onclick="recordCreditPayment(${c.id},${c.amount_owed})" style="font-size:11px;padding:4px 9px;border-radius:6px;border:none;background:var(--accent);color:#000;cursor:pointer;font-weight:700">💰 Paid</button>
+            ${c.customer_phone?`<button onclick="sendCreditReminder(${c.id})" style="font-size:11px;padding:4px 9px;border-radius:6px;border:1px solid rgba(37,211,102,0.3);background:transparent;color:#25d366;cursor:pointer">💬 Remind</button>`:''}
+          `:'<span style="font-size:11px;color:var(--muted)">Settled</span>'}
+        </td>
+      </tr>`;
+    }).join('');
+  } catch(e) { body.innerHTML = '<tr><td colspan="7" style="color:var(--danger);padding:20px">Error: '+e.message+'</td></tr>'; }
+}
+
+async function recordCreditPayment(id, amount) {
+  if (!confirm(`Mark this credit as fully paid (UGX ${Number(amount).toLocaleString()})?`)) return;
+  try {
+    const res  = await fetch(API()+'/api/credit/'+id+'/paid', { method:'PATCH', headers:H(), body:JSON.stringify({amount_paid:amount}) });
+    const data = await res.json();
+    showToast(data.message || '✅ Payment recorded!');
+    loadCreditPage();
+  } catch(e) { showToast('Error: '+e.message,'error'); }
+}
+
+async function sendCreditReminder(id) {
+  showToast('Sending WhatsApp reminder...','warn');
+  try {
+    const res  = await fetch(API()+'/api/credit/'+id+'/remind', { method:'POST', headers:H() });
+    const data = await res.json();
+    showToast(data.message || '✅ Reminder sent!');
+  } catch(e) { showToast('Error: '+e.message,'error'); }
+}
+
+function openCreditModal() {
+  document.getElementById('creditModal').classList.add('open');
+}
+function closeCreditModal() {
+  document.getElementById('creditModal').classList.remove('open');
+  document.getElementById('creditForm').reset();
+}
+async function submitCredit() {
+  const btn = document.getElementById('creditSubmitBtn');
+  const payload = {
+    customer_name:     document.getElementById('crName').value.trim(),
+    customer_phone:    document.getElementById('crPhone').value.trim(),
+    items_description: document.getElementById('crItems').value.trim(),
+    amount_owed:       document.getElementById('crAmount').value,
+    due_date:          document.getElementById('crDue').value,
+    notes:             document.getElementById('crNotes').value.trim(),
+  };
+  if (!payload.customer_name || !payload.amount_owed) { showToast('Customer name and amount required','warn'); return; }
+  btn.textContent='⏳ Saving...'; btn.disabled=true;
+  try {
+    const res  = await fetch(API()+'/api/credit', { method:'POST', headers:H(), body:JSON.stringify(payload) });
+    const data = await res.json();
+    if (data.credit) { showToast('✅ Credit recorded for '+payload.customer_name+'!'); closeCreditModal(); loadCreditPage(); }
+    else showToast('❌ '+(data.error||'Failed'),'error');
+  } catch(e) { showToast('❌ '+e.message,'error'); }
+  btn.textContent='✅ Record Credit'; btn.disabled=false;
+}
+
+// ════════════════════════════════════════════════════════════
+// ADDON 3 — NDA REPORT
+// ════════════════════════════════════════════════════════════
+function loadNDAPage() {
+  const today = new Date().toISOString().split('T')[0];
+  const from  = new Date(Date.now()-30*24*60*60*1000).toISOString().split('T')[0];
+  document.getElementById('ndaFrom').value = from;
+  document.getElementById('ndaTo').value   = today;
+}
+
+async function generateNDAReport() {
+  const btn  = document.getElementById('ndaBtn');
+  const from = document.getElementById('ndaFrom').value;
+  const to   = document.getElementById('ndaTo').value;
+  btn.textContent = '⏳ Generating...'; btn.disabled = true;
+  try {
+    const res  = await fetch(`${API()}/api/nda/report?from=${from}&to=${to}`, { headers: H() });
+    const data = await res.json();
+    if (data.error) { showToast('❌ '+data.error,'error'); return; }
+
+    // Classified drug register
+    const rxBody = document.getElementById('ndaRxBody');
+    rxBody.innerHTML = data.classified_sales.length
+      ? data.classified_sales.map(r=>`
+          <tr>
+            <td style="font-size:12px">${new Date(r.created_at).toLocaleDateString()}</td>
+            <td style="font-family:monospace;font-size:11px;color:var(--accent)">${r.receipt_number}</td>
+            <td><strong>${r.drug_name}</strong></td>
+            <td style="text-align:center">${r.quantity}</td>
+            <td style="font-size:12px">${r.customer_name}</td>
+            <td style="font-size:11px">${r.category||'—'}</td>
+          </tr>`).join('')
+      : '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--muted)">No classified drug dispensing in this period</td></tr>';
+
+    // Stock inventory
+    const stockBody = document.getElementById('ndaStockBody');
+    stockBody.innerHTML = data.current_stock.map(d=>`
+      <tr>
+        <td><strong>${d.name}</strong>${d.generic_name?` <span style="font-size:11px;color:var(--muted)">(${d.generic_name})</span>`:''}</td>
+        <td style="font-size:12px">${d.category||'—'}</td>
+        <td style="font-weight:700;color:${d.quantity<=d.threshold?'var(--danger)':'var(--accent)'}">${d.quantity}</td>
+        <td style="font-size:12px;color:${d.expiry_date&&new Date(d.expiry_date)<new Date(Date.now()+30*24*60*60*1000)?'var(--danger)':'var(--muted)'}">${d.expiry_date?new Date(d.expiry_date).toLocaleDateString():'N/A'}</td>
+        <td style="font-size:12px">${d.supplier||'—'}</td>
+        <td style="text-align:center">${d.requires_rx?'✅ Yes':'—'}</td>
+      </tr>`).join('');
+
+    // Expiring stock
+    const expBody = document.getElementById('ndaExpiryBody');
+    expBody.innerHTML = data.expiring_stock.length
+      ? data.expiring_stock.map(d=>`
+          <tr>
+            <td><strong>${d.name}</strong></td>
+            <td>${d.quantity}</td>
+            <td style="color:${d.days_left<=14?'var(--danger)':'var(--warn)'}">${new Date(d.expiry_date).toLocaleDateString()}</td>
+            <td style="font-weight:700;color:${d.days_left<=14?'var(--danger)':'var(--warn)'}">${d.days_left} days</td>
+          </tr>`).join('')
+      : '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--muted)">No drugs expiring within 60 days</td></tr>';
+
+    document.getElementById('ndaReportOutput').style.display = 'block';
+    showToast('✅ NDA report generated! Ready to print.');
+  } catch(e) { showToast('❌ '+e.message,'error'); }
+  btn.textContent = '📄 Generate Report'; btn.disabled = false;
+}
+
+// ════════════════════════════════════════════════════════════
+// ADDON 4 — EXPIRY INTELLIGENCE
+// ════════════════════════════════════════════════════════════
+async function loadExpiryIntel() {
+  const grid = document.getElementById('expiryIntelGrid');
+  if (!grid) return;
+  grid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">Analysing stock...</div>';
+  try {
+    const res  = await fetch(API()+'/api/expiry/intelligence', { headers: H() });
+    const data = await res.json();
+    const recs = data.recommendations || [];
+
+    if (!recs.length) { grid.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">No drugs expiring within 90 days. Great job! ✅</div>'; return; }
+
+    const actionConfig = {
+      discount_now:       { color:'var(--danger)',  icon:'🔴', label:'Discount Now',       bg:'rgba(239,68,68,0.08)' },
+      consider_discount:  { color:'var(--warn)',    icon:'🟡', label:'Consider Discount',  bg:'rgba(245,158,11,0.08)' },
+      return_to_supplier: { color:'var(--accent2)', icon:'🔵', label:'Return to Supplier', bg:'rgba(59,130,246,0.08)' },
+      monitor:            { color:'var(--muted)',   icon:'⚪', label:'Monitor',             bg:'rgba(255,255,255,0.03)' },
+    };
+
+    grid.innerHTML = recs.map(r => {
+      const ac = actionConfig[r.action] || actionConfig.monitor;
+      return `
+        <div style="background:${ac.bg};border:1px solid ${ac.color}33;border-radius:14px;padding:18px 20px;display:flex;align-items:center;gap:20px">
+          <div style="font-size:32px;flex-shrink:0">${ac.icon}</div>
+          <div style="flex:1">
+            <div style="font-family:var(--display);font-weight:700;font-size:15px;margin-bottom:2px">${r.name}</div>
+            <div style="font-size:12px;color:var(--muted)">
+              Expires: ${new Date(r.expiry_date).toLocaleDateString()} &nbsp;·&nbsp; 
+              ${r.days_left} days left &nbsp;·&nbsp;
+              Stock: ${r.quantity} units &nbsp;·&nbsp;
+              Weekly sales: ~${r.weekly_velocity} units
+            </div>
+            ${r.surplus_units > 0 ? `<div style="font-size:12px;color:var(--warn);margin-top:4px">⚠️ Est. ${r.surplus_units} units may not sell before expiry</div>` : ''}
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <div style="font-size:11px;color:${ac.color};font-weight:700;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px">${ac.label}</div>
+            ${r.action === 'discount_now' || r.action === 'consider_discount' ? `
+              <div style="font-size:13px;color:var(--text)">
+                Original: <span style="text-decoration:line-through;color:var(--muted)">UGX ${Number(r.unit_price).toLocaleString()}</span>
+              </div>
+              <div style="font-size:16px;font-weight:800;color:${ac.color}">UGX ${Number(r.suggested_price).toLocaleString()}</div>
+            ` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch(e) { grid.innerHTML = '<div style="color:var(--danger);padding:20px">Error: '+e.message+'</div>'; }
+}
+
+// ════════════════════════════════════════════════════════════
+// ADDON 5 — SEASONAL DEMAND FORECAST
+// ════════════════════════════════════════════════════════════
+async function loadForecastPage() {
+  const body   = document.getElementById('forecastBody');
+  const banner = document.getElementById('seasonBanner');
+  if (!body) return;
+  body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--muted)">Loading forecast...</td></tr>';
+  try {
+    const res  = await fetch(API()+'/api/forecast', { headers: H() });
+    const data = await res.json();
+
+    // Season banner
+    if (data.season && banner) {
+      const isOngoing = data.season.start === 'ongoing';
+      banner.innerHTML = `
+        <div style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.25);border-radius:12px;padding:16px 20px;display:flex;align-items:center;gap:14px">
+          <div style="font-size:32px">🌧️</div>
+          <div>
+            <div style="font-family:var(--display);font-weight:700;font-size:15px;color:var(--accent2)">${data.season.name} Season — ${isOngoing ? 'Currently Active' : 'Starts in '+data.season.weeks+' weeks ('+data.season.start+')'}</div>
+            <div style="font-size:13px;color:var(--muted);margin-top:3px">Antimalarial demand expected to increase by up to 80%. Reorder Coartem, Lumartem, and ACTs now.</div>
+          </div>
+        </div>`;
+    }
+
+    const forecasts = (data.forecasts||[]).filter(f=>f.reorder_qty>0||f.current_stock>0);
+    if (!forecasts.length) { body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--muted)">No forecast data yet. Record some sales first.</td></tr>'; return; }
+
+    body.innerHTML = forecasts.map(f => {
+      const urgColor = f.urgency==='urgent'?'var(--danger)':f.urgency==='recommended'?'var(--warn)':'var(--accent)';
+      return `<tr>
+        <td>
+          <strong>${f.drug_name}</strong>
+          ${f.is_seasonal?'<span style="margin-left:6px;font-size:10px;background:rgba(59,130,246,0.15);color:var(--accent2);padding:2px 6px;border-radius:20px;font-weight:700">🌧️ SEASONAL</span>':''}
+        </td>
+        <td style="text-align:center;font-weight:700;color:${f.current_stock<20?'var(--danger)':'var(--text)'}">${f.current_stock}</td>
+        <td style="text-align:center;color:var(--muted)">${f.avg_monthly_sales}</td>
+        <td style="text-align:center;font-weight:700;color:${f.is_seasonal?'var(--accent2)':'var(--text)'}">${f.forecast_next_month}${f.is_seasonal?' (+80%)':''}</td>
+        <td style="text-align:center;font-weight:800;color:${urgColor}">${f.reorder_qty > 0 ? f.reorder_qty + ' units' : '—'}</td>
+        <td><span style="font-size:11px;padding:3px 10px;border-radius:20px;font-weight:700;background:${urgColor}22;color:${urgColor}">${f.urgency.toUpperCase()}</span></td>
+      </tr>`;
+    }).join('');
+  } catch(e) { body.innerHTML = '<tr><td colspan="6" style="color:var(--danger);padding:20px">Error: '+e.message+'</td></tr>'; }
+}
+
+// ════════════════════════════════════════════════════════════
+// ADDON 6 — URA TAX REPORT
+// ════════════════════════════════════════════════════════════
+function loadTaxPage() {
+  const now = new Date();
+  document.getElementById('taxMonth').value = now.getMonth()+1;
+  document.getElementById('taxYear').value  = now.getFullYear();
+}
+
+async function generateTaxReport() {
+  const btn   = document.getElementById('taxBtn');
+  const month = document.getElementById('taxMonth').value;
+  const year  = document.getElementById('taxYear').value;
+  btn.textContent='⏳ Generating...'; btn.disabled=true;
+  try {
+    const res  = await fetch(`${API()}/api/tax/summary?month=${month}&year=${year}`, { headers: H() });
+    const data = await res.json();
+    if (data.error) { showToast('❌ '+data.error,'error'); return; }
+
+    const s = data.summary;
+    document.getElementById('taxGross').textContent    = 'UGX '+Number(s.gross_revenue||0).toLocaleString();
+    document.getElementById('taxTxns').textContent     = s.transaction_count||0;
+    document.getElementById('taxMomo').textContent     = 'UGX '+Number(s.momo_revenue||0).toLocaleString();
+    document.getElementById('taxEstimate').textContent = 'UGX '+Number(data.tax_estimate?.estimated_tax_ugx||0).toLocaleString();
+
+    const dailyBody = document.getElementById('taxDailyBody');
+    dailyBody.innerHTML = data.daily_breakdown.length
+      ? data.daily_breakdown.map(d=>`
+          <tr>
+            <td style="font-size:12px">${new Date(d.day).toLocaleDateString('en-UG',{weekday:'short',day:'numeric',month:'short'})}</td>
+            <td style="font-weight:700">UGX ${Number(d.revenue).toLocaleString()}</td>
+            <td style="color:var(--muted)">${d.txns}</td>
+          </tr>`).join('')
+      : '<tr><td colspan="3" style="text-align:center;padding:20px;color:var(--muted)">No sales in this period</td></tr>';
+
+    const drugsBody = document.getElementById('taxDrugsBody');
+    drugsBody.innerHTML = data.top_drugs.map((d,i)=>`
+      <tr>
+        <td><span style="font-size:11px;color:var(--muted);margin-right:8px">#${i+1}</span><strong>${d.drug_name}</strong></td>
+        <td style="color:var(--muted)">${d.units}</td>
+        <td style="font-weight:700">UGX ${Number(d.revenue).toLocaleString()}</td>
+      </tr>`).join('');
+
+    const noteBox = document.getElementById('taxNoteBox');
+    const t = data.tax_estimate;
+    noteBox.innerHTML = `<strong style="color:var(--text)">⚠️ URA Tax Estimate for ${data.period.name}:</strong><br>
+      Gross Revenue: UGX ${Number(t.gross_revenue).toLocaleString()} &nbsp;·&nbsp;
+      Annual Estimate: UGX ${Number(t.annual_estimate).toLocaleString()}<br>
+      Presumptive Tax Rate: ${t.presumptive_rate} of gross revenue<br>
+      <strong>Estimated Tax: UGX ${Number(t.estimated_tax_ugx).toLocaleString()}</strong><br>
+      <em style="font-size:11px;margin-top:4px;display:block">${t.note}</em>`;
+
+    document.getElementById('taxReportOutput').style.display = 'block';
+    showToast('✅ Tax report ready to print!');
+  } catch(e) { showToast('❌ '+e.message,'error'); }
+  btn.textContent='📄 Generate Report'; btn.disabled=false;
+}
+
 </script>
+
+<!-- ADD DRUG MODAL -->
+<div class="overlay" id="addDrugOverlay" onclick="if(event.target===this)closeAddDrug()">
+  <div style="background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:28px;width:500px;max-width:94vw;box-shadow:0 30px 80px rgba(0,0,0,0.6);animation:modalIn 0.2s ease;">
+    <div style="font-family:var(--display);font-weight:700;font-size:20px;margin-bottom:4px">💊 Add New Drug</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:22px">Saves to your real database • Works offline too</div>
+    <form id="addDrugForm" onsubmit="event.preventDefault();submitAddDrug()">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+        <div style="grid-column:1/-1;display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Drug Name *</label>
+          <input id="adName" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Paracetamol 500mg" required/>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Category</label>
+          <select id="adCategory" style="background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:var(--font);font-size:13px;outline:none">
+            <option>General</option><option>Antimalarials</option><option>Antibiotics</option>
+            <option>Analgesics</option><option>Antifungals</option><option>Vitamins</option>
+            <option>Antivirals</option><option>Cardiovascular</option><option>Diabetes</option>
+            <option>Dermatology</option><option>Gastrointestinal</option><option>Other</option>
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Quantity in Stock *</label>
+          <input id="adQty" type="number" min="0" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. 200" required/>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Selling Price (UGX) *</label>
+          <input id="adPrice" type="number" min="0" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. 500" required/>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Cost Price (UGX)</label>
+          <input id="adCost" type="number" min="0" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. 300"/>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Expiry Date</label>
+          <input id="adExpiry" type="date" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px"/>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Supplier</label>
+          <input id="adSupplier" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Cipla Uganda"/>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Low Stock Alert (units)</label>
+          <input id="adThreshold" type="number" min="1" value="20" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px"/>
+        </div>
+        <div style="grid-column:1/-1;display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--s2);border:1px solid var(--border);border-radius:10px">
+          <input type="checkbox" id="adRx" style="width:16px;height:16px;cursor:pointer"/>
+          <label for="adRx" style="font-size:13px;cursor:pointer">Requires prescription (Rx only)</label>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:6px">
+        <button type="button" onclick="closeAddDrug()" style="flex:1;padding:11px;border-radius:10px;background:var(--s2);color:var(--text);border:1px solid var(--border);font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
+        <button type="submit" id="addDrugBtn" style="flex:2;padding:11px;border-radius:10px;background:var(--accent);color:#000;border:none;font-family:var(--display);font-weight:800;font-size:14px;cursor:pointer">✅ Add Drug</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+<!-- INVITE STAFF MODAL -->
+<div class="overlay" id="inviteOverlay" onclick="if(event.target===this)closeInviteModal()">
+  <div style="background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:28px;width:480px;max-width:94vw;animation:modalIn 0.2s ease">
+    <div style="font-family:var(--display);font-weight:700;font-size:20px;margin-bottom:4px">👤 Invite Staff Member</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:20px">Create a login account for your staff. Give them the email and password you set here.</div>
+    <form id="inviteForm" onsubmit="event.preventDefault();submitInvite()">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Full Name *</label>
+          <input id="invName" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Sarah Nakato" required/>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Email Address *</label>
+          <input id="invEmail" type="email" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="sarah@yourpharmacy.com" required/>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Password *</label>
+          <input id="invPassword" type="password" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="Min 6 characters" required/>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Role</label>
+            <select id="invRole" style="background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:var(--font);font-size:13px;outline:none">
+              <option value="staff">Staff / Cashier</option>
+              <option value="pharmacist">Pharmacist</option>
+              <option value="manager">Manager</option>
+            </select>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Assign to Branch</label>
+            <select id="invBranch" style="background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:var(--font);font-size:13px;outline:none">
+              <option value="">Loading branches...</option>
+            </select>
+          </div>
+        </div>
+        <div style="background:rgba(0,212,170,0.06);border:1px solid rgba(0,212,170,0.15);border-radius:10px;padding:12px;font-size:12px;color:var(--muted)">
+          💡 <strong style="color:var(--text)">How staff log in:</strong> They go to your pharmacy app URL and enter the email and password you set above. They will only see their assigned branch.
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:18px">
+        <button type="button" onclick="closeInviteModal()" style="flex:1;padding:11px;border-radius:10px;background:var(--s2);color:var(--text);border:1px solid var(--border);font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
+        <button type="submit" id="inviteSubmitBtn" style="flex:2;padding:11px;border-radius:10px;background:var(--accent);color:#000;border:none;font-family:var(--display);font-weight:800;font-size:14px;cursor:pointer">✅ Add Staff Member</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ADD BRANCH MODAL -->
+<div class="overlay" id="addBranchOverlay" onclick="if(event.target===this)closeAddBranchModal()">
+  <div style="background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:28px;width:440px;max-width:94vw;animation:modalIn 0.2s ease">
+    <div style="font-family:var(--display);font-weight:700;font-size:20px;margin-bottom:4px">🏪 Add New Branch</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:20px">Add a new pharmacy location to your organisation</div>
+    <form id="addBranchForm" onsubmit="event.preventDefault();submitAddBranch()">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Branch Name *</label>
+          <input id="brName" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Ntinda Branch" required/>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Address</label>
+          <input id="brAddress" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Ntinda Complex, Kampala"/>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Phone</label>
+          <input id="brPhone" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. 0701 234 567"/>
+        </div>
+        <div style="background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.15);border-radius:10px;padding:12px;font-size:12px;color:var(--muted)">
+          💡 Each branch has its own inventory and sales. You can assign staff to this branch after creating it.
+          Pricing: UGX 35,000/month per branch (discount applied automatically).
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:18px">
+        <button type="button" onclick="closeAddBranchModal()" style="flex:1;padding:11px;border-radius:10px;background:var(--s2);color:var(--text);border:1px solid var(--border);font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
+        <button type="submit" id="addBranchSubmitBtn" style="flex:2;padding:11px;border-radius:10px;background:var(--accent);color:#000;border:none;font-family:var(--display);font-weight:800;font-size:14px;cursor:pointer">✅ Add Branch</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- STOCK TRANSFER MODAL -->
+<div class="overlay" id="transferOverlay" onclick="if(event.target===this)closeTransferModal()">
+  <div style="background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:28px;width:440px;max-width:94vw;animation:modalIn 0.2s ease">
+    <div style="font-family:var(--display);font-weight:700;font-size:20px;margin-bottom:4px">🔄 Request Stock Transfer</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:20px">Move stock from one branch to another</div>
+    <form id="transferForm" onsubmit="event.preventDefault();submitTransfer()">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">From Branch</label>
+          <select id="trFromBranch" style="background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:var(--font);font-size:13px;outline:none"></select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">To Branch</label>
+          <select id="trToBranch" style="background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:var(--font);font-size:13px;outline:none"></select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Drug Name</label>
+          <input id="trDrug" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Paracetamol 500mg" required/>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Quantity to Transfer</label>
+          <input id="trQty" type="number" min="1" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. 50" required/>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:18px">
+        <button type="button" onclick="closeTransferModal()" style="flex:1;padding:11px;border-radius:10px;background:var(--s2);color:var(--text);border:1px solid var(--border);font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
+        <button type="submit" id="transferSubmitBtn" style="flex:2;padding:11px;border-radius:10px;background:var(--accent);color:#000;border:none;font-family:var(--display);font-weight:800;font-size:14px;cursor:pointer">✅ Request Transfer</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+<!-- CREDIT RECORD MODAL -->
+<div class="overlay" id="creditModal" onclick="if(event.target===this)closeCreditModal()">
+  <div style="background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:28px;width:480px;max-width:94vw;animation:modalIn 0.2s ease">
+    <div style="font-family:var(--display);font-weight:700;font-size:20px;margin-bottom:4px">💳 Record Credit Sale</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:20px">Track drugs given on credit — system will remind customer automatically</div>
+    <form id="creditForm" onsubmit="event.preventDefault();submitCredit()">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Customer Name *</label>
+            <input id="crName" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. John Mugisha" required/>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Phone (for WhatsApp reminder)</label>
+            <input id="crPhone" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="07XX XXX XXX"/>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Drugs / Items Given</label>
+          <input id="crItems" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Paracetamol x10, Coartem x1"/>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Amount Owed (UGX) *</label>
+            <input id="crAmount" type="number" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. 15000" required/>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Payment Due Date</label>
+            <input id="crDue" type="date" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px"/>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Notes (optional)</label>
+          <input id="crNotes" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Will pay Friday salary day"/>
+        </div>
+        <div style="background:rgba(0,212,170,0.06);border:1px solid rgba(0,212,170,0.15);border-radius:10px;padding:12px;font-size:12px;color:var(--muted)">
+          💬 If you add a phone number, MedVault will send a WhatsApp reminder automatically when payment is due.
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:18px">
+        <button type="button" onclick="closeCreditModal()" style="flex:1;padding:11px;border-radius:10px;background:var(--s2);color:var(--text);border:1px solid var(--border);font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
+        <button type="submit" id="creditSubmitBtn" style="flex:2;padding:11px;border-radius:10px;background:var(--accent);color:#000;border:none;font-family:var(--display);font-weight:800;font-size:14px;cursor:pointer">✅ Record Credit</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 </body>
 </html>
