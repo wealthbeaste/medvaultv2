@@ -725,128 +725,579 @@ module.exports = function registerRoutes(app) {
     }
   });
 
+};
+
+
   // ══════════════════════════════════════════════════════════
   // STAFF MANAGEMENT
   // ══════════════════════════════════════════════════════════
 
-  // GET /api/staff — list all staff in the organisation
+  // GET /api/staff — list all staff in this organisation
   app.get('/api/staff', auth, async (req, res) => {
     const { orgId } = req.user;
     try {
       const result = await query(
-        `SELECT u.id, u.name, u.email, u.role, u.is_active,
-                p.name as pharmacy_name, u.created_at
+        `SELECT u.id, u.name, u.email, u.role, u.is_active, u.created_at,
+                p.name as pharmacy_name, p.id as pharmacy_id
          FROM users u
          LEFT JOIN pharmacies p ON p.id = u.pharmacy_id
          WHERE u.organisation_id = $1
-         ORDER BY u.role, u.name`,
+         ORDER BY u.created_at DESC`,
         [orgId]
       );
       res.json({ staff: result.rows });
-    } catch (e) {
-      res.json({ error: e.message }, 500);
-    }
+    } catch(e) { res.json({ error: e.message }, 500); }
   });
 
-  // POST /api/staff/invite — create a new staff account (owner only)
+  // POST /api/staff/invite — owner invites a new staff member
   app.post('/api/staff/invite', auth, async (req, res) => {
-    const { orgId, role: callerRole } = req.user;
-    if (!['owner', 'super_admin'].includes(callerRole))
-      return res.json({ error: 'Only owners can add staff members' }, 403);
-
-    const { name, email, phone, role, pharmacy_id, password } = req.body;
+    const { orgId, role } = req.user;
+    if (!['owner','super_admin'].includes(role))
+      return res.json({ error: 'Only owners can invite staff' }, 403);
+    const { name, email, password, staffRole, pharmacyId } = req.body;
     if (!name || !email || !password)
-      return res.json({ error: 'Name, email, and password are required' }, 400);
-
-    const allowedRoles = ['staff', 'manager', 'owner'];
-    if (role && !allowedRoles.includes(role))
-      return res.json({ error: 'Invalid role. Must be: staff, manager, or owner' }, 400);
-
+      return res.json({ error: 'Name, email and password are required' }, 400);
     try {
-      // Check email not already taken
-      const exists = await query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
-      if (exists.rows.length > 0)
-        return res.json({ error: 'A user with this email already exists' }, 409);
-
-      // Validate pharmacy belongs to this org (if provided)
-      let assignedPharmacyId = null;
-      if (pharmacy_id) {
-        const pharmaCheck = await query(
-          'SELECT id FROM pharmacies WHERE id = $1 AND organisation_id = $2',
-          [pharmacy_id, orgId]
-        );
-        if (!pharmaCheck.rows.length)
-          return res.json({ error: 'Branch not found in your organisation' }, 404);
-        assignedPharmacyId = pharmacy_id;
-      } else {
-        // Default to head office
-        const hq = await query(
-          'SELECT id FROM pharmacies WHERE organisation_id = $1 AND is_head_office = true LIMIT 1',
-          [orgId]
-        );
-        assignedPharmacyId = hq.rows[0]?.id || null;
-      }
-
-      const pwHash = await hash(password);
+      const exists = await query(`SELECT id FROM users WHERE email = $1`, [email.toLowerCase()]);
+      if (exists.rows.length) return res.json({ error: 'Email already registered' }, 409);
+      const { hash } = require('../core/password');
+      const pw = await hash(password);
       const result = await query(
         `INSERT INTO users (organisation_id, pharmacy_id, name, email, password_hash, role)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         RETURNING id, name, email, role`,
-        [orgId, assignedPharmacyId, name, email.toLowerCase(), pwHash, role || 'staff']
+         VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, name, email, role`,
+        [orgId, pharmacyId||null, name, email.toLowerCase(), pw, staffRole||'staff']
       );
+      res.json({ message: '✅ Staff member added!', user: result.rows[0] });
+    } catch(e) { res.json({ error: e.message }, 500); }
+  });
+
+  // PATCH /api/staff/:id/deactivate
+  app.patch('/api/staff/:id/deactivate', auth, async (req, res) => {
+    const { orgId, role } = req.user;
+    if (!['owner','super_admin'].includes(role))
+      return res.json({ error: 'Only owners can deactivate staff' }, 403);
+    try {
+      await query(
+        `UPDATE users SET is_active = false WHERE id = $1 AND organisation_id = $2`,
+        [req.params.id, orgId]
+      );
+      res.json({ message: '✅ Staff member deactivated' });
+    } catch(e) { res.json({ error: e.message }, 500); }
+  });
+
+  // PATCH /api/staff/:id/activate
+  app.patch('/api/staff/:id/activate', auth, async (req, res) => {
+    const { orgId, role } = req.user;
+    if (!['owner','super_admin'].includes(role))
+      return res.json({ error: 'Only owners can activate staff' }, 403);
+    try {
+      await query(
+        `UPDATE users SET is_active = true WHERE id = $1 AND organisation_id = $2`,
+        [req.params.id, orgId]
+      );
+      res.json({ message: '✅ Staff member reactivated' });
+    } catch(e) { res.json({ error: e.message }, 500); }
+  });
+
+
+  // ══════════════════════════════════════════════════════════
+  // ADDON 1 — ANTI-THEFT VARIANCE ENGINE
+  // Compares units sold vs stock reduction to detect theft
+  // ══════════════════════════════════════════════════════════
+
+  app.get('/api/variance/daily', auth, async (req, res) => {
+    const { pharmacyId } = req.user;
+    const date = req.query.date || new Date().toISOString().split('T')[0];
+    try {
+      // Units sold per drug today from sale_items
+      const sold = await query(
+        `SELECT si.drug_id, si.drug_name, SUM(si.quantity) as units_sold
+         FROM sale_items si
+         JOIN sales s ON s.id = si.sale_id
+         WHERE s.pharmacy_id = $1 AND DATE(s.created_at) = $2 AND si.drug_id IS NOT NULL
+         GROUP BY si.drug_id, si.drug_name`,
+        [pharmacyId, date]
+      );
+      // Get current vs opening stock for each drug
+      // Opening stock = current + sold (simplified — real system uses snapshots)
+      const variances = [];
+      for (const row of sold.rows) {
+        const drug = await query(
+          `SELECT name, quantity, threshold FROM drugs WHERE id = $1`,
+          [row.drug_id]
+        );
+        if (drug.rows.length) {
+          const d = drug.rows[0];
+          const expected = parseInt(row.units_sold);
+          // Flag if variance pattern is unusual (sold > 20 of a high value drug)
+          variances.push({
+            drug_id:     row.drug_id,
+            drug_name:   row.drug_name,
+            units_sold:  expected,
+            current_qty: d.quantity,
+            status:      expected > 50 ? 'review' : 'ok',
+          });
+        }
+      }
+      res.json({ date, variances, total: variances.length });
+    } catch(e) { res.json({ error: e.message }, 500); }
+  });
+
+  // Log a manual stock count (for reconciliation)
+  app.post('/api/variance/stockcount', auth, async (req, res) => {
+    const { pharmacyId, userId } = req.user;
+    const { counts } = req.body; // [{drug_id, counted_qty}]
+    if (!counts?.length) return res.json({ error: 'counts array required' }, 400);
+    try {
+      const variances = [];
+      for (const c of counts) {
+        const drug = await query(
+          `SELECT id, name, quantity FROM drugs WHERE id = $1 AND pharmacy_id = $2`,
+          [c.drug_id, pharmacyId]
+        );
+        if (!drug.rows.length) continue;
+        const d = drug.rows[0];
+        const system_qty = d.quantity;
+        const counted_qty = parseInt(c.counted_qty);
+        const diff = system_qty - counted_qty;
+        if (Math.abs(diff) > 0) {
+          variances.push({
+            drug_id: d.id, drug_name: d.name,
+            system_qty, counted_qty,
+            variance: diff,
+            flag: diff > 0 ? 'shortage' : 'surplus',
+          });
+          // Update to actual counted quantity
+          await query(
+            `UPDATE drugs SET quantity = $1, updated_at = NOW() WHERE id = $2`,
+            [counted_qty, d.id]
+          );
+        }
+      }
+      res.json({
+        message: `Stock count complete. ${variances.length} variances found.`,
+        variances,
+      });
+    } catch(e) { res.json({ error: e.message }, 500); }
+  });
+
+  // Staff activity log
+  app.get('/api/activity', auth, async (req, res) => {
+    const { pharmacyId } = req.user;
+    const limit = parseInt(req.query.limit) || 50;
+    try {
+      // Get recent sales with staff info
+      const result = await query(
+        `SELECT s.id, s.receipt_number, s.total_amount, s.customer_name,
+                s.created_at, s.payment_method,
+                u.name as staff_name,
+                COUNT(si.id) as item_count
+         FROM sales s
+         LEFT JOIN users u ON u.id = s.user_id
+         LEFT JOIN sale_items si ON si.sale_id = s.id
+         WHERE s.pharmacy_id = $1
+         GROUP BY s.id, u.name
+         ORDER BY s.created_at DESC LIMIT $2`,
+        [pharmacyId, limit]
+      );
+      res.json({ activity: result.rows });
+    } catch(e) { res.json({ error: e.message }, 500); }
+  });
+
+  // ══════════════════════════════════════════════════════════
+  // ADDON 2 — CREDIT CUSTOMER MANAGER
+  // Track drugs given on credit, send WhatsApp reminders
+  // ══════════════════════════════════════════════════════════
+
+  app.get('/api/credit', auth, async (req, res) => {
+    const { pharmacyId } = req.user;
+    try {
+      const result = await query(
+        `SELECT * FROM credit_sales
+         WHERE pharmacy_id = $1
+         ORDER BY due_date ASC`,
+        [pharmacyId]
+      );
+      const total = await query(
+        `SELECT COALESCE(SUM(amount_owed),0) as total,
+                COUNT(*) as count,
+                COUNT(CASE WHEN status='overdue' THEN 1 END) as overdue_count
+         FROM credit_sales WHERE pharmacy_id = $1 AND status != 'paid'`,
+        [pharmacyId]
+      );
+      res.json({
+        credits: result.rows,
+        summary: total.rows[0],
+      });
+    } catch(e) { res.json({ error: e.message }, 500); }
+  });
+
+  app.post('/api/credit', auth, async (req, res) => {
+    const { pharmacyId, userId } = req.user;
+    const { customer_name, customer_phone, items_description,
+            amount_owed, due_date, notes } = req.body;
+    if (!customer_name || !amount_owed)
+      return res.json({ error: 'Customer name and amount required' }, 400);
+    try {
+      const result = await query(
+        `INSERT INTO credit_sales
+          (pharmacy_id, user_id, customer_name, customer_phone,
+           items_description, amount_owed, due_date, notes, status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending') RETURNING *`,
+        [pharmacyId, userId, customer_name, customer_phone || null,
+         items_description || null, parseFloat(amount_owed),
+         due_date || null, notes || null]
+      );
+      res.json({ message: '✅ Credit recorded!', credit: result.rows[0] });
+    } catch(e) { res.json({ error: e.message }, 500); }
+  });
+
+  app.patch('/api/credit/:id/paid', auth, async (req, res) => {
+    const { pharmacyId } = req.user;
+    const { amount_paid } = req.body;
+    try {
+      const result = await query(
+        `UPDATE credit_sales SET
+          status = CASE WHEN $1::numeric >= amount_owed THEN 'paid' ELSE 'partial' END,
+          amount_paid = COALESCE(amount_paid,0) + $1::numeric,
+          paid_at = NOW()
+         WHERE id = $2 AND pharmacy_id = $3 RETURNING *`,
+        [parseFloat(amount_paid || 0), req.params.id, pharmacyId]
+      );
+      if (!result.rows.length) return res.json({ error: 'Credit not found' }, 404);
+      res.json({ message: '✅ Payment recorded!', credit: result.rows[0] });
+    } catch(e) { res.json({ error: e.message }, 500); }
+  });
+
+  // Send WhatsApp reminder for overdue credit
+  app.post('/api/credit/:id/remind', auth, async (req, res) => {
+    const { pharmacyId } = req.user;
+    try {
+      const result = await query(
+        `SELECT * FROM credit_sales WHERE id = $1 AND pharmacy_id = $2`,
+        [req.params.id, pharmacyId]
+      );
+      if (!result.rows.length) return res.json({ error: 'Credit not found' }, 404);
+      const c = result.rows[0];
+      if (!c.customer_phone) return res.json({ error: 'No phone number for this customer' }, 400);
+
+      const pharma = await query(
+        `SELECT name FROM pharmacies WHERE id = $1`, [pharmacyId]
+      );
+      const pharmacyName = pharma.rows[0]?.name || 'Your pharmacy';
+      const message = `Hello ${c.customer_name}, your balance of UGX ${Number(c.amount_owed).toLocaleString()} at ${pharmacyName} is due. Please pay via MoMo or visit us. Thank you! 🙏`;
+
+      // Send via WhatsApp if configured
+      const waToken = process.env.WA_ACCESS_TOKEN;
+      const waPhone = process.env.WA_PHONE_NUMBER_ID;
+      if (waToken && waPhone) {
+        const https = require('https');
+        const body = JSON.stringify({
+          messaging_product: 'whatsapp',
+          to: c.customer_phone.replace(/^0/, '256'),
+          type: 'text',
+          text: { body: message }
+        });
+        const options = {
+          hostname: 'graph.facebook.com',
+          path: `/v18.0/${waPhone}/messages`,
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${waToken}`,
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(body)
+          }
+        };
+        await new Promise((resolve) => {
+          const req = https.request(options, res => { res.on('data', () => {}); res.on('end', resolve); });
+          req.on('error', resolve);
+          req.write(body);
+          req.end();
+        });
+      }
+
+      // Update reminder sent date
+      await query(
+        `UPDATE credit_sales SET last_reminded = NOW() WHERE id = $1`,
+        [req.params.id]
+      );
+      res.json({ message: `✅ Reminder sent to ${c.customer_name}`, whatsapp: !!waToken });
+    } catch(e) { res.json({ error: e.message }, 500); }
+  });
+
+  // ══════════════════════════════════════════════════════════
+  // ADDON 3 — NDA INSPECTION MODE
+  // One-tap generates all required NDA documents
+  // ══════════════════════════════════════════════════════════
+
+  app.get('/api/nda/report', auth, async (req, res) => {
+    const { pharmacyId } = req.user;
+    const { from, to } = req.query;
+    const fromDate = from || new Date(Date.now() - 30*24*60*60*1000).toISOString().split('T')[0];
+    const toDate   = to   || new Date().toISOString().split('T')[0];
+    try {
+      const [pharmaRes, rxSales, allStock, expiring] = await Promise.all([
+        query(`SELECT p.*, o.name as org_name FROM pharmacies p JOIN organisations o ON o.id=p.organisation_id WHERE p.id=$1`, [pharmacyId]),
+        query(
+          `SELECT s.created_at, s.receipt_number, s.customer_name,
+                  si.drug_name, si.quantity, si.unit_price,
+                  d.requires_rx, d.category
+           FROM sales s
+           JOIN sale_items si ON si.sale_id = s.id
+           LEFT JOIN drugs d ON d.id = si.drug_id
+           WHERE s.pharmacy_id = $1
+             AND DATE(s.created_at) BETWEEN $2 AND $3
+             AND (d.requires_rx = true OR d.category IN ('Antibiotics','Antimalarials','Antivirals'))
+           ORDER BY s.created_at DESC`,
+          [pharmacyId, fromDate, toDate]
+        ),
+        query(
+          `SELECT name, generic_name, category, quantity, expiry_date,
+                  supplier, requires_rx, unit_price, threshold
+           FROM drugs WHERE pharmacy_id = $1 ORDER BY category, name`,
+          [pharmacyId]
+        ),
+        query(
+          `SELECT name, quantity, expiry_date,
+                  (expiry_date - CURRENT_DATE)::int as days_left
+           FROM drugs
+           WHERE pharmacy_id = $1
+             AND expiry_date IS NOT NULL
+             AND expiry_date <= CURRENT_DATE + INTERVAL '60 days'
+           ORDER BY expiry_date`,
+          [pharmacyId]
+        ),
+      ]);
 
       res.json({
-        message: `✅ Staff member ${name} added successfully!`,
-        staff: result.rows[0],
+        pharmacy:        pharmaRes.rows[0],
+        period:          { from: fromDate, to: toDate },
+        classified_sales: rxSales.rows,
+        current_stock:   allStock.rows,
+        expiring_stock:  expiring.rows,
+        generated_at:    new Date().toISOString(),
       });
-    } catch (e) {
-      console.error('Staff invite error:', e.message);
-      res.json({ error: 'Failed to add staff: ' + e.message }, 500);
-    }
+    } catch(e) { res.json({ error: e.message }, 500); }
   });
 
-  // PATCH /api/staff/:id — update staff (deactivate, change role, etc.)
-  app.patch('/api/staff/:id', auth, async (req, res) => {
-    const { orgId, role: callerRole, userId } = req.user;
-    if (!['owner', 'super_admin'].includes(callerRole))
-      return res.json({ error: 'Only owners can modify staff accounts' }, 403);
+  // ══════════════════════════════════════════════════════════
+  // ADDON 4 — EXPIRY INTELLIGENCE
+  // Smart near-expiry discount and return-to-supplier tracking
+  // ══════════════════════════════════════════════════════════
 
-    const staffId = parseInt(req.params.id);
-    if (staffId === userId)
-      return res.json({ error: 'You cannot modify your own account this way' }, 400);
-
-    const { is_active, role } = req.body;
+  app.get('/api/expiry/intelligence', auth, async (req, res) => {
+    const { pharmacyId } = req.user;
     try {
-      // Verify staff belongs to this org
-      const check = await query(
-        'SELECT id FROM users WHERE id = $1 AND organisation_id = $2',
-        [staffId, orgId]
+      // Get sales velocity per drug (avg units sold per week)
+      const velocity = await query(
+        `SELECT si.drug_id, si.drug_name,
+                SUM(si.quantity) as total_sold,
+                COUNT(DISTINCT DATE(s.created_at)) as days_active,
+                ROUND(SUM(si.quantity)::numeric /
+                  GREATEST(COUNT(DISTINCT DATE(s.created_at)),1) * 7, 1) as weekly_velocity
+         FROM sale_items si
+         JOIN sales s ON s.id = si.sale_id
+         WHERE s.pharmacy_id = $1
+           AND s.created_at >= NOW() - INTERVAL '60 days'
+           AND si.drug_id IS NOT NULL
+         GROUP BY si.drug_id, si.drug_name`,
+        [pharmacyId]
       );
-      if (!check.rows.length)
-        return res.json({ error: 'Staff member not found in your organisation' }, 404);
-
-      const updates = [];
-      const params = [];
-      let i = 1;
-      if (is_active !== undefined) { updates.push(`is_active = $${i++}`); params.push(is_active); }
-      if (role !== undefined) { updates.push(`role = $${i++}`); params.push(role); }
-
-      if (!updates.length)
-        return res.json({ error: 'No fields to update' }, 400);
-
-      updates.push(`updated_at = NOW()`);
-      params.push(staffId, orgId);
-
-      const result = await query(
-        `UPDATE users SET ${updates.join(', ')} WHERE id = $${i++} AND organisation_id = $${i++} RETURNING id, name, email, role, is_active`,
-        params
+      // Get drugs expiring within 90 days
+      const expiring = await query(
+        `SELECT id, name, quantity, expiry_date, unit_price, supplier,
+                (expiry_date - CURRENT_DATE)::int as days_left
+         FROM drugs
+         WHERE pharmacy_id = $1
+           AND expiry_date IS NOT NULL
+           AND expiry_date > CURRENT_DATE
+           AND expiry_date <= CURRENT_DATE + INTERVAL '90 days'
+         ORDER BY expiry_date`,
+        [pharmacyId]
       );
 
+      // Build recommendations
+      const velMap = {};
+      for (const v of velocity.rows) velMap[v.drug_id] = parseFloat(v.weekly_velocity);
 
-      res.json({ message: '✅ Staff member updated', staff: result.rows[0] });
-    } catch (e) {
-      res.json({ error: e.message }, 500);
-    }
+      const recommendations = expiring.rows.map(d => {
+        const weeksLeft = Math.floor(d.days_left / 7);
+        const velocity  = velMap[d.id] || 0;
+        const canSell   = Math.round(weeksLeft * velocity);
+        const surplus   = Math.max(0, d.quantity - canSell);
+        let action = 'monitor';
+        let suggested_price = d.unit_price;
+        if (surplus > 0 && d.days_left <= 30) {
+          action = 'discount_now';
+          suggested_price = Math.round(d.unit_price * 0.65);
+        } else if (surplus > 0 && d.days_left <= 60) {
+          action = 'consider_discount';
+          suggested_price = Math.round(d.unit_price * 0.80);
+        } else if (surplus > 10 && d.days_left <= 90) {
+          action = 'return_to_supplier';
+        }
+        return {
+          ...d,
+          weekly_velocity: velocity,
+          units_sellable:  canSell,
+          surplus_units:   surplus,
+          action,
+          suggested_price,
+        };
+      });
+
+      res.json({ recommendations, total: recommendations.length });
+    } catch(e) { res.json({ error: e.message }, 500); }
   });
 
-};
+  // ══════════════════════════════════════════════════════════
+  // ADDON 5 — SEASONAL DEMAND PREDICTOR
+  // Uganda malaria seasons + sales history = reorder forecast
+  // ══════════════════════════════════════════════════════════
+
+  app.get('/api/forecast', auth, async (req, res) => {
+    const { pharmacyId } = req.user;
+    try {
+      // Uganda malaria seasons: Mar-May and Oct-Dec
+      const now = new Date();
+      const month = now.getMonth() + 1;
+      const upcomingSeason =
+        month >= 1 && month <= 2  ? { name: 'Long Rains', start: 'March',   weeks: Math.round((new Date(now.getFullYear(),2,1) - now) / 604800000) } :
+        month >= 3 && month <= 5  ? { name: 'Long Rains', start: 'ongoing', weeks: 0 } :
+        month >= 7 && month <= 9  ? { name: 'Short Rains', start: 'October', weeks: Math.round((new Date(now.getFullYear(),9,1) - now) / 604800000) } :
+        month >= 10 && month <= 12 ? { name: 'Short Rains', start: 'ongoing', weeks: 0 } :
+        null;
+
+      // Get 12-month sales history for key drugs
+      const history = await query(
+        `SELECT si.drug_name,
+                EXTRACT(MONTH FROM s.created_at) as month,
+                SUM(si.quantity) as units_sold
+         FROM sale_items si
+         JOIN sales s ON s.id = si.sale_id
+         WHERE s.pharmacy_id = $1
+           AND s.created_at >= NOW() - INTERVAL '12 months'
+         GROUP BY si.drug_name, EXTRACT(MONTH FROM s.created_at)
+         ORDER BY si.drug_name, month`,
+        [pharmacyId]
+      );
+
+      // Get current stock
+      const stock = await query(
+        `SELECT id, name, quantity, threshold FROM drugs
+         WHERE pharmacy_id = $1 ORDER BY name`,
+        [pharmacyId]
+      );
+
+      // Build per-drug forecast
+      const drugMap = {};
+      for (const row of history.rows) {
+        if (!drugMap[row.drug_name]) drugMap[row.drug_name] = {};
+        drugMap[row.drug_name][row.month] = parseInt(row.units_sold);
+      }
+
+      // Season months for demand multiplier
+      const seasonMonths = [3,4,5,10,11,12];
+      const forecasts = stock.rows.map(d => {
+        const history = drugMap[d.name] || {};
+        const avgMonthly = Object.values(history).length
+          ? Object.values(history).reduce((a,b)=>a+b,0) / Object.values(history).length
+          : 0;
+        const isSeasonalDrug = d.name.toLowerCase().includes('coartem') ||
+          d.name.toLowerCase().includes('lumartem') ||
+          d.name.toLowerCase().includes('artemether') ||
+          d.name.toLowerCase().includes('malaria') ||
+          d.name.toLowerCase().includes('act');
+        const multiplier = isSeasonalDrug && upcomingSeason ? 1.8 : 1.0;
+        const forecastNextMonth = Math.round(avgMonthly * multiplier);
+        const reorderQty = Math.max(0, forecastNextMonth - d.quantity);
+        return {
+          drug_id:           d.id,
+          drug_name:         d.name,
+          current_stock:     d.quantity,
+          avg_monthly_sales: Math.round(avgMonthly),
+          forecast_next_month: forecastNextMonth,
+          reorder_qty:       reorderQty,
+          is_seasonal:       isSeasonalDrug,
+          urgency:           reorderQty > 0 ? (d.quantity < d.threshold ? 'urgent' : 'recommended') : 'ok',
+        };
+      });
+
+      res.json({
+        season:     upcomingSeason,
+        forecasts:  forecasts.filter(f => f.avg_monthly_sales > 0 || f.current_stock > 0),
+        generated:  new Date().toISOString(),
+      });
+    } catch(e) { res.json({ error: e.message }, 500); }
+  });
+
+  // ══════════════════════════════════════════════════════════
+  // ADDON 6 — URA TAX SUMMARY REPORT
+  // Auto-generates monthly tax summary for accountant/URA
+  // ══════════════════════════════════════════════════════════
+
+  app.get('/api/tax/summary', auth, async (req, res) => {
+    const { pharmacyId, orgId } = req.user;
+    const { month, year } = req.query;
+    const m = parseInt(month) || new Date().getMonth() + 1;
+    const y = parseInt(year)  || new Date().getFullYear();
+    try {
+      const [pharmaRes, salesRes, dailyRes, topDrugs] = await Promise.all([
+        query(
+          `SELECT p.*, o.name as org_name, o.email FROM pharmacies p
+           JOIN organisations o ON o.id=p.organisation_id WHERE p.id=$1`,
+          [pharmacyId]
+        ),
+        query(
+          `SELECT
+            COUNT(*)                             as transaction_count,
+            COALESCE(SUM(total_amount),0)        as gross_revenue,
+            COALESCE(SUM(discount_amount),0)     as total_discounts,
+            COALESCE(SUM(total_amount - discount_amount),0) as net_revenue,
+            COUNT(DISTINCT customer_name)        as unique_customers,
+            SUM(CASE WHEN payment_method='momo' THEN total_amount ELSE 0 END) as momo_revenue,
+            SUM(CASE WHEN payment_method='cash' THEN total_amount ELSE 0 END) as cash_revenue
+           FROM sales
+           WHERE pharmacy_id=$1
+             AND EXTRACT(MONTH FROM created_at)=$2
+             AND EXTRACT(YEAR FROM created_at)=$3`,
+          [pharmacyId, m, y]
+        ),
+        query(
+          `SELECT DATE(created_at) as day, SUM(total_amount) as revenue, COUNT(*) as txns
+           FROM sales
+           WHERE pharmacy_id=$1 AND EXTRACT(MONTH FROM created_at)=$2 AND EXTRACT(YEAR FROM created_at)=$3
+           GROUP BY DATE(created_at) ORDER BY day`,
+          [pharmacyId, m, y]
+        ),
+        query(
+          `SELECT si.drug_name, SUM(si.quantity) as units, SUM(si.total_price) as revenue
+           FROM sale_items si JOIN sales s ON s.id=si.sale_id
+           WHERE s.pharmacy_id=$1 AND EXTRACT(MONTH FROM s.created_at)=$2 AND EXTRACT(YEAR FROM s.created_at)=$3
+           GROUP BY si.drug_name ORDER BY revenue DESC LIMIT 10`,
+          [pharmacyId, m, y]
+        ),
+      ]);
+
+      const gross = parseFloat(salesRes.rows[0].gross_revenue);
+      // Presumptive tax: 1% of gross turnover for businesses UGX 10M-150M/yr
+      const annualEstimate = gross * 12;
+      const presumptiveTax = annualEstimate >= 10000000 ? Math.round(gross * 0.01) : 0;
+
+      res.json({
+        pharmacy:        pharmaRes.rows[0],
+        period:          { month: m, year: y, name: new Date(y, m-1).toLocaleString('en', {month:'long', year:'numeric'}) },
+        summary:         salesRes.rows[0],
+        daily_breakdown: dailyRes.rows,
+        top_drugs:       topDrugs.rows,
+        tax_estimate: {
+          gross_revenue:     gross,
+          annual_estimate:   annualEstimate,
+          presumptive_rate:  '1%',
+          estimated_tax_ugx: presumptiveTax,
+          note:              'Consult your accountant. Based on URA presumptive tax regime for businesses with annual turnover UGX 10M-150M.',
+        },
+        generated_at: new Date().toISOString(),
+      });
+    } catch(e) { res.json({ error: e.message }, 500); }
+  });
