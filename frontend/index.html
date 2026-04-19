@@ -159,21 +159,36 @@ footer{padding:40px;border-top:1px solid var(--border);display:flex;align-items:
     <a href="#faq">FAQ</a>
   </div>
   <div class="nav-right">
-    <button class="btn btn-ghost" onclick="window.open('app.html','_blank')">Log In</button>
+    <button class="btn btn-ghost" onclick="window.location.href='app.html'">Log In</button>
     <button class="btn btn-accent" onclick="document.getElementById('signup').scrollIntoView({behavior:'smooth'})">Start Free Trial →</button>
   </div>
 </nav>
 
 <!-- HERO -->
 <section class="hero">
-  <div class="hero-badge"><div class="hero-badge-dot"></div>Built for Uganda's Pharmacies</div>
-  <h1>Run Your Pharmacy<br><span class="green">Smarter.</span> <span class="fade">Faster.</span></h1>
-  <p>Inventory, sales, online orders, and MoMo payments — all in one place. No installation. Start in 5 minutes.</p>
-  <div class="hero-ctas">
-    <button class="btn btn-accent btn-hero" onclick="document.getElementById('signup').scrollIntoView({behavior:'smooth'})">🚀 Start 14-Day Free Trial</button>
-    <button class="btn btn-ghost btn-hero" onclick="window.open('app.html','_blank')">👀 View Live Demo</button>
+  <div class="hero-badge"><div class="hero-badge-dot"></div>🇺🇬 Built for Uganda · Works when the internet doesn't · Priced for Everyone</div>
+
+  <h1>MedVault <span class="green">Protects</span><br>Your Pharmacy.</h1>
+
+  <p style="font-size:17px;max-width:600px;margin:0 auto 14px;line-height:1.75;color:rgba(238,242,255,0.65)">
+    From stolen stock, expired drugs, credit losses, NDA inspections,<br>
+    and unreliable internet — <strong style="color:rgba(238,242,255,0.9)">MedVault has you covered.</strong>
+  </p>
+
+  <!-- Problem pills -->
+  <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;margin-bottom:32px">
+    <span style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);color:#fca5a5;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600">🔒 Staff Theft</span>
+    <span style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.25);color:#fcd34d;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600">⏰ Expired Stock</span>
+    <span style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);color:#fca5a5;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600">💳 Credit Losses</span>
+    <span style="background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.25);color:#93c5fd;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600">🏥 NDA Inspections</span>
+    <span style="background:rgba(124,58,237,0.1);border:1px solid rgba(124,58,237,0.25);color:#c4b5fd;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600">📴 No Internet</span>
   </div>
-  <div class="hero-note">No credit card needed · <span>Free for 14 days</span> · Cancel anytime</div>
+
+  <div class="hero-ctas">
+    <button class="btn btn-accent btn-hero" onclick="document.getElementById('signup').scrollIntoView({behavior:'smooth'})">🚀 Start Free — No Credit Card</button>
+    <button class="btn btn-ghost btn-hero" onclick="window.location.href='app.html'">👀 View Live Demo</button>
+  </div>
+  <div class="hero-note">Free 14-day trial · <span>From UGX 20,000/month</span> · Works offline · Cancel anytime</div>
 </section>
 
 <!-- STATS -->
@@ -223,46 +238,55 @@ footer{padding:40px;border-top:1px solid var(--border);display:flex;align-items:
   <div class="section-title">Simple, honest pricing</div>
   <div class="section-sub">Pay with MTN MoMo or Airtel Money. Cancel anytime. No hidden fees.</div>
   <div class="pricing-grid">
+
+    <!-- TIER 1: Drug Shop -->
     <div class="price-card">
-      <div class="price-name">Basic</div>
+      <div class="price-name">Drug Shop</div>
       <div class="price-amount">UGX 20K</div>
       <div class="price-period">per month · ~$5</div>
       <div class="price-divider"></div>
       <div class="price-feat"><span class="ck">✓</span>Inventory management</div>
       <div class="price-feat"><span class="ck">✓</span>Sales & receipts</div>
       <div class="price-feat"><span class="ck">✓</span>Expiry & stock alerts</div>
+      <div class="price-feat"><span class="ck">✓</span>Credit customer tracker</div>
       <div class="price-feat"><span class="ck">✓</span>2 staff accounts</div>
-      <div class="price-feat"><span class="no">✗</span>Online customer ordering</div>
-      <div class="price-feat"><span class="no">✗</span>Analytics & reports</div>
+      <div class="price-feat"><span class="no">✗</span>Online ordering</div>
+      <div class="price-feat"><span class="no">✗</span>WhatsApp reports</div>
       <button class="price-btn ghost" onclick="document.getElementById('signup').scrollIntoView({behavior:'smooth'})">Start Free Trial</button>
     </div>
+
+    <!-- TIER 2: Pro (most popular) -->
     <div class="price-card popular">
       <div class="popular-tag">⭐ Most Popular</div>
-      <div class="price-name">Pro</div>
+      <div class="price-name">Pro Pharmacy</div>
       <div class="price-amount">UGX 50K</div>
       <div class="price-period">per month · ~$14</div>
       <div class="price-divider"></div>
-      <div class="price-feat"><span class="ck">✓</span>Everything in Basic</div>
+      <div class="price-feat"><span class="ck">✓</span>Everything in Drug Shop</div>
       <div class="price-feat"><span class="ck">✓</span>Online customer ordering</div>
+      <div class="price-feat"><span class="ck">✓</span>WhatsApp daily reports</div>
+      <div class="price-feat"><span class="ck">✓</span>NDA inspection reports</div>
+      <div class="price-feat"><span class="ck">✓</span>URA tax summary</div>
       <div class="price-feat"><span class="ck">✓</span>5 staff accounts</div>
-      <div class="price-feat"><span class="ck">✓</span>Full analytics & reports</div>
-      <div class="price-feat"><span class="ck">✓</span>MTN & Airtel MoMo</div>
-      <div class="price-feat"><span class="ck">✓</span>Priority support</div>
+      <div class="price-feat"><span class="ck">✓</span>Priority WhatsApp support</div>
       <button class="price-btn primary" onclick="document.getElementById('signup').scrollIntoView({behavior:'smooth'})">Start Free Trial</button>
     </div>
+
+    <!-- TIER 3: Enterprise -->
     <div class="price-card">
       <div class="price-name">Enterprise</div>
       <div class="price-amount">UGX 150K</div>
       <div class="price-period">per month · ~$40</div>
       <div class="price-divider"></div>
       <div class="price-feat"><span class="ck">✓</span>Everything in Pro</div>
-      <div class="price-feat"><span class="ck">✓</span>Multi-branch support</div>
+      <div class="price-feat"><span class="ck">✓</span>Multi-branch management</div>
+      <div class="price-feat"><span class="ck">✓</span>Cross-branch stock transfers</div>
+      <div class="price-feat"><span class="ck">✓</span>AI demand forecasting</div>
       <div class="price-feat"><span class="ck">✓</span>Unlimited staff accounts</div>
-      <div class="price-feat"><span class="ck">✓</span>AI stock predictions</div>
       <div class="price-feat"><span class="ck">✓</span>Dedicated account manager</div>
-      <div class="price-feat"><span class="ck">✓</span>Custom NDA reporting</div>
       <button class="price-btn ghost" onclick="document.getElementById('signup').scrollIntoView({behavior:'smooth'})">Contact Us</button>
     </div>
+
   </div>
 </section>
 
@@ -304,7 +328,7 @@ footer{padding:40px;border-top:1px solid var(--border);display:flex;align-items:
         <div class="fg"><label class="fl">Phone (MTN/Airtel)</label><input class="fi" id="regPhone" placeholder="07XX XXX XXX"/></div>
         <div class="fg full"><label class="fl">Email Address</label><input class="fi" id="regEmail" placeholder="your@email.com" type="email"/></div>
         <div class="fg"><label class="fl">Password</label><input class="fi" id="regPass" placeholder="Min 6 characters" type="password"/></div>
-        <div class="fg"><label class="fl">Plan</label><select class="fsel" id="regPlan"><option value="basic">Basic — UGX 20K/mo</option><option value="pro" selected>Pro — UGX 50K/mo</option><option value="enterprise">Enterprise — UGX 150K/mo</option></select></div>
+        <div class="fg"><label class="fl">Plan</label><select class="fsel" id="regPlan"><option value="drug_shop">Drug Shop — UGX 20K/mo</option><option value="pro" selected>Pro Pharmacy — UGX 50K/mo</option><option value="enterprise">Enterprise — UGX 150K/mo</option></select></div>
       </div>
       <button class="submit-btn" onclick="registerPharmacy()">🚀 Create My Free Account →</button>
       <div class="signup-trust">
@@ -316,7 +340,7 @@ footer{padding:40px;border-top:1px solid var(--border);display:flex;align-items:
     <div class="success-msg" id="successMsg">
       <div class="success-icon">🎉</div>
       <div class="success-title">Account Created!</div>
-      <div class="success-sub">Your 14-day free trial has started.<br>Redirecting you to your dashboard…<br><br><button class="btn btn-accent" style="margin-top:10px" onclick="window.location.href='app.html'">Open Your Dashboard →</button></div>
+      <div class="success-sub">Your 14-day free trial has started.<br>Login details sent to your phone via SMS.<br><br><button class="btn btn-accent" style="margin-top:10px" onclick="window.location.href='app.html'">Open Your Dashboard →</button></div>
     </div>
   </div>
 </section>
@@ -335,7 +359,7 @@ footer{padding:40px;border-top:1px solid var(--border);display:flex;align-items:
     <a href="#">Privacy Policy</a>
     <a href="#">Terms of Service</a>
     <a href="#">Contact Us</a>
-    <a href="app.html">Admin Login</a>
+    <a href="#" onclick="window.open('medvault-admin.html','_blank')">Admin Login</a>
   </div>
   <div class="footer-copy">© 2026 MedVault Uganda. NDA Registered Platform.</div>
 </footer>
@@ -346,7 +370,7 @@ const faqs = [
   {q:'What phones does it work on?', a:'Any smartphone with a browser. Android, iPhone — all work. You don\'t need a computer, though it works great on desktops too.'},
   {q:'How do I pay for the subscription?', a:'We accept MTN Mobile Money and Airtel Money. You\'ll receive a payment prompt on your phone each month. Simple and familiar.'},
   {q:'What happens after my free trial?', a:'After 14 days, you\'ll receive a MoMo payment prompt. If you pay, your account stays active. If not, you get a 3-day grace period before the account is locked. Your data is always safe.'},
-  {q:'Can my staff also use it?', a:'Yes! The Basic plan supports 2 staff accounts, Pro supports 5, and Enterprise supports unlimited staff. Each staff member has their own login.'},
+  {q:'Can my staff also use it?', a:'Yes! The Drug Shop plan supports 2 staff accounts, Pro Pharmacy supports 5, and Enterprise supports unlimited staff. Each staff member has their own login.'},
   {q:'Is my data safe?', a:'Yes. Your pharmacy data is completely separate from other pharmacies. Only you and your authorized staff can see your data. We use bank-level security.'},
   {q:'Do you comply with Uganda\'s NDA requirements?', a:'Yes. MedVault is designed to support NDA compliance. You can generate stock reports and expiry tracking reports required by Uganda\'s National Drug Authority.'},
   {q:'What if I need help?', a:'We offer support via WhatsApp (+256 700 123 456) and email (support@medvault.ug). Pro and Enterprise clients get priority response within 2 hours.'},
@@ -377,14 +401,15 @@ async function registerPharmacy() {
   const email    = document.getElementById('regEmail').value.trim();
   const pass     = document.getElementById('regPass').value;
   const plan     = document.getElementById('regPlan').value;
+  const btn      = document.querySelector('.submit-btn');
 
-  if (!pharmacy || !name || !phone || !email || !pass) {
-    alert('Please fill in all fields: pharmacy name, your name, phone, email, and password');
-    return;
-  }
+  if (!pharmacy) { alert('Please enter your pharmacy name'); return; }
+  if (!name)     { alert('Please enter your name'); return; }
+  if (!phone)    { alert('Please enter your phone number'); return; }
+  if (!email)    { alert('Please enter your email address'); return; }
+  if (!pass || pass.length < 6) { alert('Password must be at least 6 characters'); return; }
 
-  const btn = document.querySelector('.submit-btn');
-  btn.textContent = '⏳ Creating account…';
+  btn.textContent = '⏳ Creating your account...';
   btn.disabled = true;
 
   try {
@@ -392,33 +417,35 @@ async function registerPharmacy() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        orgName: pharmacy,
+        orgName:   pharmacy,
         ownerName: name,
         phone,
         email,
-        password: pass,
+        password:  pass,
         plan,
-        address: '',
+        address:   '',
       })
     });
+
     const data = await res.json();
+
     if (data.token) {
+      // Save credentials
       localStorage.setItem('mv_token', data.token);
       localStorage.setItem('mv_user', JSON.stringify(data.user));
+      // Show success
       document.getElementById('signupForm').style.display = 'none';
       document.getElementById('successMsg').style.display = 'block';
-      // Auto-redirect to dashboard after 2 seconds
-      setTimeout(() => { window.location.href = 'app.html'; }, 2000);
-      return;
+    } else {
+      // Show error from server
+      alert('❌ ' + (data.error || 'Registration failed. Please try again.'));
+      btn.textContent = '🚀 Create My Free Account →';
+      btn.disabled = false;
     }
-    // Server returned an error
-    alert('❌ ' + (data.error || 'Registration failed. Please try again.'));
+  } catch (e) {
+    alert('❌ Cannot reach server. Please check your internet and try again.');
     btn.textContent = '🚀 Create My Free Account →';
     btn.disabled = false;
-  } catch (e) {
-    // Offline / network error — show success anyway for demo
-    document.getElementById('signupForm').style.display = 'none';
-    document.getElementById('successMsg').style.display = 'block';
   }
 }
 
