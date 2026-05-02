@@ -223,16 +223,66 @@ async function doLogin() {
 
   setLoading(true);
 
-  try {
-    const res = await fetch(API_BASE + '/api/auth/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify({ email, password: pass }),
-    });
+  // Helper: fetch with an explicit timeout, since the Railway backend can hang
+  // mid-request (cold starts, container restarts) — we don't want users to wait 60s.
+  async function fetchLogin(timeoutMs) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      return await fetch(API_BASE + '/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({ email, password: pass }),
+        signal: ctrl.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
 
+  let res;
+  let networkErr = null;
+  // Try twice — first attempt may hit a sleeping/cold-starting backend.
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      if (attempt === 2) {
+        document.getElementById('loginBtn').textContent = '⏳ Retrying…';
+      }
+      res = await fetchLogin(attempt === 1 ? 12000 : 25000);
+      networkErr = null;
+      break;
+    } catch (e) {
+      networkErr = e;
+      if (attempt === 1) await new Promise(r => setTimeout(r, 800));
+    }
+  }
+
+  if (networkErr) {
+    setLoading(false);
+    // Network-level failure — fall back to a cached session if it matches this email
+    const cachedToken = localStorage.getItem('mv_token');
+    const cachedUser  = localStorage.getItem('mv_user');
+    if (cachedToken && cachedUser) {
+      try {
+        const user = JSON.parse(cachedUser);
+        if (user.email && user.email.toLowerCase() === email.toLowerCase()) {
+          window.location.href = 'app.html';
+          return;
+        }
+      } catch (_) {}
+    }
+    if (networkErr.name === 'AbortError') {
+      showError('⏱ The server is taking too long to respond — it may be restarting. Please wait a minute and try again.');
+    } else {
+      showError('🌐 Cannot reach the server. Check your internet connection or try again shortly.');
+    }
+    return;
+  }
+
+  try {
     let data;
     try {
       data = await res.json();
@@ -241,14 +291,11 @@ async function doLogin() {
     }
 
     if (data.token) {
-      // Store credentials
       localStorage.setItem('mv_token', data.token);
       localStorage.setItem('mv_user', JSON.stringify(data.user));
-      // Redirect to dashboard
       window.location.href = 'app.html';
     } else {
       setLoading(false);
-      // Distinguish auth errors from server errors
       if (res.status === 401 || res.status === 403) {
         showError('❌ Incorrect email or password. Please try again.');
       } else if (res.status >= 500) {
@@ -264,20 +311,6 @@ async function doLogin() {
     setLoading(false);
     if (e.message === 'SERVER_PARSE_ERROR') {
       showError('🔧 Unexpected response from the server. Please try again.');
-    } else if (e.name === 'TypeError' || e.message.includes('fetch')) {
-      // Fetch failed — check for a cached session before showing offline error
-      const cachedToken = localStorage.getItem('mv_token');
-      const cachedUser  = localStorage.getItem('mv_user');
-      if (cachedToken && cachedUser) {
-        try {
-          const user = JSON.parse(cachedUser);
-          if (user.email && user.email.toLowerCase() === email.toLowerCase()) {
-            window.location.href = 'app.html';
-            return;
-          }
-        } catch (_) {}
-      }
-      showError('🌐 Cannot reach the server. Check your internet connection or try again shortly.');
     } else {
       showError('⚠️ Something went wrong. Please refresh the page and try again.');
     }
