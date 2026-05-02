@@ -48,7 +48,14 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // API calls: try network first, fall back to error response
+  // Cross-origin requests (e.g. the Railway API): let the browser handle
+  // them directly so real network/CORS errors surface to the page instead
+  // of being masked as "offline".
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+
+  // Same-origin API calls: try network first, fall back to error response
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
       fetch(event.request).catch(() =>
