@@ -1567,26 +1567,25 @@ async function submitAddDrug() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// DASHBOARD — reads from local storage
+// DASHBOARD — renders immediately from local storage, then
+//             refreshes stat cards from /api/dashboard
 // ═══════════════════════════════════════════════════════════
-function loadDashboard() {
-  const stats = MedVaultOffline.getDashboardStats();
-  const drugs = MedVaultOffline.getDrugs();
-
+function renderDashboardStats(stats, drugs) {
   document.getElementById('dRev').textContent  = 'UGX ' + Math.round(stats.revenueToday).toLocaleString();
   document.getElementById('dTx').textContent   = stats.transactionsToday;
   document.getElementById('dLow').textContent  = stats.lowStockCount;
   document.getElementById('dExp').textContent  = stats.expiringCount;
   document.getElementById('lowBadge').textContent = stats.lowStockCount;
 
-  // Chart from local data
-  const weekly = MedVaultOffline.getWeeklyRevenue();
+  // Weekly revenue chart
+  const weekly = stats.weeklyRevenue || MedVaultOffline.getWeeklyRevenue();
   const max = Math.max(...weekly.map(d => d.revenue), 1);
   const c = document.getElementById('chartBars'); c.innerHTML = '';
   weekly.forEach((d, i) => {
     const pct = (d.revenue / max) * 85;
+    const label = d.label || (d.day ? new Date(d.day).toLocaleDateString('en-UG',{weekday:'short'}) : '');
     const w = document.createElement('div'); w.className = 'bar-wrap';
-    w.innerHTML = `<div class="bar" style="height:0%;transition-delay:${i*0.07}s" data-h="${pct||2}" title="UGX ${Math.round(d.revenue).toLocaleString()}"></div><div class="bar-lbl">${d.label}</div>`;
+    w.innerHTML = `<div class="bar" style="height:0%;transition-delay:${i*0.07}s" data-h="${pct||2}" title="UGX ${Math.round(d.revenue).toLocaleString()}"></div><div class="bar-lbl">${label}</div>`;
     c.appendChild(w);
   });
   requestAnimationFrame(() => requestAnimationFrame(() => document.querySelectorAll('.bar').forEach(b => b.style.height = b.dataset.h + '%')));
@@ -1599,12 +1598,33 @@ function loadDashboard() {
     <td>${s._offline?'<span class="offline-tag">📴 offline</span>':''}</td></tr>
   `).join('') || '<tr><td colspan="4" style="text-align:center;padding:16px;color:var(--muted)">No sales yet today</td></tr>';
 
-  // Alerts
-  const lowStock = drugs.filter(d => d.quantity <= (d.threshold||20));
+  // Stock alerts
+  const lowStock = (drugs||[]).filter(d => d.quantity <= (d.threshold||20));
   document.getElementById('alertsBody').innerHTML = lowStock.slice(0,5).map(d => `
     <tr><td><strong>${d.name}</strong></td><td>${d.quantity} units</td>
     <td><span class="pill ${d.stock_status}">${d.stock_status==='critical'?'Critical':'Low Stock'}</span></td></tr>
   `).join('') || '<tr><td colspan="3" style="text-align:center;padding:16px;color:var(--muted)">✅ All stock levels good!</td></tr>';
+}
+
+function loadDashboard() {
+  // Step 1 — render immediately with whatever is in local storage (no blank/Loading state)
+  const localStats = MedVaultOffline.getDashboardStats();
+  const drugs      = MedVaultOffline.getDrugs();
+  renderDashboardStats(localStats, drugs);
+
+  // Step 2 — fetch live data from /api/dashboard in the background and update the cards
+  if (token && MedVaultOffline.isOnline()) {
+    fetch(MedVaultOffline.API_BASE + '/api/dashboard', { headers: { 'Authorization': 'Bearer ' + token } })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data || data.error) return;
+        // Merge server stats with local drug list for the alerts table
+        const liveDrugs = MedVaultOffline.getDrugs();
+        renderDashboardStats(data, liveDrugs);
+        document.getElementById('dRevSub').textContent = 'live from server';
+      })
+      .catch(() => { /* stay with local data on network error */ });
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
