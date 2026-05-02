@@ -725,12 +725,10 @@ module.exports = function registerRoutes(app) {
     }
   });
 
-};
-
-
   // ══════════════════════════════════════════════════════════
   // STAFF MANAGEMENT
   // ══════════════════════════════════════════════════════════
+
 
   // GET /api/staff — list all staff in this organisation
   app.get('/api/staff', auth, async (req, res) => {
@@ -1301,3 +1299,4 @@ module.exports = function registerRoutes(app) {
       });
     } catch(e) { res.json({ error: e.message }, 500); }
   });
+};
