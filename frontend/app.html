@@ -1427,25 +1427,31 @@ async function doLogin() {
 
 async function boot(data) {
   const user = data.user || currentUser;
+
+  // Show the dashboard UI immediately — don't wait for data
+  document.getElementById('loginScreen').classList.add('hidden');
   document.getElementById('userName').textContent    = user.name || user.pharmacyName || 'Pharmacy';
   document.getElementById('userRole').textContent    = (user.pharmacyName||'') + ' · ' + (user.plan||'pro');
   document.getElementById('userAvatar').textContent  = (user.name||'KP').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
   document.getElementById('rPharmAddr').textContent  = (user.pharmacyName||'MedVault') + ' · Kampala, Uganda';
-  document.getElementById('loginScreen').classList.add('hidden');
 
   MedVaultOffline.init(token);
 
-  // Pull latest data from server
-  showToast('⏳ Syncing your data…');
-  const syncResult = await MedVaultOffline.pullFromServer(token);
-  if (syncResult.success) {
-    showToast('✅ Data synced! Working live.');
-  } else {
-    showToast('📴 Working offline with saved data.', 'warn');
-  }
-
+  // Render dashboard immediately with whatever is in local storage
   allDrugs = MedVaultOffline.getDrugs();
   go('dashboard', document.querySelector('.nav-item.active'));
+
+  // Pull latest data from server in the background — UI stays responsive
+  MedVaultOffline.pullFromServer(token).then(syncResult => {
+    if (syncResult.success) {
+      showToast('✅ Data synced! Working live.');
+      // Refresh data and re-render the current page with fresh data
+      allDrugs = MedVaultOffline.getDrugs();
+      loadPage(currentPage);
+    } else {
+      showToast('📴 Working offline with saved data.', 'warn');
+    }
+  });
 }
 
 // ═══════════════════════════════════════════════════════════
