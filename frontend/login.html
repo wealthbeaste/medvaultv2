@@ -153,6 +153,13 @@ footer{padding:24px 40px;border-top:1px solid var(--border);display:flex;align-i
 </footer>
 
 <script>
+// ── API base URL: production Railway backend or local dev server ──
+const API_BASE = (
+  window.location.hostname === 'localhost' ||
+  window.location.hostname === '127.0.0.1'
+) ? 'http://localhost:4000'
+  : 'https://medvaultv2-production.up.railway.app';
+
 function togglePassword() {
   const input = document.getElementById('loginPass');
   const btn   = document.getElementById('toggleBtn');
@@ -216,14 +223,40 @@ async function doLogin() {
 
   setLoading(true);
 
+  // ── Offline fallback: check cached credentials ──────────────────
+  if (!navigator.onLine) {
+    const cachedToken = localStorage.getItem('mv_token');
+    const cachedUser  = localStorage.getItem('mv_user');
+    if (cachedToken && cachedUser) {
+      try {
+        const user = JSON.parse(cachedUser);
+        if (user.email && user.email.toLowerCase() === email.toLowerCase()) {
+          window.location.href = 'app.html';
+          return;
+        }
+      } catch (_) {}
+    }
+    setLoading(false);
+    showError('⚡ You appear to be offline and no cached session was found. Please connect to the internet and try again.');
+    return;
+  }
+
   try {
-    const res = await fetch('https://medvaultv2-production.up.railway.app/api/auth/login', {
+    const res = await fetch(API_BASE + '/api/auth/login', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
       body: JSON.stringify({ email, password: pass }),
     });
 
-    const data = await res.json();
+    let data;
+    try {
+      data = await res.json();
+    } catch (_) {
+      throw new Error('SERVER_PARSE_ERROR');
+    }
 
     if (data.token) {
       // Store credentials
@@ -233,14 +266,27 @@ async function doLogin() {
       window.location.href = 'app.html';
     } else {
       setLoading(false);
-      const msg = data.error || 'Invalid email or password. Please try again.';
-      showError(msg);
+      // Distinguish auth errors from server errors
+      if (res.status === 401 || res.status === 403) {
+        showError('❌ Incorrect email or password. Please try again.');
+      } else if (res.status >= 500) {
+        showError('🔧 The server encountered an error. Please try again in a moment.');
+      } else {
+        const msg = data.error || data.message || 'Invalid email or password. Please try again.';
+        showError(msg);
+      }
       document.getElementById('loginPass').value = '';
       document.getElementById('loginPass').focus();
     }
   } catch (e) {
     setLoading(false);
-    showError('Cannot reach the server. Please check your internet connection and try again.');
+    if (e.message === 'SERVER_PARSE_ERROR') {
+      showError('🔧 Unexpected response from the server. Please try again.');
+    } else if (e.name === 'TypeError' || e.message.includes('fetch')) {
+      showError('🌐 Cannot reach the server. Check your internet connection or try again shortly.');
+    } else {
+      showError('⚠️ Something went wrong. Please refresh the page and try again.');
+    }
   }
 }
 </script>
