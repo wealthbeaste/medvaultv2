@@ -223,24 +223,6 @@ async function doLogin() {
 
   setLoading(true);
 
-  // ── Offline fallback: check cached credentials ──────────────────
-  if (!navigator.onLine) {
-    const cachedToken = localStorage.getItem('mv_token');
-    const cachedUser  = localStorage.getItem('mv_user');
-    if (cachedToken && cachedUser) {
-      try {
-        const user = JSON.parse(cachedUser);
-        if (user.email && user.email.toLowerCase() === email.toLowerCase()) {
-          window.location.href = 'app.html';
-          return;
-        }
-      } catch (_) {}
-    }
-    setLoading(false);
-    showError('⚡ You appear to be offline and no cached session was found. Please connect to the internet and try again.');
-    return;
-  }
-
   try {
     const res = await fetch(API_BASE + '/api/auth/login', {
       method: 'POST',
@@ -283,6 +265,18 @@ async function doLogin() {
     if (e.message === 'SERVER_PARSE_ERROR') {
       showError('🔧 Unexpected response from the server. Please try again.');
     } else if (e.name === 'TypeError' || e.message.includes('fetch')) {
+      // Fetch failed — check for a cached session before showing offline error
+      const cachedToken = localStorage.getItem('mv_token');
+      const cachedUser  = localStorage.getItem('mv_user');
+      if (cachedToken && cachedUser) {
+        try {
+          const user = JSON.parse(cachedUser);
+          if (user.email && user.email.toLowerCase() === email.toLowerCase()) {
+            window.location.href = 'app.html';
+            return;
+          }
+        } catch (_) {}
+      }
       showError('🌐 Cannot reach the server. Check your internet connection or try again shortly.');
     } else {
       showError('⚠️ Something went wrong. Please refresh the page and try again.');
