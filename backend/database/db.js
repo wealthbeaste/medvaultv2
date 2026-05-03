@@ -10,12 +10,18 @@ let pool;
 function getPool() {
   if (pool) return pool;
   const { Pool } = require('pg');
+  // Parse connection string and force ssl verify-full to silence pg warning
+  const connStr = process.env.DATABASE_URL || '';
+  const cleanConn = connStr.includes('sslmode=') 
+    ? connStr.replace(/sslmode=[^&]+/, 'sslmode=verify-full')
+    : connStr + (connStr.includes('?') ? '&' : '?') + 'sslmode=verify-full';
+
   pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: cleanConn,
     ssl: { rejectUnauthorized: false },
     max: 5,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
+    connectionTimeoutMillis: 15000,
   });
   pool.on('error', (err) => {
     console.error('DB pool error:', err.message);
