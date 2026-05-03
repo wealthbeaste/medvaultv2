@@ -9,6 +9,59 @@ const { hash, compare } = require('../core/password');
 const { sign } = require('../core/jwt');
 const auth = require('../middleware/auth');
 
+
+  // ══════════════════════════════════════════════════════════
+  // EMERGENCY SEED — creates super admin if missing
+  // Visit /api/setup once to create admin account
+  // ══════════════════════════════════════════════════════════
+  app.get('/api/setup', async (req, res) => {
+    try {
+      const { runMigrations, seedSuperAdmin } = require('../database/db');
+      await runMigrations();
+      await seedSuperAdmin();
+
+      // Also try to create directly in case seed skipped
+      const { query } = require('../database/db');
+      const exists = await query(
+        `SELECT id FROM users WHERE email = $1`,
+        ['admin@medvault.ug']
+      );
+
+      if (exists.rows.length) {
+        res.json({
+          message: '✅ Setup complete! Admin account exists.',
+          email:    'admin@medvault.ug',
+          password: 'MedVault2026!',
+          user_id:  exists.rows[0].id,
+        });
+      } else {
+        res.json({
+          message: '⚠️ Migrations ran but seed may have failed. Check Railway logs.',
+          hint: 'Make sure DATABASE_URL is set in Railway Variables',
+        });
+      }
+    } catch(e) {
+      res.json({ error: e.message, hint: 'Check DATABASE_URL in Railway Variables' });
+    }
+  });
+
+  // Test DB connection directly
+  app.get('/api/dbtest', async (req, res) => {
+    try {
+      const { query } = require('../database/db');
+      const result = await query('SELECT NOW() as time, current_database() as db');
+      const users  = await query('SELECT COUNT(*) as cnt FROM users').catch(() => ({ rows: [{ cnt: 'table missing' }] }));
+      res.json({
+        status:    'connected',
+        db:        result.rows[0],
+        userCount: users.rows[0].cnt,
+      });
+    } catch(e) {
+      res.json({ status: 'error', message: e.message });
+    }
+  });
+
+
 module.exports = function registerRoutes(app) {
 
   // ══════════════════════════════════════════════════════════
@@ -725,10 +778,12 @@ module.exports = function registerRoutes(app) {
     }
   });
 
+};
+
+
   // ══════════════════════════════════════════════════════════
   // STAFF MANAGEMENT
   // ══════════════════════════════════════════════════════════
-
 
   // GET /api/staff — list all staff in this organisation
   app.get('/api/staff', auth, async (req, res) => {
@@ -1299,4 +1354,3 @@ module.exports = function registerRoutes(app) {
       });
     } catch(e) { res.json({ error: e.message }, 500); }
   });
-};
