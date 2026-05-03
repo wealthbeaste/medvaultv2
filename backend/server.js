@@ -2,7 +2,7 @@
 const fs   = require('fs');
 const path = require('path');
 
-// Load .env for local dev only
+// ── Load .env for local dev ───────────────────────────────
 try {
   const ep = path.join(__dirname, '.env');
   if (fs.existsSync(ep)) {
@@ -17,70 +17,91 @@ try {
   }
 } catch(e) {}
 
-// Check required vars — warn but don't crash
-const required = ['DATABASE_URL','JWT_SECRET'];
-const missing  = required.filter(k => !process.env[k]);
-if (missing.length) {
-  console.error(`❌ Missing: ${missing.join(', ')} — add in Railway Variables`);
+// ── Log all env vars for debugging ───────────────────────
+console.log('=== MedVault Starting ===');
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('PORT:', process.env.PORT);
+console.log('DATABASE_URL set:', !!process.env.DATABASE_URL);
+console.log('JWT_SECRET set:', !!process.env.JWT_SECRET);
+
+// ── PORT — use Railway's PORT exactly as given ────────────
+// Railway sets PORT automatically — DO NOT hardcode
+const PORT = parseInt(process.env.PORT || '8080');
+const HOST = '0.0.0.0';
+
+// ── Load framework ────────────────────────────────────────
+let App;
+try {
+  App = require('./core/framework').App;
+  console.log('✅ Framework loaded');
+} catch(e) {
+  console.error('❌ Framework failed:', e.message);
+  process.exit(1);
 }
 
-const { App } = require('./core/framework');
-const registerRoutes = require('./routes/index');
+// ── Load routes ───────────────────────────────────────────
+let registerRoutes;
+try {
+  registerRoutes = require('./routes/index');
+  console.log('✅ Routes loaded');
+} catch(e) {
+  console.error('❌ Routes failed:', e.message);
+  process.exit(1);
+}
 
 const app = new App();
 registerRoutes(app);
 
-// Optional modules — never crash if missing
-['./payments/momo','./notifications/whatsapp'].forEach(mod => {
+// ── Optional modules ──────────────────────────────────────
+['./payments/momo', './notifications/whatsapp'].forEach(mod => {
   try {
     const m = require(mod);
     if (m.registerMomoRoutes)     m.registerMomoRoutes(app);
     if (m.registerWhatsAppRoutes) m.registerWhatsAppRoutes(app);
     if (m.startScheduler)         m.startScheduler();
-    console.log('✅ Loaded:', mod);
+    console.log('✅ Optional module loaded:', mod);
   } catch(e) {
-    console.log('⚠️  Skipped:', mod, '-', e.message.slice(0,60));
+    console.log('⚠️  Optional skipped:', mod);
   }
 });
 
-// ── START SERVER FIRST — then run DB setup in background ──
-const PORT = parseInt(process.env.PORT) || 4000;
-const HOST = '0.0.0.0';
-
+// ── Start HTTP server IMMEDIATELY ────────────────────────
+// Must start fast — Railway kills if no response within 60s
 const server = app.server();
 
 server.listen(PORT, HOST, () => {
-  console.log('\n╔══════════════════════════════════════════╗');
-  console.log('║  💊 MedVault API v2 — Railway Live      ║');
+  console.log('');
+  console.log('╔══════════════════════════════════════════╗');
+  console.log('║  💊 MedVault API — LIVE                  ║');
   console.log('╚══════════════════════════════════════════╝');
-  console.log(`\n🚀 Listening on ${HOST}:${PORT}`);
-  console.log(`🌍 Env: ${process.env.NODE_ENV || 'production'}`);
-  console.log(`❤️  Health check: /health\n`);
+  console.log('🚀 Port:', PORT);
+  console.log('🌍 Host:', HOST);
+  console.log('❤️  Health: /health');
+  console.log('');
 
-  // Run DB migrations AFTER server is already accepting requests
+  // Run DB setup AFTER server is listening
   if (process.env.DATABASE_URL) {
-    const { runMigrations, seedSuperAdmin } = require('./database/db');
-    runMigrations()
-      .then(() => seedSuperAdmin())
-      .then(() => console.log('✅ Database ready'))
-      .catch(e => console.error('⚠️  DB setup error (server still running):', e.message));
+    setTimeout(() => {
+      try {
+        const { runMigrations, seedSuperAdmin } = require('./database/db');
+        runMigrations()
+          .then(() => seedSuperAdmin())
+          .then(() => console.log('✅ Database ready'))
+          .catch(e => console.error('⚠️  DB setup error:', e.message));
+      } catch(e) {
+        console.error('⚠️  DB module error:', e.message);
+      }
+    }, 2000); // 2 second delay after server starts
   } else {
-    console.warn('⚠️  No DATABASE_URL — running without database');
+    console.warn('⚠️  No DATABASE_URL — set it in Railway Variables');
   }
 });
 
-server.on('error', (err) => {
+server.on('error', err => {
   console.error('❌ Server error:', err.message);
-  if (err.code === 'EADDRINUSE') {
-    console.error(`Port ${PORT} already in use`);
-    process.exit(1);
-  }
+  process.exit(1);
 });
 
-// Keep process alive
-process.on('uncaughtException', err => {
-  console.error('Uncaught exception:', err.message);
-});
-process.on('unhandledRejection', err => {
-  console.error('Unhandled rejection:', err.message || err);
-});
+// Keep alive
+process.on('uncaughtException',  e => console.error('Uncaught:', e.message));
+process.on('unhandledRejection', e => console.error('Rejection:', e));
