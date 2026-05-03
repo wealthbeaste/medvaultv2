@@ -9,6 +9,9 @@ const { hash, compare } = require('../core/password');
 const { sign } = require('../core/jwt');
 const auth = require('../middleware/auth');
 
+module.exports = function registerRoutes(app) {
+
+
 
   // ══════════════════════════════════════════════════════════
   // EMERGENCY SEED — creates super admin if missing
@@ -62,7 +65,6 @@ const auth = require('../middleware/auth');
   });
 
 
-module.exports = function registerRoutes(app) {
 
   // ══════════════════════════════════════════════════════════
   // HEALTH CHECK
