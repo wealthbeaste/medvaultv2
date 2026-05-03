@@ -32,6 +32,9 @@
 
   /* LOGIN */
   .login-screen{position:fixed;inset:0;background:var(--bg);z-index:200;display:flex;align-items:center;justify-content:center;}
+  .login-screen.hidden{display:none !important;}
+  .app-shell{display:none;width:100%;height:100vh;overflow:hidden;}
+  .app-shell.visible{display:flex !important;}
   .login-screen.hidden{display:none;}
   .login-box{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:40px;width:400px;max-width:92vw;box-shadow:0 30px 80px rgba(0,0,0,0.5);}
   .login-logo{display:flex;align-items:center;gap:10px;margin-bottom:32px;}
@@ -90,6 +93,9 @@
 
   /* PAGES */
   .page{display:none;padding:28px 32px;animation:fadeUp 0.3s ease both;}
+  .page.active{display:block;}
+  #appShell{display:none;}
+  #appShell.visible{display:flex;}
   .page.active{display:block;}
   @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 
@@ -335,6 +341,7 @@
 </div>
 
 <!-- SIDEBAR -->
+<div id="appShell" class="app-shell">
 <aside class="sidebar">
   <div class="logo">
     <div class="logo-mark"><div class="logo-icon">💊</div><div class="logo-text">MedVault</div></div>
@@ -1172,6 +1179,7 @@ Or open: https://app.medvault.ug</div>
   </div>
 
 </main>
+</div><!-- /appShell -->
 </div>
 
 <!-- RECEIPT MODAL -->
@@ -1427,31 +1435,25 @@ async function doLogin() {
 
 async function boot(data) {
   const user = data.user || currentUser;
-
-  // Show the dashboard UI immediately — don't wait for data
-  document.getElementById('loginScreen').classList.add('hidden');
   document.getElementById('userName').textContent    = user.name || user.pharmacyName || 'Pharmacy';
   document.getElementById('userRole').textContent    = (user.pharmacyName||'') + ' · ' + (user.plan||'pro');
   document.getElementById('userAvatar').textContent  = (user.name||'KP').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
   document.getElementById('rPharmAddr').textContent  = (user.pharmacyName||'MedVault') + ' · Kampala, Uganda';
+  document.getElementById('loginScreen').classList.add('hidden');
 
   MedVaultOffline.init(token);
 
-  // Render dashboard immediately with whatever is in local storage
+  // Pull latest data from server
+  showToast('⏳ Syncing your data…');
+  const syncResult = await MedVaultOffline.pullFromServer(token);
+  if (syncResult.success) {
+    showToast('✅ Data synced! Working live.');
+  } else {
+    showToast('📴 Working offline with saved data.', 'warn');
+  }
+
   allDrugs = MedVaultOffline.getDrugs();
   go('dashboard', document.querySelector('.nav-item.active'));
-
-  // Pull latest data from server in the background — UI stays responsive
-  MedVaultOffline.pullFromServer(token).then(syncResult => {
-    if (syncResult.success) {
-      showToast('✅ Data synced! Working live.');
-      // Refresh data and re-render the current page with fresh data
-      allDrugs = MedVaultOffline.getDrugs();
-      loadPage(currentPage);
-    } else {
-      showToast('📴 Working offline with saved data.', 'warn');
-    }
-  });
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1470,8 +1472,16 @@ const pageMeta = {
 
 function go(page, el) {
   currentPage = page;
+  // Make sure app shell is visible
+  const shell = document.getElementById('appShell');
+  if (shell) shell.classList.add('visible');
+  // Hide login
+  const loginEl = document.getElementById('loginScreen');
+  if (loginEl) loginEl.classList.add('hidden');
+
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.getElementById('page-' + page).classList.add('active');
+  const pageEl = document.getElementById('page-' + page);
+  if (pageEl) pageEl.classList.add('active');
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   if (el) el.classList.add('active');
   const m = pageMeta[page] || {t:page, s:''};
@@ -1567,25 +1577,26 @@ async function submitAddDrug() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// DASHBOARD — renders immediately from local storage, then
-//             refreshes stat cards from /api/dashboard
+// DASHBOARD — reads from local storage
 // ═══════════════════════════════════════════════════════════
-function renderDashboardStats(stats, drugs) {
+function loadDashboard() {
+  const stats = MedVaultOffline.getDashboardStats();
+  const drugs = MedVaultOffline.getDrugs();
+
   document.getElementById('dRev').textContent  = 'UGX ' + Math.round(stats.revenueToday).toLocaleString();
   document.getElementById('dTx').textContent   = stats.transactionsToday;
   document.getElementById('dLow').textContent  = stats.lowStockCount;
   document.getElementById('dExp').textContent  = stats.expiringCount;
   document.getElementById('lowBadge').textContent = stats.lowStockCount;
 
-  // Weekly revenue chart
-  const weekly = stats.weeklyRevenue || MedVaultOffline.getWeeklyRevenue();
+  // Chart from local data
+  const weekly = MedVaultOffline.getWeeklyRevenue();
   const max = Math.max(...weekly.map(d => d.revenue), 1);
   const c = document.getElementById('chartBars'); c.innerHTML = '';
   weekly.forEach((d, i) => {
     const pct = (d.revenue / max) * 85;
-    const label = d.label || (d.day ? new Date(d.day).toLocaleDateString('en-UG',{weekday:'short'}) : '');
     const w = document.createElement('div'); w.className = 'bar-wrap';
-    w.innerHTML = `<div class="bar" style="height:0%;transition-delay:${i*0.07}s" data-h="${pct||2}" title="UGX ${Math.round(d.revenue).toLocaleString()}"></div><div class="bar-lbl">${label}</div>`;
+    w.innerHTML = `<div class="bar" style="height:0%;transition-delay:${i*0.07}s" data-h="${pct||2}" title="UGX ${Math.round(d.revenue).toLocaleString()}"></div><div class="bar-lbl">${d.label}</div>`;
     c.appendChild(w);
   });
   requestAnimationFrame(() => requestAnimationFrame(() => document.querySelectorAll('.bar').forEach(b => b.style.height = b.dataset.h + '%')));
@@ -1598,33 +1609,12 @@ function renderDashboardStats(stats, drugs) {
     <td>${s._offline?'<span class="offline-tag">📴 offline</span>':''}</td></tr>
   `).join('') || '<tr><td colspan="4" style="text-align:center;padding:16px;color:var(--muted)">No sales yet today</td></tr>';
 
-  // Stock alerts
-  const lowStock = (drugs||[]).filter(d => d.quantity <= (d.threshold||20));
+  // Alerts
+  const lowStock = drugs.filter(d => d.quantity <= (d.threshold||20));
   document.getElementById('alertsBody').innerHTML = lowStock.slice(0,5).map(d => `
     <tr><td><strong>${d.name}</strong></td><td>${d.quantity} units</td>
     <td><span class="pill ${d.stock_status}">${d.stock_status==='critical'?'Critical':'Low Stock'}</span></td></tr>
   `).join('') || '<tr><td colspan="3" style="text-align:center;padding:16px;color:var(--muted)">✅ All stock levels good!</td></tr>';
-}
-
-function loadDashboard() {
-  // Step 1 — render immediately with whatever is in local storage (no blank/Loading state)
-  const localStats = MedVaultOffline.getDashboardStats();
-  const drugs      = MedVaultOffline.getDrugs();
-  renderDashboardStats(localStats, drugs);
-
-  // Step 2 — fetch live data from /api/dashboard in the background and update the cards
-  if (token && MedVaultOffline.isOnline()) {
-    fetch(MedVaultOffline.API_BASE + '/api/dashboard', { headers: { 'Authorization': 'Bearer ' + token } })
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (!data || data.error) return;
-        // Merge server stats with local drug list for the alerts table
-        const liveDrugs = MedVaultOffline.getDrugs();
-        renderDashboardStats(data, liveDrugs);
-        document.getElementById('dRevSub').textContent = 'live from server';
-      })
-      .catch(() => { /* stay with local data on network error */ });
-  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -3735,6 +3725,69 @@ function exportCountSheet() {
 </body></html>`);
   w.document.close();
 }
+
+
+
+// ═══════════════════════════════════════════════════════════
+// STARTUP — Auto-login if token exists
+// ═══════════════════════════════════════════════════════════
+(function startup() {
+  const savedToken = localStorage.getItem('mv_token');
+  const savedUser  = localStorage.getItem('mv_user');
+
+  if (savedToken && savedUser) {
+    // Already logged in — skip login screen
+    try {
+      token       = savedToken;
+      currentUser = JSON.parse(savedUser);
+
+      // Hide login, show dashboard
+      document.getElementById('loginScreen').classList.add('hidden');
+      const shell = document.getElementById('appShell');
+      if (shell) shell.classList.add('visible');
+
+      // Set user info in sidebar
+      const u = currentUser;
+      const nameEl   = document.getElementById('userName');
+      const roleEl   = document.getElementById('userRole');
+      const avatarEl = document.getElementById('userAvatar');
+      if (nameEl)   nameEl.textContent   = u.name || 'Pharmacy';
+      if (roleEl)   roleEl.textContent   = (u.pharmacyName || u.orgName || '') + ' · ' + (u.plan || 'pro');
+      if (avatarEl) avatarEl.textContent = (u.name || 'KP').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+
+      // Try to set receipt address
+      const addrEl = document.getElementById('rPharmAddr');
+      if (addrEl) addrEl.textContent = (u.pharmacyName || u.orgName || 'MedVault') + ' · Kampala, Uganda';
+
+      MedVaultOffline.init(token);
+      allDrugs = MedVaultOffline.getDrugs();
+      go('dashboard', document.querySelector('.nav-item'));
+    } catch(e) {
+      console.error('Auto-login error:', e);
+      // Clear bad data and show login
+      localStorage.removeItem('mv_token');
+      localStorage.removeItem('mv_user');
+      showLoginScreen();
+    }
+  } else {
+    showLoginScreen();
+  }
+})();
+
+function showLoginScreen() {
+  const loginEl = document.getElementById('loginScreen');
+  const shellEl = document.getElementById('appShell');
+  if (loginEl) loginEl.classList.remove('hidden');
+  if (shellEl) shellEl.classList.remove('visible');
+}
+
+// Override boot() to also show appShell
+const _origBoot = boot;
+boot = async function(data) {
+  await _origBoot(data);
+  const shell = document.getElementById('appShell');
+  if (shell) shell.classList.add('visible');
+};
 
 </script>
 
