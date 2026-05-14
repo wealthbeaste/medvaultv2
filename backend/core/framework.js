@@ -63,11 +63,14 @@ class App {
       const pathname = url.pathname;
 
       // ── Enrich res object ──
-      res.json = (data, status = 200) => {
-        res.writeHead(status, { 'Content-Type': 'application/json' });
+      res._statusCode = 200;
+      res.status = (code) => { res._statusCode = code; return res; };
+      res.json = (data, status) => {
+        // Use explicitly passed status, or one set via res.status(), or default 200
+        const code = status !== undefined ? status : res._statusCode;
+        res.writeHead(code, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(data));
       };
-      res.status = (code) => { res._statusCode = code; return res; };
 
       // ── CORS headers ──
       res.setHeader('Access-Control-Allow-Origin', '*');
@@ -111,7 +114,14 @@ class App {
           await route.handlers[i++](req, res, next);
         }
       };
-      await next();
+      try {
+        await next();
+      } catch (err) {
+        console.error('Unhandled route error:', err);
+        if (!res.headersSent) {
+          res.json({ error: 'Internal server error' }, 500);
+        }
+      }
     });
   }
 }
