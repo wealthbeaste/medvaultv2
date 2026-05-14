@@ -174,6 +174,10 @@ module.exports = function registerRoutes(app) {
 
   // ── DASHBOARD ───────────────────────────────────────────
   app.get('/api/dashboard', auth, async (req, res) => {
+    const { role } = req.user;
+    if (!['owner','manager','cashier'].includes(role)) {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
     const { pharmacyId } = req.user;
     if (!pharmacyId) return res.status(400).json({ success:false, error:'No pharmacy assigned. Ask your owner to reassign you.', revenueToday:0, transactionsToday:0, lowStockCount:0, expiringCount:0, weeklyRevenue:[], recentSales:[] });
     try {
@@ -195,7 +199,10 @@ module.exports = function registerRoutes(app) {
 
   // ── INVENTORY ───────────────────────────────────────────
   app.get('/api/inventory', auth, async (req, res) => {
-    const { pharmacyId } = req.user;
+    const { pharmacyId, role } = req.user;
+    if (!['owner','manager','cashier','dispensor'].includes(role)) {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
     const { search, category } = req.query;
     try {
       let sql = `SELECT *,
@@ -212,7 +219,10 @@ module.exports = function registerRoutes(app) {
   });
 
   app.get('/api/inventory/alerts', auth, async (req, res) => {
-    const { pharmacyId } = req.user;
+    const { pharmacyId, role } = req.user;
+    if (!['owner','manager','cashier'].includes(role)) {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
     try {
       const [low,exp] = await Promise.all([
         query(`SELECT * FROM drugs WHERE pharmacy_id=$1 AND quantity<=threshold ORDER BY quantity`,[pharmacyId]),
@@ -226,9 +236,12 @@ module.exports = function registerRoutes(app) {
 
 // UPDATE INVENTORY ITEM
   app.put('/api/inventory/:id', auth, async (req, res) => {
-  const { pharmacyId } = req.user;
+    const { pharmacyId, role } = req.user;
+    if (!['owner','manager'].includes(role)) {
+      return res.status(403).json({ error: 'Not allowed' });
+    }
 
-  const {
+    const {
     name,
     generic_name,
     category,
@@ -294,7 +307,11 @@ module.exports = function registerRoutes(app) {
 
 
 // ADD NEW DRUG + INITIAL BATCH
-  app.post('/api/inventory', auth, async (req, res) => {
+app.post('/api/inventory', auth, async (req, res) => {
+  const { role } = req.user;
+  if (!['owner','manager'].includes(role)) {
+    return res.status(403).json({ error: 'Not allowed' });
+  }
 
   const {
     name,
