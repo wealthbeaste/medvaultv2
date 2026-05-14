@@ -308,6 +308,7 @@ module.exports = function registerRoutes(app) {
     supplier,
     barcode,
     sku,
+    batch_number,
   } = req.body;
 
   // Validate / auto-generate batch_number
