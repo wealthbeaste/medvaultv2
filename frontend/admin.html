@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MedVault — Super Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#07090f;--s1:#0d1117;--s2:#131920;--s3:#1a2230;--s4:#1f2a3a;
+  --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.1);
+  --accent:#00e5b0;--accent2:#3b82f6;--gold:#f59e0b;
+  --danger:#ef4444;--success:#10b981;--warn:#f59e0b;--purple:#a855f7;
+  --text:#eef2ff;--muted:#5a6a82;--muted2:#8899aa;
+  --font:'Outfit',sans-serif;--mono:'DM Mono',monospace;--display:'Syne',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:var(--font);background:var(--bg);color:var(--text);display:flex;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 60% 40% at 5% 20%,rgba(0,229,176,0.04) 0%,transparent 60%),radial-gradient(ellipse 50% 40% at 95% 80%,rgba(59,130,246,0.04) 0%,transparent 60%),radial-gradient(ellipse 30% 30% at 50% 50%,rgba(168,85,247,0.02) 0%,transparent 60%);pointer-events:none;z-index:0;}
+
+/* ── SIDEBAR ── */
+.sidebar{width:220px;background:var(--s1);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:20;}
+.logo-wrap{padding:24px 20px 20px;border-bottom:1px solid var(--border);}
+.logo-row{display:flex;align-items:center;gap:10px;margin-bottom:3px;}
+.logo-gem{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 0 16px rgba(0,229,176,0.25);}
+.logo-name{font-family:var(--display);font-weight:800;font-size:18px;letter-spacing:-0.5px;}
+.logo-tag{font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;padding-left:42px;}
+.admin-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(168,85,247,0.12);border:1px solid rgba(168,85,247,0.2);color:var(--purple);padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600;letter-spacing:0.3px;margin-top:8px;}
+.nav{flex:1;padding:16px 10px;display:flex;flex-direction:column;gap:1px;overflow-y:auto;}
+.nav-section{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);padding:10px 10px 5px;font-weight:600;}
+.ni{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:8px;cursor:pointer;transition:all 0.18s;color:var(--muted2);font-size:13px;position:relative;}
+.ni:hover{background:var(--s2);color:var(--text);}
+.ni.active{background:rgba(0,229,176,0.08);color:var(--accent);}
+.ni.active::before{content:'';position:absolute;left:0;top:25%;bottom:25%;width:2px;background:var(--accent);border-radius:0 2px 2px 0;}
+.ni-icon{font-size:15px;width:18px;text-align:center;flex-shrink:0;}
+.ni-badge{margin-left:auto;font-size:9px;font-weight:700;padding:2px 6px;border-radius:10px;}
+.ni-badge.r{background:var(--danger);color:#fff;}
+.ni-badge.w{background:var(--warn);color:#000;}
+.ni-badge.g{background:var(--success);color:#fff;}
+.sidebar-bottom{padding:12px 10px;border-top:1px solid var(--border);}
+.admin-card{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:8px;background:var(--s2);cursor:pointer;}
+.admin-card:hover{background:var(--s3);}
+.admin-av{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--purple),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;}
+.admin-name{font-size:12px;font-weight:500;}
+.admin-role{font-size:10px;color:var(--muted);}
+
+/* ── MAIN ── */
+.main{margin-left:220px;flex:1;display:flex;flex-direction:column;position:relative;z-index:1;}
+.topbar{padding:16px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);background:rgba(7,9,15,0.7);backdrop-filter:blur(12px);position:sticky;top:0;z-index:10;}
+.tb-left{display:flex;align-items:center;gap:14px;}
+.tb-title{font-family:var(--display);font-weight:700;font-size:18px;}
+.tb-sub{font-size:12px;color:var(--muted);}
+.tb-right{display:flex;align-items:center;gap:10px;}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:all 0.18s;font-family:var(--font);}
+.btn-accent{background:var(--accent);color:#000;}
+.btn-accent:hover{filter:brightness(1.1);transform:translateY(-1px);}
+.btn-ghost{background:var(--s2);color:var(--text);border:1px solid var(--border);}
+.btn-ghost:hover{background:var(--s3);}
+.btn-danger{background:rgba(239,68,68,0.12);color:var(--danger);border:1px solid rgba(239,68,68,0.2);}
+.btn-danger:hover{background:rgba(239,68,68,0.2);}
+.btn-warn{background:rgba(245,158,11,0.12);color:var(--warn);border:1px solid rgba(245,158,11,0.2);}
+.live-pulse{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--success);background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.15);padding:5px 12px;border-radius:20px;}
+.lp-dot{width:6px;height:6px;border-radius:50%;background:var(--success);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.7)}}
+
+/* ── PAGES ── */
+.page{display:none;padding:24px 28px;animation:fadeUp 0.25s ease both;}
+.page.active{display:block;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── STAT CARDS ── */
+.stats-row{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:24px;}
+.stat{background:var(--s1);border:1px solid var(--border);border-radius:14px;padding:18px 20px;position:relative;overflow:hidden;cursor:default;}
+.stat::after{content:'';position:absolute;top:-15px;right:-15px;width:70px;height:70px;border-radius:50%;filter:blur(25px);opacity:0.1;}
+.stat.acc::after{background:var(--accent)}.stat.blu::after{background:var(--accent2)}.stat.gol::after{background:var(--gold)}.stat.red::after{background:var(--danger)}.stat.pur::after{background:var(--purple)}
+.stat-ico{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;margin-bottom:12px;}
+.stat-ico.acc{background:rgba(0,229,176,0.1)}.stat-ico.blu{background:rgba(59,130,246,0.1)}.stat-ico.gol{background:rgba(245,158,11,0.1)}.stat-ico.red{background:rgba(239,68,68,0.1)}.stat-ico.pur{background:rgba(168,85,247,0.1)}
+.stat-val{font-family:var(--display);font-weight:800;font-size:24px;letter-spacing:-0.5px;line-height:1;margin-bottom:4px;}
+.stat-lbl{font-size:11px;color:var(--muted);margin-bottom:3px;}
+.stat-chg{font-size:11px;}
+.chg-up{color:var(--success)}.chg-dn{color:var(--danger)}.chg-n{color:var(--muted)}
+
+/* ── CARDS ── */
+.card{background:var(--s1);border:1px solid var(--border);border-radius:14px;overflow:hidden;}
+.ch{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.ct{font-family:var(--display);font-weight:700;font-size:14px;}
+.cs{font-size:11px;color:var(--muted);margin-top:2px;}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:20px;}
+.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;margin-bottom:20px;}
+
+/* ── TABLE ── */
+.tbl{width:100%;border-collapse:collapse;font-size:12px;}
+.tbl th{padding:11px 16px;text-align:left;font-size:10px;letter-spacing:0.7px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);font-weight:500;}
+.tbl td{padding:12px 16px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.tbl tr:last-child td{border-bottom:none;}
+.tbl tbody tr{cursor:pointer;transition:background 0.15s;}
+.tbl tbody tr:hover td{background:rgba(255,255,255,0.02);}
+
+/* ── PILLS ── */
+.pill{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:600;white-space:nowrap;}
+.pill.active{background:rgba(16,185,129,0.12);color:var(--success);}
+.pill.trial{background:rgba(59,130,246,0.12);color:#93c5fd;}
+.pill.overdue{background:rgba(239,68,68,0.12);color:var(--danger);}
+.pill.suspended{background:rgba(90,106,130,0.15);color:var(--muted2);}
+.pill.basic{background:rgba(90,106,130,0.12);color:var(--muted2);}
+.pill.pro{background:rgba(0,229,176,0.12);color:var(--accent);}
+.pill.enterprise{background:rgba(168,85,247,0.12);color:var(--purple);}
+.pill.paid{background:rgba(16,185,129,0.1);color:var(--success);}
+.pill.pending{background:rgba(245,158,11,0.1);color:var(--warn);}
+.pill.failed{background:rgba(239,68,68,0.1);color:var(--danger);}
+
+/* ── REVENUE CHART ── */
+.rev-chart{padding:18px 20px;height:160px;display:flex;align-items:flex-end;gap:6px;}
+.rbar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;height:100%;justify-content:flex-end;}
+.rbar{width:100%;border-radius:5px 5px 0 0;transition:height 0.8s cubic-bezier(0.34,1.56,0.64,1);cursor:pointer;position:relative;}
+.rbar:hover::after{content:attr(data-tip);position:absolute;top:-28px;left:50%;transform:translateX(-50%);background:var(--s4);border:1px solid var(--border2);padding:3px 8px;border-radius:5px;font-size:10px;white-space:nowrap;color:var(--text);}
+.rbar-lbl{font-size:9px;color:var(--muted);font-family:var(--mono);}
+
+/* ── PHARMACY ROW ── */
+.pharma-row{display:flex;align-items:center;gap:12px;padding:13px 18px;border-bottom:1px solid var(--border);transition:background 0.15s;cursor:pointer;}
+.pharma-row:hover{background:rgba(255,255,255,0.02);}
+.pharma-row:last-child{border-bottom:none;}
+.pharma-av{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;}
+.pharma-info{flex:1;}
+.pharma-name{font-size:13px;font-weight:600;}
+.pharma-meta{font-size:11px;color:var(--muted);margin-top:2px;}
+.pharma-right{text-align:right;}
+.pharma-rev{font-family:var(--display);font-weight:700;font-size:13px;}
+.pharma-date{font-size:10px;color:var(--muted);margin-top:2px;}
+
+/* ── ACTIVITY FEED ── */
+.activity-item{display:flex;align-items:flex-start;gap:12px;padding:12px 18px;border-bottom:1px solid var(--border);}
+.activity-item:last-child{border-bottom:none;}
+.act-dot{width:8px;height:8px;border-radius:50%;margin-top:5px;flex-shrink:0;}
+.act-text{font-size:12px;color:var(--muted2);flex:1;line-height:1.5;}
+.act-text strong{color:var(--text);}
+.act-time{font-size:10px;color:var(--muted);font-family:var(--mono);white-space:nowrap;}
+
+/* ── MODAL ── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);z-index:100;display:none;align-items:center;justify-content:center;}
+.overlay.open{display:flex;}
+.modal{background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:28px;width:480px;max-width:92vw;box-shadow:0 30px 80px rgba(0,0,0,0.6);animation:modalIn 0.2s ease;}
+@keyframes modalIn{from{opacity:0;transform:scale(0.96) translateY(16px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.modal-title{font-family:var(--display);font-weight:700;font-size:18px;margin-bottom:4px;}
+.modal-sub{font-size:12px;color:var(--muted);margin-bottom:22px;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;}
+.fg{display:flex;flex-direction:column;gap:5px;}
+.fg.full{grid-column:1/-1;}
+.fl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;}
+.fi{background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-family:var(--font);font-size:13px;outline:none;transition:border-color 0.2s;width:100%;}
+.fi:focus{border-color:rgba(0,229,176,0.4);}
+.fi::placeholder{color:var(--muted);}
+.fsel{background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-family:var(--font);font-size:13px;outline:none;width:100%;}
+.fsel option{background:var(--s2);}
+.modal-footer{display:flex;gap:10px;justify-content:flex-end;margin-top:22px;padding-top:18px;border-top:1px solid var(--border);}
+
+/* ── PLAN CARDS ── */
+.plan-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;}
+.plan-card{background:var(--s2);border:1px solid var(--border);border-radius:12px;padding:20px;position:relative;cursor:pointer;transition:all 0.2s;}
+.plan-card:hover{border-color:rgba(0,229,176,0.3);transform:translateY(-2px);}
+.plan-card.current{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 8px 30px rgba(0,229,176,0.1);}
+.plan-popular{position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:var(--accent);color:#000;font-size:9px;font-weight:700;padding:3px 12px;border-radius:20px;white-space:nowrap;}
+.plan-name{font-family:var(--display);font-weight:800;font-size:16px;margin-bottom:4px;}
+.plan-price{font-family:var(--display);font-weight:800;font-size:26px;letter-spacing:-0.5px;color:var(--accent);}
+.plan-period{font-size:11px;color:var(--muted);}
+.plan-div{height:1px;background:var(--border);margin:14px 0;}
+.plan-feat{font-size:12px;color:var(--muted2);margin-bottom:7px;display:flex;align-items:center;gap:7px;}
+.plan-feat .ck{color:var(--success);}
+.plan-btn{width:100%;padding:9px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;font-family:var(--font);margin-top:14px;transition:all 0.2s;}
+.plan-btn.pr{background:var(--accent);color:#000;}
+.plan-btn.gh{background:var(--s3);color:var(--text);border:1px solid var(--border);}
+
+/* ── SEARCH ── */
+.search-wrap{display:flex;align-items:center;gap:8px;background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;width:240px;}
+.search-wrap input{background:none;border:none;outline:none;color:var(--text);font-family:var(--font);font-size:12px;width:100%;}
+.search-wrap input::placeholder{color:var(--muted);}
+
+/* ── METRIC RING ── */
+.metric-rings{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:18px 20px;}
+.ring-card{text-align:center;}
+.ring-label{font-size:11px;color:var(--muted);margin-top:8px;}
+.ring-val{font-family:var(--display);font-weight:800;font-size:20px;margin-top:2px;}
+svg.ring-svg{transform:rotate(-90deg);}
+.ring-track{fill:none;stroke:rgba(255,255,255,0.06);}
+.ring-fill{fill:none;stroke-linecap:round;transition:stroke-dashoffset 1s ease;}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--s2);border:1px solid var(--border2);border-left:3px solid var(--accent);border-radius:10px;padding:12px 16px;font-size:12px;font-weight:500;transform:translateY(70px);opacity:0;transition:all 0.28s ease;z-index:300;max-width:320px;}
+.toast.show{transform:translateY(0);opacity:1;}
+.toast.err{border-left-color:var(--danger);}
+.toast.warn{border-left-color:var(--warn);}
+
+/* ── MISC ── */
+.section-title{font-family:var(--display);font-weight:700;font-size:16px;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+.mono{font-family:var(--mono);font-size:11px;}
+.tag{display:inline-block;padding:2px 8px;border-radius:5px;font-size:10px;font-weight:600;background:var(--s3);color:var(--muted2);}
+.divider{height:1px;background:var(--border);margin:20px 0;}
+.empty-state{text-align:center;padding:40px 20px;color:var(--muted);}
+.empty-icon{font-size:36px;margin-bottom:10px;}
+
+/* ── OVERVIEW GRID ── */
+.overview-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:18px;margin-bottom:20px;}
+.revenue-vs{padding:14px 20px;display:flex;gap:20px;}
+.rvs-item{text-align:center;flex:1;}
+.rvs-val{font-family:var(--display);font-weight:800;font-size:20px;letter-spacing:-0.5px;}
+.rvs-lbl{font-size:10px;color:var(--muted);margin-top:3px;}
+
+/* ── BILLING TIMELINE ── */
+.billing-row{display:flex;align-items:center;gap:12px;padding:11px 18px;border-bottom:1px solid var(--border);}
+.billing-row:last-child{border-bottom:none;}
+.br-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.br-info{flex:1;}
+.br-name{font-size:12px;font-weight:500;}
+.br-meta{font-size:11px;color:var(--muted);margin-top:2px;}
+.br-amount{font-family:var(--display);font-weight:700;font-size:13px;}
+</style>
+</head>
+<body>
+
+<!-- ══════════ SIDEBAR ══════════ -->
+<aside class="sidebar">
+  <div class="logo-wrap">
+    <div class="logo-row"><div class="logo-gem">💊</div><div class="logo-name">MedVault</div></div>
+    <div class="logo-tag">Control Center</div>
+    <div class="admin-badge">⚡ Super Admin</div>
+  </div>
+  <nav class="nav">
+    <div class="nav-section">Overview</div>
+    <div class="ni active" onclick="go('overview',this)"><span class="ni-icon">📊</span>Overview</div>
+    <div class="ni" onclick="go('revenue',this)"><span class="ni-icon">💰</span>Revenue<span class="ni-badge g" id="revBadge">Live</span></div>
+
+    <div class="nav-section">Clients</div>
+    <div class="ni" onclick="go('pharmacies',this)"><span class="ni-icon">🏥</span>All Pharmacies<span class="ni-badge g" id="pharmCount">0</span></div>
+    <div class="ni" onclick="go('subscriptions',this)"><span class="ni-icon">💳</span>Subscriptions<span class="ni-badge r" id="overdueCount">0</span></div>
+    <div class="ni" onclick="go('billing',this)"><span class="ni-icon">🧾</span>Billing</div>
+    <div class="ni" onclick="go('trials',this)"><span class="ni-icon">⏳</span>Trials<span class="ni-badge w" id="trialCount">0</span></div>
+
+    <div class="nav-section">Operations</div>
+    <div class="ni" onclick="go('payments',this)"><span class="ni-icon">📱</span>MoMo Payments</div>
+    <div class="ni" onclick="go('support',this)"><span class="ni-icon">🎧</span>Support<span class="ni-badge r">2</span></div>
+    <div class="ni" onclick="go('activity',this)"><span class="ni-icon">📡</span>Activity Log</div>
+
+    <div class="nav-section">System</div>
+    <div class="ni" onclick="go('pricing',this)"><span class="ni-icon">🏷️</span>Pricing Plans</div>
+    <div class="ni" onclick="go('settings',this)"><span class="ni-icon">⚙️</span>Settings</div>
+  </nav>
+  <div class="sidebar-bottom">
+    <div class="admin-card">
+      <div class="admin-av">SA</div>
+      <div><div class="admin-name">Super Admin</div><div class="admin-role">medvault.ug</div></div>
+    </div>
+  </div>
+</aside>
+
+<!-- ══════════ MAIN ══════════ -->
+<main class="main">
+  <div class="topbar">
+    <div class="tb-left">
+      <div><div class="tb-title" id="tb-title">Overview</div><div class="tb-sub" id="tb-sub">MedVault Control Center</div></div>
+    </div>
+    <div class="tb-right">
+      <div class="live-pulse"><div class="lp-dot"></div>Live</div>
+      <button class="btn btn-ghost" onclick="refreshPage()">🔄 Refresh</button>
+      <button class="btn btn-accent" onclick="openAddPharmacy()">+ Add Pharmacy</button>
+    </div>
+  </div>
+
+  <!-- ══ OVERVIEW ══ -->
+  <div class="page active" id="page-overview">
+    <div class="stats-row" id="overviewStats">
+      <div class="stat acc"><div class="stat-ico acc">🏥</div><div class="stat-val" id="sTotalPharma">47</div><div class="stat-lbl">Total Pharmacies</div><div class="stat-chg chg-up">↑ 3 this week</div></div>
+      <div class="stat blu"><div class="stat-ico blu">✅</div><div class="stat-val" id="sActive">39</div><div class="stat-lbl">Active Subscriptions</div><div class="stat-chg chg-up">↑ 2 this month</div></div>
+      <div class="stat gol"><div class="stat-ico gol">💰</div><div class="stat-val" id="sMRR">UGX 2.3M</div><div class="stat-lbl">Monthly Revenue (MRR)</div><div class="stat-chg chg-up">↑ 18% vs last month</div></div>
+      <div class="stat red"><div class="stat-ico red">⚠️</div><div class="stat-val" id="sOverdue">4</div><div class="stat-lbl">Overdue Payments</div><div class="stat-chg chg-dn">↑ 1 this week</div></div>
+      <div class="stat pur"><div class="stat-ico pur">⏳</div><div class="stat-val" id="sTrials">8</div><div class="stat-lbl">Active Trials</div><div class="stat-chg chg-n">14-day free trial</div></div>
+    </div>
+
+    <div class="overview-grid">
+      <!-- Revenue Chart -->
+      <div class="card">
+        <div class="ch"><div><div class="ct">Monthly Revenue</div><div class="cs">Last 7 months · UGX</div></div><span class="tag">MRR</span></div>
+        <div class="rev-chart" id="revChart"></div>
+        <div class="revenue-vs">
+          <div class="rvs-item"><div class="rvs-val" style="color:var(--accent)">UGX 2.3M</div><div class="rvs-lbl">This Month</div></div>
+          <div class="rvs-item"><div class="rvs-val" style="color:var(--muted2)">UGX 1.95M</div><div class="rvs-lbl">Last Month</div></div>
+          <div class="rvs-item"><div class="rvs-val" style="color:var(--success)">↑ 18%</div><div class="rvs-lbl">Growth</div></div>
+        </div>
+      </div>
+
+      <!-- Subscription breakdown rings -->
+      <div class="card">
+        <div class="ch"><div class="ct">Plan Breakdown</div></div>
+        <div class="metric-rings" id="planRings"></div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <!-- Recent signups -->
+      <div class="card">
+        <div class="ch"><div class="ct">Recent Signups</div><span class="see-all" onclick="go('pharmacies',document.querySelectorAll('.ni')[3])">View all →</span></div>
+        <div id="recentSignups"></div>
+      </div>
+      <!-- Activity feed -->
+      <div class="card">
+        <div class="ch"><div class="ct">Live Activity</div><span class="tag">Real-time</span></div>
+        <div id="activityFeed"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ REVENUE ══ -->
+  <div class="page" id="page-revenue">
+    <div class="stats-row">
+      <div class="stat acc"><div class="stat-ico acc">📅</div><div class="stat-val">UGX 2.3M</div><div class="stat-lbl">This Month</div><div class="stat-chg chg-up">↑ 18%</div></div>
+      <div class="stat blu"><div class="stat-ico blu">📆</div><div class="stat-val">UGX 1.95M</div><div class="stat-lbl">Last Month</div><div class="stat-chg chg-n">—</div></div>
+      <div class="stat gol"><div class="stat-ico gol">📈</div><div class="stat-val">UGX 12.4M</div><div class="stat-lbl">This Year</div><div class="stat-chg chg-up">↑ 34%</div></div>
+      <div class="stat pur"><div class="stat-ico pur">💳</div><div class="stat-val">UGX 147K</div><div class="stat-lbl">Avg Per Client</div><div class="stat-chg chg-up">↑ 5%</div></div>
+      <div class="stat red"><div class="stat-ico red">❌</div><div class="stat-val">UGX 200K</div><div class="stat-lbl">Churn (Lost)</div><div class="stat-chg chg-dn">2 cancellations</div></div>
+    </div>
+    <div class="two-col">
+      <div class="card">
+        <div class="ch"><div class="ct">Revenue by Plan</div></div>
+        <div style="padding:18px 20px">
+          <div style="margin-bottom:16px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:12px">Enterprise (UGX 150K)</span><span style="font-size:12px;font-family:var(--mono);color:var(--purple)">UGX 900K · 4 clients</span></div>
+            <div style="height:8px;background:var(--s3);border-radius:4px;overflow:hidden"><div style="height:100%;width:39%;background:var(--purple);border-radius:4px;transition:width 1s ease"></div></div>
+          </div>
+          <div style="margin-bottom:16px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:12px">Pro (UGX 50K)</span><span style="font-size:12px;font-family:var(--mono);color:var(--accent)">UGX 1.25M · 25 clients</span></div>
+            <div style="height:8px;background:var(--s3);border-radius:4px;overflow:hidden"><div style="height:100%;width:54%;background:var(--accent);border-radius:4px;transition:width 1s ease"></div></div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:12px">Basic (UGX 20K)</span><span style="font-size:12px;font-family:var(--mono);color:var(--muted2)">UGX 200K · 10 clients</span></div>
+            <div style="height:8px;background:var(--s3);border-radius:4px;overflow:hidden"><div style="height:100%;width:9%;background:var(--muted2);border-radius:4px;transition:width 1s ease"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ch"><div class="ct">Payment Methods</div></div>
+        <div style="padding:18px 20px">
+          <div style="margin-bottom:14px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:12px">📱 MTN MoMo</span><span style="font-size:12px;font-family:var(--mono);color:#f59e0b">62% · 24 clients</span></div>
+            <div style="height:8px;background:var(--s3);border-radius:4px;overflow:hidden"><div style="height:100%;width:62%;background:#f59e0b;border-radius:4px"></div></div>
+          </div>
+          <div style="margin-bottom:14px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:12px">📲 Airtel Money</span><span style="font-size:12px;font-family:var(--mono);color:#ef4444">28% · 11 clients</span></div>
+            <div style="height:8px;background:var(--s3);border-radius:4px;overflow:hidden"><div style="height:100%;width:28%;background:#ef4444;border-radius:4px"></div></div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:12px">💵 Cash/Bank</span><span style="font-size:12px;font-family:var(--mono);color:var(--muted2)">10% · 4 clients</span></div>
+            <div style="height:8px;background:var(--s3);border-radius:4px;overflow:hidden"><div style="height:100%;width:10%;background:var(--muted2);border-radius:4px"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><div class="ct">Revenue Timeline</div><div class="cs">All transactions this month</div></div>
+      <table class="tbl"><thead><tr><th>Date</th><th>Pharmacy</th><th>Plan</th><th>Amount</th><th>Method</th><th>Status</th></tr></thead>
+      <tbody id="revTimeline"></tbody></table>
+    </div>
+  </div>
+
+  <!-- ══ ALL PHARMACIES ══ -->
+  <div class="page" id="page-pharmacies">
+    <div class="toolbar" style="margin-bottom:18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <div class="search-wrap"><span>🔍</span><input type="text" id="pharmSearch" placeholder="Search pharmacy…" oninput="filterPharmas()"/></div>
+      <button class="btn btn-ghost" onclick="filterByStatus('')">All</button>
+      <button class="btn btn-ghost" onclick="filterByStatus('active')">✅ Active</button>
+      <button class="btn btn-ghost" onclick="filterByStatus('trial')">⏳ Trial</button>
+      <button class="btn btn-ghost" onclick="filterByStatus('overdue')">⚠️ Overdue</button>
+      <button class="btn btn-ghost" onclick="filterByStatus('suspended')">🚫 Suspended</button>
+      <button class="btn btn-accent" style="margin-left:auto" onclick="openAddPharmacy()">+ Add Pharmacy</button>
+    </div>
+    <div class="card">
+      <table class="tbl" id="pharmaTable">
+        <thead><tr><th>Pharmacy</th><th>Location</th><th>Plan</th><th>Status</th><th>Monthly Revenue</th><th>Billing Date</th><th>Last Active</th><th>Actions</th></tr></thead>
+        <tbody id="pharmaBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══ SUBSCRIPTIONS ══ -->
+  <div class="page" id="page-subscriptions">
+    <div class="stats-row" style="grid-template-columns:repeat(4,1fr)">
+      <div class="stat acc"><div class="stat-ico acc">✅</div><div class="stat-val" id="subActive">39</div><div class="stat-lbl">Active</div></div>
+      <div class="stat red"><div class="stat-ico red">⚠️</div><div class="stat-val" id="subOverdue">4</div><div class="stat-lbl">Overdue</div></div>
+      <div class="stat pur"><div class="stat-ico pur">⏳</div><div class="stat-val" id="subTrial">8</div><div class="stat-lbl">On Trial</div></div>
+      <div class="stat blu"><div class="stat-ico blu">🚫</div><div class="stat-val" id="subSuspended">2</div><div class="stat-lbl">Suspended</div></div>
+    </div>
+    <div class="two-col">
+      <div class="card">
+        <div class="ch"><div class="ct">Overdue — Action Required</div><span class="pill overdue">4 accounts</span></div>
+        <div id="overdueList"></div>
+      </div>
+      <div class="card">
+        <div class="ch"><div class="ct">Trials Ending Soon</div><span class="pill trial">This week</span></div>
+        <div id="trialEndList"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><div class="ct">All Subscriptions</div></div>
+      <table class="tbl"><thead><tr><th>Pharmacy</th><th>Plan</th><th>Amount</th><th>Billing Date</th><th>Days Left</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody id="allSubsBody"></tbody></table>
+    </div>
+  </div>
+
+  <!-- ══ BILLING ══ -->
+  <div class="page" id="page-billing">
+    <div class="stats-row" style="grid-template-columns:repeat(4,1fr)">
+      <div class="stat acc"><div class="stat-ico acc">✅</div><div class="stat-val">UGX 2.1M</div><div class="stat-lbl">Collected This Month</div></div>
+      <div class="stat red"><div class="stat-ico red">⌛</div><div class="stat-val">UGX 200K</div><div class="stat-lbl">Outstanding</div></div>
+      <div class="stat gol"><div class="stat-ico gol">📅</div><div class="stat-val">12</div><div class="stat-lbl">Due This Week</div></div>
+      <div class="stat blu"><div class="stat-ico blu">🔔</div><div class="stat-val">8</div><div class="stat-lbl">Reminders Sent</div></div>
+    </div>
+    <div class="two-col">
+      <div class="card">
+        <div class="ch"><div class="ct">Upcoming Billings</div><div class="cs">Next 7 days</div></div>
+        <div id="upcomingBilling"></div>
+      </div>
+      <div class="card">
+        <div class="ch"><div class="ct">Recent Collections</div></div>
+        <div id="recentCollections"></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:12px;margin-bottom:18px">
+      <button class="btn btn-accent" onclick="sendAllReminders()">📱 Send All Payment Reminders</button>
+      <button class="btn btn-ghost" onclick="toast('Generating PDF invoice report…')">📄 Export Invoices</button>
+      <button class="btn btn-ghost" onclick="toast('Scheduling auto-charge via MTN MoMo…')">⚡ Auto-Charge All Overdue</button>
+    </div>
+  </div>
+
+  <!-- ══ TRIALS ══ -->
+  <div class="page" id="page-trials">
+    <div class="section-title">⏳ Active Free Trials</div>
+    <div class="card">
+      <table class="tbl"><thead><tr><th>Pharmacy</th><th>Started</th><th>Days Left</th><th>Usage</th><th>Contact</th><th>Actions</th></tr></thead>
+      <tbody id="trialsBody"></tbody></table>
+    </div>
+  </div>
+
+  <!-- ══ MOMO PAYMENTS ══ -->
+  <div class="page" id="page-payments">
+    <div class="stats-row" style="grid-template-columns:repeat(4,1fr)">
+      <div class="stat acc"><div class="stat-ico acc">✅</div><div class="stat-val">87</div><div class="stat-lbl">Successful Payments</div></div>
+      <div class="stat red"><div class="stat-ico red">❌</div><div class="stat-val">5</div><div class="stat-lbl">Failed Payments</div></div>
+      <div class="stat gol"><div class="stat-ico gol">⏳</div><div class="stat-val">3</div><div class="stat-lbl">Pending</div></div>
+      <div class="stat pur"><div class="stat-ico pur">💰</div><div class="stat-val">UGX 2.1M</div><div class="stat-lbl">Total Collected</div></div>
+    </div>
+    <div class="card">
+      <div class="ch"><div class="ct">MoMo Transaction Log</div><div class="cs">All MTN & Airtel payments</div></div>
+      <table class="tbl"><thead><tr><th>Reference ID</th><th>Pharmacy</th><th>Phone</th><th>Amount</th><th>Network</th><th>Time</th><th>Status</th></tr></thead>
+      <tbody id="momoLog"></tbody></table>
+    </div>
+  </div>
+
+  <!-- ══ SUPPORT ══ -->
+  <div class="page" id="page-support">
+    <div class="section-title">🎧 Support Tickets</div>
+    <div class="card">
+      <table class="tbl"><thead><tr><th>Ticket</th><th>Pharmacy</th><th>Issue</th><th>Priority</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody id="supportBody"></tbody></table>
+    </div>
+  </div>
+
+  <!-- ══ ACTIVITY ══ -->
+  <div class="page" id="page-activity">
+    <div class="section-title">📡 Full Activity Log</div>
+    <div class="card" id="fullActivityLog"></div>
+  </div>
+
+  <!-- ══ PRICING ══ -->
+  <div class="page" id="page-pricing">
+    <div class="section-title">🏷️ Subscription Plans</div>
+    <div class="plan-grid">
+      <div class="plan-card"><div class="plan-name">Basic</div><div class="plan-price">UGX 20K</div><div class="plan-period">per month</div><div class="plan-div"></div><div class="plan-feat"><span class="ck">✓</span>Inventory management</div><div class="plan-feat"><span class="ck">✓</span>Sales & receipts</div><div class="plan-feat"><span class="ck">✓</span>2 staff accounts</div><div class="plan-feat" style="opacity:0.4"><span>✗</span>Online ordering</div><button class="plan-btn gh" onclick="editPlan('basic')">Edit Plan</button></div>
+      <div class="plan-card current"><div class="plan-popular">Most Popular</div><div class="plan-name">Pro</div><div class="plan-price">UGX 50K</div><div class="plan-period">per month</div><div class="plan-div"></div><div class="plan-feat"><span class="ck">✓</span>Everything in Basic</div><div class="plan-feat"><span class="ck">✓</span>Online ordering</div><div class="plan-feat"><span class="ck">✓</span>5 staff accounts</div><div class="plan-feat"><span class="ck">✓</span>Analytics & reports</div><button class="plan-btn pr" onclick="editPlan('pro')">Edit Plan</button></div>
+      <div class="plan-card"><div class="plan-name">Enterprise</div><div class="plan-price">UGX 150K</div><div class="plan-period">per month</div><div class="plan-div"></div><div class="plan-feat"><span class="ck">✓</span>Everything in Pro</div><div class="plan-feat"><span class="ck">✓</span>Multi-branch</div><div class="plan-feat"><span class="ck">✓</span>AI stock predictions</div><div class="plan-feat"><span class="ck">✓</span>Priority support</div><button class="plan-btn gh" onclick="editPlan('enterprise')">Edit Plan</button></div>
+    </div>
+    <div class="divider"></div>
+    <div class="section-title">🎁 Discount Codes</div>
+    <div class="card">
+      <div class="ch"><div class="ct">Active Codes</div><button class="btn btn-accent" style="padding:6px 12px;font-size:11px" onclick="toast('Create discount code form coming!')">+ New Code</button></div>
+      <table class="tbl"><thead><tr><th>Code</th><th>Discount</th><th>Uses</th><th>Expires</th><th>Actions</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">LAUNCH50</td><td>50% off 1st month</td><td>12 uses</td><td>31 Dec 2026</td><td><button class="btn btn-ghost" style="padding:4px 10px;font-size:11px" onclick="toast('Code deactivated')">Deactivate</button></td></tr>
+        <tr><td class="mono">KATO2026</td><td>1 month free</td><td>3 uses</td><td>30 Jun 2026</td><td><button class="btn btn-ghost" style="padding:4px 10px;font-size:11px" onclick="toast('Code deactivated')">Deactivate</button></td></tr>
+      </tbody></table>
+    </div>
+  </div>
+
+  <!-- ══ SETTINGS ══ -->
+  <div class="page" id="page-settings">
+    <div class="two-col">
+      <div class="card">
+        <div class="ch"><div class="ct">System Settings</div></div>
+        <div style="padding:20px;display:flex;flex-direction:column;gap:16px">
+          <div class="fg"><label class="fl">Platform Name</label><input class="fi" value="MedVault"/></div>
+          <div class="fg"><label class="fl">Support Email</label><input class="fi" value="support@medvault.ug"/></div>
+          <div class="fg"><label class="fl">Support WhatsApp</label><input class="fi" value="+256 700 123 456"/></div>
+          <div class="fg"><label class="fl">Trial Period (days)</label><input class="fi" type="number" value="14"/></div>
+          <div class="fg"><label class="fl">Grace Period (days)</label><input class="fi" type="number" value="3"/></div>
+          <button class="btn btn-accent" onclick="toast('✅ Settings saved!')">Save Settings</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ch"><div class="ct">MTN MoMo Config</div></div>
+        <div style="padding:20px;display:flex;flex-direction:column;gap:16px">
+          <div class="fg"><label class="fl">Environment</label><select class="fsel"><option>sandbox</option><option>production</option></select></div>
+          <div class="fg"><label class="fl">Subscription Key</label><input class="fi" type="password" placeholder="••••••••••••••••"/></div>
+          <div class="fg"><label class="fl">API User ID</label><input class="fi" placeholder="UUID format"/></div>
+          <div class="fg"><label class="fl">API Key</label><input class="fi" type="password" placeholder="••••••••••••••••"/></div>
+          <button class="btn btn-accent" onclick="toast('✅ MoMo config saved!')">Save MoMo Config</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><div class="ct">Broadcast Message</div><div class="cs">Send announcement to all pharmacies</div></div>
+      <div style="padding:20px;display:flex;flex-direction:column;gap:12px">
+        <div class="fg"><label class="fl">Message</label><textarea class="fi" rows="3" placeholder="Type your announcement here…" style="resize:vertical"></textarea></div>
+        <div style="display:flex;gap:10px">
+          <button class="btn btn-accent" onclick="toast('📢 Broadcast sent to 47 pharmacies!')">📢 Send to All Pharmacies</button>
+          <button class="btn btn-ghost" onclick="toast('Preview mode — message looks good!')">👁 Preview</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- ADD PHARMACY MODAL -->
+<div class="overlay" id="addModal" onclick="if(event.target===this)closeModal('addModal')">
+  <div class="modal">
+    <div class="modal-title">Add New Pharmacy</div>
+    <div class="modal-sub">Create an account for a new client pharmacy</div>
+    <div class="form-row">
+      <div class="fg full"><label class="fl">Pharmacy Name</label><input class="fi" id="newPharmName" placeholder="e.g. Kato Pharma Ltd"/></div>
+      <div class="fg"><label class="fl">Owner Name</label><input class="fi" id="newOwner" placeholder="Full name"/></div>
+      <div class="fg"><label class="fl">Phone Number</label><input class="fi" id="newPhone" placeholder="07XX XXX XXX"/></div>
+      <div class="fg full"><label class="fl">Email Address</label><input class="fi" id="newEmail" placeholder="admin@pharmacyname.com" type="email"/></div>
+      <div class="fg"><label class="fl">Location</label><input class="fi" id="newLocation" placeholder="e.g. Kampala Road"/></div>
+      <div class="fg"><label class="fl">Plan</label><select class="fsel" id="newPlan"><option value="basic">Basic — UGX 20K/mo</option><option value="pro" selected>Pro — UGX 50K/mo</option><option value="enterprise">Enterprise — UGX 150K/mo</option></select></div>
+      <div class="fg full"><label class="fl">NDA Registration Number (optional)</label><input class="fi" id="newNDA" placeholder="NDA/PH/2024/XXX"/></div>
+    </div>
+    <div style="background:rgba(0,229,176,0.06);border:1px solid rgba(0,229,176,0.15);border-radius:8px;padding:12px;font-size:12px;color:var(--muted2);margin-bottom:4px">
+      💡 System will auto-generate login credentials and send them to the pharmacy's phone via SMS.
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('addModal')">Cancel</button>
+      <button class="btn btn-accent" onclick="createPharmacy()">Create Account & Send Login</button>
+    </div>
+  </div>
+</div>
+
+<!-- PHARMACY DETAIL MODAL -->
+<div class="overlay" id="detailModal" onclick="if(event.target===this)closeModal('detailModal')">
+  <div class="modal" style="width:540px">
+    <div class="modal-title" id="detailTitle">Pharmacy Details</div>
+    <div class="modal-sub" id="detailSub">Full account information</div>
+    <div id="detailContent"></div>
+    <div class="modal-footer" id="detailActions"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span id="toastMsg"></span></div>
+
+<script>
+// ══════════════════════════════════════════════════
+// DEMO DATA
+// ══════════════════════════════════════════════════
+const pharmacies = [
+  {id:1,name:'Kato Pharma',owner:'James Kato',phone:'0770123456',email:'admin@katopharma.ug',location:'Kampala Road, Kampala',plan:'pro',status:'active',revenue:50000,billingDate:'2026-04-22',lastActive:'2 min ago',joined:'2025-08-14',nda:'NDA/PH/2024/001',sales:847000,drugs:142},
+  {id:2,name:'City Pharmacy',owner:'Sarah Nambi',phone:'0752891234',email:'admin@citypharma.ug',location:'Entebbe Road, Entebbe',plan:'enterprise',status:'active',revenue:150000,billingDate:'2026-04-18',lastActive:'1 hr ago',joined:'2025-07-02',nda:'NDA/PH/2024/015',sales:2100000,drugs:310},
+  {id:3,name:'Mengo Drug Store',owner:'Robert Ssali',phone:'0701445678',email:'rssali@mengodrugs.ug',location:'Mengo Hill Road',plan:'pro',status:'overdue',revenue:50000,billingDate:'2026-03-15',lastActive:'3 days ago',joined:'2025-09-20',nda:'NDA/PH/2024/028',sales:620000,drugs:98},
+  {id:4,name:'Nakawa Health',owner:'Grace Amoding',phone:'0780334890',email:'grace@nakawahealth.ug',location:'Nakawa Industrial Area',plan:'basic',status:'trial',revenue:20000,billingDate:'2026-04-05',lastActive:'5 hr ago',joined:'2026-03-09',nda:null,sales:120000,drugs:45},
+  {id:5,name:'Wandegeya Pharmacy',owner:'Moses Kizito',phone:'0762567123',email:'mkizito@wandegeyapharma.ug',location:'Wandegeya Market, Kampala',plan:'pro',status:'active',revenue:50000,billingDate:'2026-04-10',lastActive:'30 min ago',joined:'2025-11-03',nda:'NDA/PH/2025/007',sales:780000,drugs:167},
+  {id:6,name:'Mulago Drugs',owner:'Dr. Alice Pero',phone:'0703445678',email:'admin@mulagodrugs.ug',location:'Mulago Hill, Kampala',plan:'enterprise',status:'active',revenue:150000,billingDate:'2026-04-25',lastActive:'Now',joined:'2025-06-15',nda:'NDA/PH/2024/003',sales:3200000,drugs:450},
+  {id:7,name:'Nansana Pharmacy',owner:'Paul Tumwine',phone:'0771234509',email:'ptumwine@nansanapharma.ug',location:'Nansana, Wakiso',plan:'basic',status:'overdue',revenue:20000,billingDate:'2026-03-20',lastActive:'1 week ago',joined:'2025-10-11',nda:'NDA/PH/2025/002',sales:85000,drugs:32},
+  {id:8,name:'Kireka Health Stores',owner:'Fatuma Nabirye',phone:'0754889123',email:'fnabirye@kireka.ug',location:'Kireka Trading Centre',plan:'basic',status:'trial',revenue:20000,billingDate:'2026-04-06',lastActive:'2 hr ago',joined:'2026-03-10',nda:null,sales:45000,drugs:28},
+  {id:9,name:'Ntinda Pharmacy',owner:'Brian Mugabe',phone:'0787334210',email:'brian@ntindapharma.ug',location:'Ntinda Shopping Centre',plan:'pro',status:'suspended',revenue:50000,billingDate:'2026-03-01',lastActive:'3 weeks ago',joined:'2025-08-22',nda:'NDA/PH/2024/044',sales:0,drugs:112},
+  {id:10,name:'Jinja Road Drugs',owner:'Christine Akello',phone:'0701567893',email:'cakello@jinjadrugs.ug',location:'Jinja Road, Kampala',plan:'pro',status:'active',revenue:50000,billingDate:'2026-04-28',lastActive:'4 hr ago',joined:'2025-12-01',nda:'NDA/PH/2025/019',sales:540000,drugs:88},
+];
+
+const transactions = [
+  {ref:'TXN-0034',pharmacy:'Mulago Drugs',phone:'0703445678',amount:150000,network:'MTN',time:'Today 09:14',status:'paid'},
+  {ref:'TXN-0033',pharmacy:'City Pharmacy',phone:'0752891234',amount:150000,network:'Airtel',time:'Today 08:52',status:'paid'},
+  {ref:'TXN-0032',pharmacy:'Kato Pharma',phone:'0770123456',amount:50000,network:'MTN',time:'Yesterday 14:30',status:'paid'},
+  {ref:'TXN-0031',pharmacy:'Wandegeya Pharmacy',phone:'0762567123',amount:50000,network:'MTN',time:'Yesterday 11:18',status:'paid'},
+  {ref:'TXN-0030',pharmacy:'Mengo Drug Store',phone:'0701445678',amount:50000,network:'Airtel',time:'Mar 15',status:'failed'},
+  {ref:'TXN-0029',pharmacy:'Nansana Pharmacy',phone:'0771234509',amount:20000,network:'MTN',time:'Mar 20',status:'failed'},
+  {ref:'TXN-0028',pharmacy:'Jinja Road Drugs',phone:'0701567893',amount:50000,network:'MTN',time:'Mar 22',status:'pending'},
+];
+
+const activities = [
+  {color:'var(--success)',text:'<strong>Mulago Drugs</strong> paid UGX 150,000 — Enterprise plan renewed',time:'2 min ago'},
+  {color:'var(--accent)',text:'<strong>Kireka Health Stores</strong> signed up — 14-day trial started',time:'18 min ago'},
+  {color:'var(--accent2)',text:'<strong>Wandegeya Pharmacy</strong> added 12 new drugs to inventory',time:'35 min ago'},
+  {color:'var(--warn)',text:'<strong>Mengo Drug Store</strong> payment overdue — 8 days past due',time:'1 hr ago'},
+  {color:'var(--success)',text:'<strong>City Pharmacy</strong> completed 24 sales today — UGX 2.1M revenue',time:'2 hr ago'},
+  {color:'var(--danger)',text:'<strong>Ntinda Pharmacy</strong> account suspended — 3 weeks non-payment',time:'3 days ago'},
+  {color:'var(--purple)',text:'<strong>Nakawa Health</strong> trial expires in 3 days — send conversion email',time:'5 hr ago'},
+];
+
+const planColors = {basic:'var(--muted2)',pro:'var(--accent)',enterprise:'var(--purple)'};
+const avatarColors = ['linear-gradient(135deg,#00e5b0,#3b82f6)','linear-gradient(135deg,#f59e0b,#ef4444)','linear-gradient(135deg,#a855f7,#3b82f6)','linear-gradient(135deg,#10b981,#a855f7)','linear-gradient(135deg,#3b82f6,#06b6d4)','linear-gradient(135deg,#f97316,#eab308)'];
+
+let filteredPharmas = [...pharmacies];
+
+// ══════════════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════════════
+const pageMeta = {
+  overview:     {t:'Overview',         s:'Platform health at a glance'},
+  revenue:      {t:'Revenue',          s:'Financial performance & MRR'},
+  pharmacies:   {t:'All Pharmacies',   s:'Manage all client accounts'},
+  subscriptions:{t:'Subscriptions',    s:'Plans, renewals & overdue accounts'},
+  billing:      {t:'Billing',          s:'Collections, reminders & upcoming payments'},
+  trials:       {t:'Free Trials',      s:'Monitor & convert trial users'},
+  payments:     {t:'MoMo Payments',    s:'MTN & Airtel Money transaction log'},
+  support:      {t:'Support',          s:'Client help requests'},
+  activity:     {t:'Activity Log',     s:'Everything happening on the platform'},
+  pricing:      {t:'Pricing Plans',    s:'Manage subscription tiers & discount codes'},
+  settings:     {t:'Settings',         s:'Platform configuration'},
+};
+
+function go(page, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.querySelectorAll('.ni').forEach(n => n.classList.remove('active'));
+  if (el) el.classList.add('active');
+  const m = pageMeta[page];
+  document.getElementById('tb-title').textContent = m.t;
+  document.getElementById('tb-sub').textContent   = m.s;
+  loadPage(page);
+}
+
+function loadPage(page) {
+  if (page === 'overview')       renderOverview();
+  if (page === 'pharmacies')     renderPharmas(pharmacies);
+  if (page === 'subscriptions')  renderSubscriptions();
+  if (page === 'billing')        renderBilling();
+  if (page === 'trials')         renderTrials();
+  if (page === 'payments')       renderPayments();
+  if (page === 'revenue')        renderRevTimeline();
+  if (page === 'support')        renderSupport();
+  if (page === 'activity')       renderFullActivity();
+}
+
+function refreshPage() {
+  loadPage(document.querySelector('.ni.active')?.textContent?.trim().toLowerCase().replace(/\s+/g, '') || 'overview');
+  toast('🔄 Refreshed');
+}
+
+// ══════════════════════════════════════════════════
+// OVERVIEW
+// ══════════════════════════════════════════════════
+function renderOverview() {
+  // Update badges
+  document.getElementById('pharmCount').textContent = pharmacies.length;
+  document.getElementById('overdueCount').textContent = pharmacies.filter(p => p.status === 'overdue').length;
+  document.getElementById('trialCount').textContent = pharmacies.filter(p => p.status === 'trial').length;
+
+  // Revenue chart
+  const months = [{m:'Sep',v:950},{m:'Oct',v:1200},{m:'Nov',v:1450},{m:'Dec',v:1600},{m:'Jan',v:1800},{m:'Feb',v:1950},{m:'Mar',v:2300}];
+  const maxRev = Math.max(...months.map(m => m.v));
+  const chart = document.getElementById('revChart');
+  chart.innerHTML = '';
+  months.forEach((m, i) => {
+    const pct = (m.v / maxRev) * 85;
+    const w = document.createElement('div'); w.className = 'rbar-wrap';
+    const color = i === months.length-1 ? 'var(--accent)' : `rgba(0,229,176,${0.2 + (i/months.length)*0.4})`;
+    w.innerHTML = `<div class="rbar" style="height:0%;background:${color};transition-delay:${i*0.08}s" data-h="${pct}" data-tip="UGX ${m.v}K"></div><div class="rbar-lbl">${m.m}</div>`;
+    chart.appendChild(w);
+  });
+  requestAnimationFrame(() => requestAnimationFrame(() => document.querySelectorAll('.rbar').forEach(b => b.style.height = b.dataset.h + '%')));
+
+  // Plan rings
+  const planCount = { basic: pharmacies.filter(p=>p.plan==='basic').length, pro: pharmacies.filter(p=>p.plan==='pro').length, enterprise: pharmacies.filter(p=>p.plan==='enterprise').length };
+  const total = pharmacies.length;
+  document.getElementById('planRings').innerHTML = [
+    {plan:'Basic', count:planCount.basic, color:'var(--muted2)'},
+    {plan:'Pro', count:planCount.pro, color:'var(--accent)'},
+    {plan:'Enterprise', count:planCount.enterprise, color:'var(--purple)'},
+  ].map(r => {
+    const pct = Math.round(r.count/total*100);
+    const circ = 2*Math.PI*28; const offset = circ - (pct/100)*circ;
+    return `<div class="ring-card">
+      <svg class="ring-svg" width="70" height="70" viewBox="0 0 70 70">
+        <circle class="ring-track" cx="35" cy="35" r="28" stroke-width="7"/>
+        <circle class="ring-fill" cx="35" cy="35" r="28" stroke-width="7" stroke="${r.color}" stroke-dasharray="${circ}" stroke-dashoffset="${offset}"/>
+      </svg>
+      <div class="ring-label">${r.plan}</div>
+      <div class="ring-val" style="color:${r.color}">${r.count}</div>
+    </div>`;
+  }).join('');
+
+  // Recent signups (last 5)
+  const recent = [...pharmacies].sort((a,b) => new Date(b.joined)-new Date(a.joined)).slice(0,5);
+  document.getElementById('recentSignups').innerHTML = recent.map((p,i) => `
+    <div class="pharma-row" onclick="openDetail(${p.id})">
+      <div class="pharma-av" style="background:${avatarColors[i%avatarColors.length]}">${p.name.split(' ').map(w=>w[0]).join('').slice(0,2)}</div>
+      <div class="pharma-info"><div class="pharma-name">${p.name}</div><div class="pharma-meta">${p.location}</div></div>
+      <div class="pharma-right"><span class="pill ${p.plan}">${p.plan}</span><div class="pharma-date">${p.joined}</div></div>
+    </div>`).join('');
+
+  // Activity feed
+  document.getElementById('activityFeed').innerHTML = activities.slice(0,6).map(a => `
+    <div class="activity-item">
+      <div class="act-dot" style="background:${a.color}"></div>
+      <div class="act-text">${a.text}</div>
+      <div class="act-time">${a.time}</div>
+    </div>`).join('');
+}
+
+// ══════════════════════════════════════════════════
+// PHARMACIES TABLE
+// ══════════════════════════════════════════════════
+function renderPharmas(data) {
+  document.getElementById('pharmaBody').innerHTML = data.map((p,i) => `
+    <tr onclick="openDetail(${p.id})">
+      <td>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="pharma-av" style="background:${avatarColors[i%avatarColors.length]};width:30px;height:30px;font-size:11px">${p.name.split(' ').map(w=>w[0]).join('').slice(0,2)}</div>
+          <div><div style="font-weight:600;font-size:13px">${p.name}</div><div style="font-size:10px;color:var(--muted)">${p.owner}</div></div>
+        </div>
+      </td>
+      <td style="color:var(--muted2);font-size:12px">${p.location}</td>
+      <td><span class="pill ${p.plan}">${p.plan}</span></td>
+      <td><span class="pill ${p.status}">${p.status}</span></td>
+      <td style="font-family:var(--mono);color:var(--accent)">UGX ${p.revenue.toLocaleString()}</td>
+      <td style="color:var(--muted2);font-size:12px">${p.billingDate}</td>
+      <td style="color:var(--muted2);font-size:12px">${p.lastActive}</td>
+      <td>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-ghost" style="padding:4px 9px;font-size:11px" onclick="event.stopPropagation();loginAs(${p.id},'${p.name}')">Login As</button>
+          <button class="btn btn-warn" style="padding:4px 9px;font-size:11px" onclick="event.stopPropagation();sendReminder(${p.id},'${p.name}')">📱 Remind</button>
+          ${p.status==='suspended'?`<button class="btn btn-accent" style="padding:4px 9px;font-size:11px" onclick="event.stopPropagation();reactivate(${p.id},'${p.name}')">Reactivate</button>`:''}
+          ${p.status==='overdue'?`<button class="btn btn-danger" style="padding:4px 9px;font-size:11px" onclick="event.stopPropagation();suspend(${p.id},'${p.name}')">Suspend</button>`:''}
+        </div>
+      </td>
+    </tr>`).join('') || `<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">🏥</div>No pharmacies found</div></td></tr>`;
+}
+
+function filterPharmas() {
+  const q = document.getElementById('pharmSearch').value.toLowerCase();
+  const filtered = pharmacies.filter(p => p.name.toLowerCase().includes(q) || p.owner.toLowerCase().includes(q) || p.location.toLowerCase().includes(q));
+  renderPharmas(filtered);
+}
+
+function filterByStatus(status) {
+  const filtered = status ? pharmacies.filter(p => p.status === status) : pharmacies;
+  renderPharmas(filtered);
+}
+
+// ══════════════════════════════════════════════════
+// SUBSCRIPTIONS
+// ══════════════════════════════════════════════════
+function renderSubscriptions() {
+  const overdue = pharmacies.filter(p => p.status === 'overdue');
+  const trials = pharmacies.filter(p => p.status === 'trial');
+
+  document.getElementById('overdueList').innerHTML = overdue.map((p,i) => `
+    <div class="billing-row">
+      <div class="br-icon" style="background:rgba(239,68,68,0.1)">⚠️</div>
+      <div class="br-info"><div class="br-name">${p.name}</div><div class="br-meta">Due: ${p.billingDate} · ${p.plan} plan · ${p.phone}</div></div>
+      <div style="text-align:right">
+        <div class="br-amount" style="color:var(--danger)">UGX ${p.revenue.toLocaleString()}</div>
+        <button class="btn btn-warn" style="padding:3px 9px;font-size:10px;margin-top:4px" onclick="sendReminder(${p.id},'${p.name}')">📱 Send Reminder</button>
+      </div>
+    </div>`).join('') || '<div class="empty-state"><div class="empty-icon">✅</div>No overdue accounts!</div>';
+
+  document.getElementById('trialEndList').innerHTML = trials.map((p,i) => `
+    <div class="billing-row">
+      <div class="br-icon" style="background:rgba(59,130,246,0.1)">⏳</div>
+      <div class="br-info"><div class="br-name">${p.name}</div><div class="br-meta">Trial ends: ${p.billingDate} · ${p.phone}</div></div>
+      <div style="text-align:right">
+        <button class="btn btn-accent" style="padding:3px 9px;font-size:10px" onclick="convertTrial(${p.id},'${p.name}')">Convert to Paid</button>
+      </div>
+    </div>`).join('') || '<div class="empty-state"><div class="empty-icon">✅</div>No trials ending soon</div>';
+
+  document.getElementById('allSubsBody').innerHTML = pharmacies.map(p => {
+    const days = Math.ceil((new Date(p.billingDate) - new Date()) / 86400000);
+    const dColor = days < 0 ? 'var(--danger)' : days < 7 ? 'var(--warn)' : 'var(--muted2)';
+    return `<tr>
+      <td><strong>${p.name}</strong></td>
+      <td><span class="pill ${p.plan}">${p.plan}</span></td>
+      <td class="mono" style="color:var(--accent)">UGX ${p.revenue.toLocaleString()}</td>
+      <td style="color:var(--muted2);font-size:12px">${p.billingDate}</td>
+      <td style="color:${dColor};font-weight:600">${days < 0 ? Math.abs(days)+' days overdue' : days === 0 ? 'Today' : days+' days'}</td>
+      <td><span class="pill ${p.status}">${p.status}</span></td>
+      <td>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-ghost" style="padding:3px 8px;font-size:10px" onclick="extendTrial(${p.id},'${p.name}')">+7 Days</button>
+          <button class="btn btn-ghost" style="padding:3px 8px;font-size:10px" onclick="changePlan(${p.id},'${p.name}')">Change Plan</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════
+// BILLING
+// ══════════════════════════════════════════════════
+function renderBilling() {
+  const upcoming = pharmacies.filter(p => {
+    const days = Math.ceil((new Date(p.billingDate) - new Date()) / 86400000);
+    return days >= 0 && days <= 7 && p.status === 'active';
+  });
+  document.getElementById('upcomingBilling').innerHTML = upcoming.map(p => {
+    const days = Math.ceil((new Date(p.billingDate) - new Date()) / 86400000);
+    return `<div class="billing-row">
+      <div class="br-icon" style="background:rgba(0,229,176,0.08)">📅</div>
+      <div class="br-info"><div class="br-name">${p.name}</div><div class="br-meta">${p.billingDate} · ${days === 0 ? 'Today' : 'In '+days+' days'}</div></div>
+      <div style="text-align:right"><div class="br-amount">UGX ${p.revenue.toLocaleString()}</div><button class="btn btn-warn" style="padding:3px 8px;font-size:10px;margin-top:4px" onclick="chargeMoMo(${p.id},'${p.name}',${p.revenue})">Charge Now</button></div>
+    </div>`;
+  }).join('') || '<div class="empty-state"><div class="empty-icon">📅</div>No billings due this week</div>';
+
+  document.getElementById('recentCollections').innerHTML = transactions.filter(t => t.status === 'paid').slice(0,5).map(t => `
+    <div class="billing-row">
+      <div class="br-icon" style="background:rgba(16,185,129,0.1)">✅</div>
+      <div class="br-info"><div class="br-name">${t.pharmacy}</div><div class="br-meta">${t.network} · ${t.time}</div></div>
+      <div class="br-amount" style="color:var(--success)">UGX ${t.amount.toLocaleString()}</div>
+    </div>`).join('');
+}
+
+// ══════════════════════════════════════════════════
+// TRIALS
+// ══════════════════════════════════════════════════
+function renderTrials() {
+  const trials = pharmacies.filter(p => p.status === 'trial');
+  document.getElementById('trialsBody').innerHTML = trials.map(p => {
+    const days = Math.max(0, Math.ceil((new Date(p.billingDate) - new Date()) / 86400000));
+    const dColor = days <= 3 ? 'var(--danger)' : days <= 7 ? 'var(--warn)' : 'var(--success)';
+    return `<tr>
+      <td><strong>${p.name}</strong><div style="font-size:10px;color:var(--muted)">${p.owner}</div></td>
+      <td style="color:var(--muted2);font-size:12px">${p.joined}</td>
+      <td style="color:${dColor};font-weight:700">${days} days</td>
+      <td><div style="height:5px;width:80px;background:var(--s3);border-radius:3px;overflow:hidden"><div style="height:100%;width:${Math.round(p.drugs/5)}%;background:var(--accent);border-radius:3px"></div></div><div style="font-size:10px;color:var(--muted);margin-top:3px">${p.drugs} drugs added</div></td>
+      <td style="font-family:var(--mono);font-size:12px">${p.phone}</td>
+      <td>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-accent" style="padding:4px 10px;font-size:11px" onclick="convertTrial(${p.id},'${p.name}')">Convert → Paid</button>
+          <button class="btn btn-ghost" style="padding:4px 10px;font-size:11px" onclick="extendTrial(${p.id},'${p.name}')">+7 Days</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">⏳</div>No active trials</div></td></tr>`;
+}
+
+// ══════════════════════════════════════════════════
+// PAYMENTS
+// ══════════════════════════════════════════════════
+function renderPayments() {
+  document.getElementById('momoLog').innerHTML = transactions.map(t => `
+    <tr>
+      <td class="mono" style="color:var(--accent);font-size:11px">${t.ref}</td>
+      <td><strong>${t.pharmacy}</strong></td>
+      <td class="mono" style="font-size:11px">${t.phone}</td>
+      <td style="font-family:var(--mono);font-weight:700">UGX ${t.amount.toLocaleString()}</td>
+      <td><span style="font-size:12px">${t.network === 'MTN' ? '📱 MTN MoMo' : '📲 Airtel Money'}</span></td>
+      <td style="color:var(--muted2);font-size:11px">${t.time}</td>
+      <td><span class="pill ${t.status}">${t.status}</span></td>
+    </tr>`).join('');
+}
+
+// ══════════════════════════════════════════════════
+// REVENUE TIMELINE
+// ══════════════════════════════════════════════════
+function renderRevTimeline() {
+  document.getElementById('revTimeline').innerHTML = transactions.map(t => `
+    <tr>
+      <td style="color:var(--muted2);font-size:12px">${t.time}</td>
+      <td><strong>${t.pharmacy}</strong></td>
+      <td><span class="pill pro">pro</span></td>
+      <td style="font-family:var(--mono);color:var(--accent)">UGX ${t.amount.toLocaleString()}</td>
+      <td>${t.network === 'MTN' ? '📱 MTN MoMo' : '📲 Airtel Money'}</td>
+      <td><span class="pill ${t.status}">${t.status}</span></td>
+    </tr>`).join('');
+}
+
+// ══════════════════════════════════════════════════
+// SUPPORT
+// ══════════════════════════════════════════════════
+function renderSupport() {
+  const tickets = [
+    {id:'TKT-001',pharmacy:'Kato Pharma',issue:'Cannot print receipts — printer not detected',priority:'high',status:'open'},
+    {id:'TKT-002',pharmacy:'Mengo Drug Store',issue:'Low stock alert not sending SMS notifications',priority:'medium',status:'open'},
+    {id:'TKT-003',pharmacy:'Nansana Pharmacy',issue:'Payment page shows error after MoMo prompt',priority:'high',status:'pending'},
+    {id:'TKT-004',pharmacy:'Nakawa Health',issue:'How to add bulk drugs from CSV file?',priority:'low',status:'resolved'},
+  ];
+  const pColor = {high:'var(--danger)',medium:'var(--warn)',low:'var(--success)'};
+  document.getElementById('supportBody').innerHTML = tickets.map(t => `
+    <tr>
+      <td class="mono" style="color:var(--accent);font-size:11px">${t.id}</td>
+      <td><strong>${t.pharmacy}</strong></td>
+      <td style="font-size:12px;color:var(--muted2);max-width:200px">${t.issue}</td>
+      <td><span style="color:${pColor[t.priority]};font-size:12px;font-weight:600">● ${t.priority}</span></td>
+      <td><span class="pill ${t.status==='open'?'overdue':t.status==='pending'?'trial':'active'}">${t.status}</span></td>
+      <td>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-ghost" style="padding:4px 9px;font-size:11px" onclick="loginAs(1,'${t.pharmacy}')">View Account</button>
+          <button class="btn btn-accent" style="padding:4px 9px;font-size:11px" onclick="toast('Ticket ${t.id} marked resolved ✅')">Resolve</button>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+// ══════════════════════════════════════════════════
+// FULL ACTIVITY
+// ══════════════════════════════════════════════════
+function renderFullActivity() {
+  document.getElementById('fullActivityLog').innerHTML = [...activities, ...activities].map(a => `
+    <div class="activity-item">
+      <div class="act-dot" style="background:${a.color}"></div>
+      <div class="act-text">${a.text}</div>
+      <div class="act-time">${a.time}</div>
+    </div>`).join('');
+}
+
+// ══════════════════════════════════════════════════
+// PHARMACY DETAIL MODAL
+// ══════════════════════════════════════════════════
+function openDetail(id) {
+  const p = pharmacies.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('detailTitle').textContent = p.name;
+  document.getElementById('detailSub').textContent = p.location + ' · ' + p.owner;
+  document.getElementById('detailContent').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">PLAN</div><span class="pill ${p.plan}" style="font-size:12px">${p.plan}</span></div>
+      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">STATUS</div><span class="pill ${p.status}" style="font-size:12px">${p.status}</span></div>
+      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">MONTHLY REVENUE</div><div style="font-family:var(--mono);color:var(--accent);font-weight:700">UGX ${p.revenue.toLocaleString()}</div></div>
+      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">TOTAL SALES</div><div style="font-family:var(--mono);color:var(--success);font-weight:700">UGX ${p.sales.toLocaleString()}</div></div>
+      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">PHONE</div><div style="font-size:13px">${p.phone}</div></div>
+      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">EMAIL</div><div style="font-size:12px;color:var(--muted2)">${p.email}</div></div>
+      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">NEXT BILLING</div><div style="font-size:13px">${p.billingDate}</div></div>
+      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">DRUGS IN STOCK</div><div style="font-size:13px">${p.drugs} types</div></div>
+    </div>
+    <div style="background:var(--s2);border-radius:8px;padding:12px;margin-bottom:8px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">NDA REGISTRATION</div><div style="font-family:var(--mono);font-size:12px">${p.nda || '⚠️ Not registered'}</div></div>
+    <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">MEMBER SINCE</div><div style="font-size:13px">${p.joined}</div></div>
+  `;
+  document.getElementById('detailActions').innerHTML = `
+    <button class="btn btn-ghost" onclick="closeModal('detailModal')">Close</button>
+    <button class="btn btn-ghost" onclick="sendReminder(${p.id},'${p.name}');closeModal('detailModal')">📱 Send Reminder</button>
+    <button class="btn btn-ghost" onclick="changePlan(${p.id},'${p.name}');closeModal('detailModal')">Change Plan</button>
+    <button class="btn btn-accent" onclick="loginAs(${p.id},'${p.name}');closeModal('detailModal')">🔐 Login As</button>
+  `;
+  document.getElementById('detailModal').classList.add('open');
+}
+
+// ══════════════════════════════════════════════════
+// ADD PHARMACY
+// ══════════════════════════════════════════════════
+function openAddPharmacy() { document.getElementById('addModal').classList.add('open'); }
+
+function createPharmacy() {
+  const name = document.getElementById('newPharmName').value.trim();
+  const phone = document.getElementById('newPhone').value.trim();
+  const email = document.getElementById('newEmail').value.trim();
+  if (!name || !phone) { toast('⚠️ Pharmacy name and phone are required', 'warn'); return; }
+  const plan = document.getElementById('newPlan').value;
+  // Simulate adding
+  const newP = {
+    id: pharmacies.length + 1, name, owner: document.getElementById('newOwner').value || name,
+    phone, email, location: document.getElementById('newLocation').value || 'Uganda',
+    plan, status: 'trial', revenue: {basic:20000,pro:50000,enterprise:150000}[plan],
+    billingDate: new Date(Date.now() + 14*86400000).toISOString().split('T')[0],
+    lastActive: 'Just now', joined: new Date().toISOString().split('T')[0],
+    nda: document.getElementById('newNDA').value || null, sales: 0, drugs: 0
+  };
+  pharmacies.unshift(newP);
+  closeModal('addModal');
+  toast(`✅ ${name} created! Login details sent to ${phone} via SMS.`);
+  renderPharmas(pharmacies);
+  document.getElementById('pharmCount').textContent = pharmacies.length;
+}
+
+// ══════════════════════════════════════════════════
+// ACTIONS
+// ══════════════════════════════════════════════════
+function sendReminder(id, name) { toast(`📱 Payment reminder sent to ${name} via WhatsApp & SMS`); }
+function sendAllReminders() { toast(`📱 Payment reminders sent to ${pharmacies.filter(p=>p.status==='overdue').length} overdue pharmacies!`); }
+function loginAs(id, name) { toast(`🔐 Opening ${name}'s dashboard as admin…`); setTimeout(() => window.open('medvault-connected.html', '_blank'), 800); }
+function suspend(id, name) { const p = pharmacies.find(x=>x.id===id); if(p){p.status='suspended';} toast(`🚫 ${name} account suspended — they cannot log in`,'err'); renderPharmas(pharmacies); }
+function reactivate(id, name) { const p = pharmacies.find(x=>x.id===id); if(p){p.status='active';} toast(`✅ ${name} reactivated!`); renderPharmas(pharmacies); }
+function convertTrial(id, name) { const p = pharmacies.find(x=>x.id===id); if(p){p.status='active';} toast(`✅ ${name} converted to paid account!`); }
+function extendTrial(id, name) { toast(`⏳ ${name} trial extended by 7 days`); }
+function changePlan(id, name) { toast(`💳 Plan change for ${name} — form coming!`); }
+function chargeMoMo(id, name, amount) { toast(`📱 Charging UGX ${amount.toLocaleString()} to ${name} via MTN MoMo…`); }
+function editPlan(plan) { toast(`✏️ Edit ${plan} plan — pricing editor coming!`); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// TOAST
+let _tt;
+function toast(msg, type='') {
+  const t = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  t.className = 'toast ' + type;
+  t.classList.add('show');
+  clearTimeout(_tt); _tt = setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+// INIT
+renderOverview();
+</script>
+</body>
+</html>
