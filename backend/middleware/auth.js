@@ -16,7 +16,7 @@ module.exports = function authMiddleware(req, res, next) {
 
   try {
     req.user = verify(token);
-    return next();
+    next();
   } catch (err) {
     return res.status(403).json({ success: false, error: 'Invalid or expired token. Please log in again.' });
   }
