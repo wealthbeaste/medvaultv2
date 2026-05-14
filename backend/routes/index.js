@@ -382,6 +382,7 @@ app.post('/api/inventory', auth, async (req, res) => {
       `INSERT INTO drug_batches (
         drug_id,
         pharmacy_id,
+        batch_number,
         expiry_date,
         quantity,
         cost_price
