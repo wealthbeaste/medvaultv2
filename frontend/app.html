@@ -3347,7 +3347,7 @@ document.getElementById('rSub').textContent   = 'UGX ' + dispatchSub.toLocaleStr
 document.getElementById('rDisc').textContent  = dispatchDisc ? `- UGX ${dispatchDa.toLocaleString()} (${dispatchDisc}%)` : 'None';
 document.getElementById('rTot').textContent   = 'UGX ' + dispatchTot.toLocaleString();
 document.getElementById('rPay').textContent   = '⏳ Proceed to Cashier';
-document.getElementById('rDisp').textContent  = currentUser?.name || '—';
+document.getElementById('rDisp').textContent  = (getCurrentUser()?.name) || currentUser?.name || '—';
 document.getElementById('rItems').innerHTML   = dispatchCart.map(c =>
   `<div class="ri"><span>${c.drug_name}</span><span style="text-align:center">${c.quantity}</span><span style="text-align:right">UGX ${(c.unit_price * c.quantity).toLocaleString()}</span></div>`
 ).join('');
