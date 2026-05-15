@@ -13,13 +13,15 @@ function getPool() {
 
   const connStr = process.env.DATABASE_URL || '';
 
-  const cleanConn = connStr.includes('sslmode=')
-    ? connStr.replace(/sslmode=[^&]+/, 'sslmode=verify-full')
-    : connStr + (connStr.includes('?') ? '&' : '?') + 'sslmode=verify-full';
+  // Railway uses self-signed SSL certs — strip any conflicting sslmode param
+  // and let the ssl object below handle it
+  const cleanConn = connStr
+    .replace(/[?&]sslmode=[^&]*/g, '')  // remove any existing sslmode
+    .replace(/\?$/, '');                // clean trailing ?
 
   pool = new Pool({
     connectionString: cleanConn,
-    ssl: { rejectUnauthorized: false },
+    ssl: connStr ? { rejectUnauthorized: false } : false,
     max: 5,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 15000,
