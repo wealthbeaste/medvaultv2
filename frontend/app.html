@@ -5018,9 +5018,10 @@ async function refreshQueue() {
 }
 
 function openCollectModal(dispatchId) {
-  currentCollectDispatchId = dispatchId; currentCollectPayMethod = 'cash';
+  currentCollectDispatchId = dispatchId; currentCollectPayMethod = 'cash'; currentCollectSaleData = null;
   fetch(API()+'/api/dispatch/pending',{headers:H()}).then(r=>r.json()).then(data=>{
     const d=(data.pending||[]).find(x=>x.id===dispatchId); if(!d) return;
+    currentCollectSaleData = d;
     const its=typeof d.items==='string'?JSON.parse(d.items):d.items;
     document.getElementById('collectSummary').innerHTML=
       `<strong>${d.customer_name}</strong> · Total: <strong style="color:var(--accent)">UGX ${Number(d.total_amount).toLocaleString()}</strong>`;
@@ -5047,6 +5048,7 @@ function closeCollectModal() {
   if(m) { m.style.display='none'; m.style.removeProperty('display'); m.style.display='none'; }
   currentCollectDispatchId=null;
   currentCollectPayMethod='cash';
+  currentCollectSaleData=null;
 }
 async function confirmCollectPayment() {
   if(!currentCollectDispatchId) return;
@@ -5075,6 +5077,32 @@ async function confirmCollectPayment() {
       || '—';
     if (rcpt === '—') console.warn('[MedVault] collect response missing receipt_number:', data);
     showToast('✅ Payment collected! Receipt: '+rcpt);
+        // ── Show real payment receipt popup for cashier to print ──
+    try {
+      const collectedUser = getCurrentUser() || currentUser;
+      const sd = currentCollectSaleData || {};
+      const its = typeof sd.items === 'string' ? JSON.parse(sd.items) : (sd.items || []);
+      const saleSub  = parseFloat(sd.subtotal       || 0);
+      const saleDisc = parseFloat(sd.discount_pct   || 0);
+      const saleDa   = parseFloat(sd.discount_amount|| 0);
+      const saleTot  = parseFloat(sd.total_amount   || 0);
+
+      document.getElementById('rNum').textContent   = rcpt;
+      document.getElementById('rDate').textContent  = new Date().toLocaleDateString('en-UG', { dateStyle: 'medium' });
+      document.getElementById('rCust').textContent  = sd.customer_name || '—';
+      document.getElementById('rOfflineTag').innerHTML = '';
+      document.getElementById('rSub').textContent   = saleSub ? 'UGX ' + saleSub.toLocaleString()  : '—';
+      document.getElementById('rDisc').textContent  = saleDisc ? `- UGX ${saleDa.toLocaleString()} (${saleDisc}%)` : 'None';
+      document.getElementById('rTot').textContent   = saleTot ? 'UGX ' + saleTot.toLocaleString()  : '—';
+      document.getElementById('rPay').textContent   = currentCollectPayMethod.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+      document.getElementById('rDisp').textContent  = collectedUser?.name || '—';
+      document.getElementById('rItems').innerHTML   = its.length
+        ? its.map(i => `<div class="ri"><span>${i.drug_name||i.name||'Item'}</span><span style="text-align:center">${i.quantity}</span><span style="text-align:right">UGX ${Number((i.unit_price||0)*i.quantity).toLocaleString()}</span></div>`).join('')
+        : `<div class="ri"><span>Sale items</span><span style="text-align:center">—</span><span style="text-align:right">UGX ${saleTot.toLocaleString()}</span></div>`;
+      document.getElementById('overlay').classList.add('open');
+    } catch(receiptErr) {
+      console.warn('[MedVault] Could not show receipt popup:', receiptErr);
+    }
     // Flash the queue list to show it's refreshing
     const list=document.getElementById('dispatchQueueList');
     if(list) list.style.opacity='0.4';
