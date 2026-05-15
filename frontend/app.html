@@ -5065,6 +5065,9 @@ async function confirmCollectPayment() {
       if(btn){btn.textContent='✅ Confirm Payment';btn.disabled=false;}
       return;
     }
+    // Snapshot before closeCollectModal() wipes currentCollectSaleData and currentCollectPayMethod
+    const snapshotSaleData  = currentCollectSaleData;
+    const snapshotPayMethod = currentCollectPayMethod;
     // Close modal FIRST so cashier sees the queue
     closeCollectModal();
     const rcpt = data.receipt_number
@@ -5077,24 +5080,24 @@ async function confirmCollectPayment() {
       || '—';
     if (rcpt === '—') console.warn('[MedVault] collect response missing receipt_number:', data);
     showToast('✅ Payment collected! Receipt: '+rcpt);
-        // ── Show real payment receipt popup for cashier to print ──
+// ── Show real payment receipt popup for cashier to print ──
     try {
       const collectedUser = getCurrentUser() || currentUser;
-      const sd = currentCollectSaleData || {};
+      const sd  = snapshotSaleData || {};
       const its = typeof sd.items === 'string' ? JSON.parse(sd.items) : (sd.items || []);
-      const saleSub  = parseFloat(sd.subtotal       || 0);
-      const saleDisc = parseFloat(sd.discount_pct   || 0);
-      const saleDa   = parseFloat(sd.discount_amount|| 0);
-      const saleTot  = parseFloat(sd.total_amount   || 0);
+      const saleSub  = parseFloat(sd.subtotal        || 0);
+      const saleDisc = parseFloat(sd.discount_pct    || 0);
+      const saleDa   = parseFloat(sd.discount_amount || 0);
+      const saleTot  = parseFloat(sd.total_amount    || 0);
 
       document.getElementById('rNum').textContent   = rcpt;
       document.getElementById('rDate').textContent  = new Date().toLocaleDateString('en-UG', { dateStyle: 'medium' });
       document.getElementById('rCust').textContent  = sd.customer_name || '—';
       document.getElementById('rOfflineTag').innerHTML = '';
-      document.getElementById('rSub').textContent   = saleSub ? 'UGX ' + saleSub.toLocaleString()  : '—';
+      document.getElementById('rSub').textContent   = saleSub  ? 'UGX ' + saleSub.toLocaleString()  : '—';
       document.getElementById('rDisc').textContent  = saleDisc ? `- UGX ${saleDa.toLocaleString()} (${saleDisc}%)` : 'None';
-      document.getElementById('rTot').textContent   = saleTot ? 'UGX ' + saleTot.toLocaleString()  : '—';
-      document.getElementById('rPay').textContent   = currentCollectPayMethod.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+      document.getElementById('rTot').textContent   = saleTot  ? 'UGX ' + saleTot.toLocaleString()  : '—';
+      document.getElementById('rPay').textContent   = snapshotPayMethod.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
       document.getElementById('rDisp').textContent  = collectedUser?.name || '—';
       document.getElementById('rItems').innerHTML   = its.length
         ? its.map(i => `<div class="ri"><span>${i.drug_name||i.name||'Item'}</span><span style="text-align:center">${i.quantity}</span><span style="text-align:right">UGX ${Number((i.unit_price||0)*i.quantity).toLocaleString()}</span></div>`).join('')
