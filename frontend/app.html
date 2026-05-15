@@ -3234,7 +3234,7 @@ function completeSale() {
   document.getElementById('rDisc').textContent = disc?`- UGX ${da.toLocaleString()} (${disc}%)`:'None';
   document.getElementById('rTot').textContent  = 'UGX '+tot.toLocaleString();
   document.getElementById('rPay').textContent  = payMethod;
-  document.getElementById('rDisp').textContent = '';
+  document.getElementById('rDisp').textContent = (getCurrentUser()?.name) || currentUser?.name || '—';
   document.getElementById('rItems').innerHTML  = cart.map(c=>`<div class="ri"><span>${c.drug_name}</span><span style="text-align:center">${c.quantity}</span><span style="text-align:right">UGX ${(c.unit_price*c.quantity).toLocaleString()}</span></div>`).join('');
   document.getElementById('overlay').classList.add('open');
 
