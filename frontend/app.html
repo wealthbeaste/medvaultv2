@@ -3309,51 +3309,90 @@ async function dispatchToCashier() {
     const data = await res.json();
     if (!res.ok) { showToast('❌ ' + (data.error||'Failed to dispatch'), 'warn'); return; }
 
-    const dispatchId = data.dispatch.id;
-    showToast('📤 Sent to cashier! You can also complete sale here.', 'warn');
+   const dispatchId = data.dispatch.id;
+showToast('📤 Sent to cashier! Print receipt for customer.', 'warn');
 
-    // Store dispatch ID for reference but DO NOT clear cart
-    // This allows the dispensor to still complete sale & print receipt if needed
-    document.getElementById('dispatchBtn').dataset.dispatchId = dispatchId;
+// Snapshot cart data BEFORE clearing — needed to populate the receipt
+const dispatchCart    = [...cart];
+const dispatchCust    = cust;
+const dispatchPhone   = phone;
+const dispatchSub     = sub;
+const dispatchDisc    = disc;
+const dispatchDa      = da;
+const dispatchTot     = tot;
+const dispatchReceiptNum = `DISP-${dispatchId}`;
 
-    // Show a prominent notice that it was sent to cashier
-    const existingNotice = document.getElementById('dispatchSentNotice');
-    if (existingNotice) existingNotice.remove();
-    const cartEl = document.getElementById('cartList') || document.querySelector('.cart-list');
-    const noticeDiv = document.createElement('div');
-    noticeDiv.id = 'dispatchSentNotice';
-    noticeDiv.style.cssText = 'background:rgba(0,212,170,0.12);border:1px solid rgba(0,212,170,0.4);border-radius:10px;padding:10px 14px;margin:8px 0;font-size:12px;color:var(--accent);text-align:center;';
-    noticeDiv.innerHTML = `✅ Sent to cashier (ID: ${dispatchId})<br><span style="color:var(--muted);font-size:11px">Cart kept — you can still complete sale & print receipt below</span>`;
-    const saleFooter = document.querySelector('.sale-footer') || document.getElementById('chargeBtn')?.parentElement;
-    if (saleFooter) saleFooter.insertBefore(noticeDiv, saleFooter.firstChild);
+// Clear customer details immediately — they now belong to the cashier's side
+document.getElementById('custNm').value = '';
+document.getElementById('custPh').value = '';
 
-    // Poll for collection (check every 6 seconds for up to 10 minutes)
-    let polls = 0;
-    if (dispatchPollTimer) clearInterval(dispatchPollTimer);
-    dispatchPollTimer = setInterval(async () => {
-      polls++;
-      if (polls > 100) { clearInterval(dispatchPollTimer); return; }
-      try {
-        const pr  = await fetch(API() + '/api/dispatch/mine', { headers: H() });
-        const pd  = await pr.json();
-        const match = (pd.dispatched||[]).find(d => d.id === dispatchId);
-        if (match && match.status === 'collected') {
-          clearInterval(dispatchPollTimer);
-          const rcpt = match.receipt_number || match.receiptNumber || match.receipt || match.sale?.receipt_number || '—';
-          showToast('✅ Cashier collected payment! Receipt: ' + rcpt);
-          // Now clear cart since cashier handled it
-          cart = [];
-          document.getElementById('custNm').value = '';
-          document.getElementById('custPh').value = '';
-          document.getElementById('discInp').value = '';
-          renderCart(); updTotals();
-          const n = document.getElementById('dispatchSentNotice'); if(n) n.remove();
-          loadSalesHistory();
-        } else if (match && match.status === 'cancelled') {
-          clearInterval(dispatchPollTimer);
-          showToast('⚠️ Cashier cancelled this sale — cart restored, you can complete it here', 'warn');
-          const n = document.getElementById('dispatchSentNotice'); if(n) n.remove();
-        }
+// Clear the cart on the dispensor's side — cashier now owns this sale
+cart = [];
+renderCart(); updTotals();
+
+// ── Show receipt popup so dispensor can print for customer to carry to cashier ──
+document.getElementById('rNum').textContent   = dispatchReceiptNum;
+document.getElementById('rDate').textContent  = new Date().toLocaleDateString('en-UG', { dateStyle: 'medium' });
+document.getElementById('rCust').textContent  = dispatchCust;
+document.getElementById('rOfflineTag').innerHTML = `<span style="background:rgba(0,212,170,0.15);color:var(--accent);font-size:9px;padding:2px 7px;border-radius:4px;font-weight:700">⏳ PENDING PAYMENT</span>`;
+document.getElementById('rSub').textContent   = 'UGX ' + dispatchSub.toLocaleString();
+document.getElementById('rDisc').textContent  = dispatchDisc ? `- UGX ${dispatchDa.toLocaleString()} (${dispatchDisc}%)` : 'None';
+document.getElementById('rTot').textContent   = 'UGX ' + dispatchTot.toLocaleString();
+document.getElementById('rPay').textContent   = '⏳ Proceed to Cashier';
+document.getElementById('rItems').innerHTML   = dispatchCart.map(c =>
+  `<div class="ri"><span>${c.drug_name}</span><span style="text-align:center">${c.quantity}</span><span style="text-align:right">UGX ${(c.unit_price * c.quantity).toLocaleString()}</span></div>`
+).join('');
+document.getElementById('overlay').classList.add('open');
+
+// Disable BOTH buttons — no further action allowed from dispensor side
+const chargeBtnEl = document.getElementById('chargeBtn');
+if (chargeBtnEl) { chargeBtnEl.disabled = true; chargeBtnEl.style.opacity = '0.4'; chargeBtnEl.title = 'Sale sent to cashier — cannot complete here'; }
+const dispBtnEl = document.getElementById('dispatchBtn');
+if (dispBtnEl) { dispBtnEl.disabled = true; dispBtnEl.style.opacity = '0.4'; }
+
+document.getElementById('dispatchBtn').dataset.dispatchId = dispatchId;
+
+// Show a prominent notice that it was sent to cashier
+const existingNotice = document.getElementById('dispatchSentNotice');
+if (existingNotice) existingNotice.remove();
+const noticeDiv = document.createElement('div');
+noticeDiv.id = 'dispatchSentNotice';
+noticeDiv.style.cssText = 'background:rgba(0,212,170,0.12);border:1px solid rgba(0,212,170,0.4);border-radius:10px;padding:10px 14px;margin:8px 0;font-size:12px;color:var(--accent);text-align:center;';
+noticeDiv.innerHTML = `✅ Sent to cashier (ID: ${dispatchId})<br><span style="color:var(--muted);font-size:11px">Waiting for cashier to collect payment…</span>`;
+const saleFooter = document.querySelector('.sale-footer') || document.getElementById('chargeBtn')?.parentElement;
+if (saleFooter) saleFooter.insertBefore(noticeDiv, saleFooter.firstChild);
+
+// Poll for collection (check every 6 seconds for up to 10 minutes)
+let polls = 0;
+if (dispatchPollTimer) clearInterval(dispatchPollTimer);
+dispatchPollTimer = setInterval(async () => {
+  polls++;
+  if (polls > 100) { clearInterval(dispatchPollTimer); return; }
+  try {
+    const pr  = await fetch(API() + '/api/dispatch/mine', { headers: H() });
+    const pd  = await pr.json();
+    const match = (pd.dispatched||[]).find(d => d.id === dispatchId);
+    if (match && match.status === 'collected') {
+      clearInterval(dispatchPollTimer);
+      const rcpt = match.receipt_number || match.receiptNumber || match.receipt || match.sale?.receipt_number || '—';
+      showToast('✅ Cashier collected payment! Receipt: ' + rcpt);
+      // Re-enable dispatch button for next sale
+      const chargeBtnEl2 = document.getElementById('chargeBtn');
+      if (chargeBtnEl2) { chargeBtnEl2.style.opacity = ''; chargeBtnEl2.title = ''; }
+      const dispBtnEl2 = document.getElementById('dispatchBtn');
+      if (dispBtnEl2) { dispBtnEl2.style.opacity = ''; }
+      const n = document.getElementById('dispatchSentNotice'); if(n) n.remove();
+      loadSalesHistory();
+    } else if (match && match.status === 'cancelled') {
+      clearInterval(dispatchPollTimer);
+      showToast('⚠️ Cashier cancelled — add items again to retry', 'warn');
+      // Restore both buttons to usable state for a fresh sale
+      const chargeBtnEl3 = document.getElementById('chargeBtn');
+      if (chargeBtnEl3) { chargeBtnEl3.disabled = true; chargeBtnEl3.style.opacity = ''; chargeBtnEl3.title = ''; }
+      const dispBtnEl3 = document.getElementById('dispatchBtn');
+      if (dispBtnEl3) { dispBtnEl3.disabled = true; dispBtnEl3.style.opacity = ''; }
+      const n = document.getElementById('dispatchSentNotice'); if(n) n.remove();
+    }
       } catch(e) {}
     }, 6000);
 
