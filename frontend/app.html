@@ -2359,8 +2359,16 @@ const MedVaultOffline = {
           token,
           body: action.body,
           timeoutMs: 12000,
-        });
-        if(res.ok){action.synced=true;pushed++;}
+        if(res.ok){
+          action.synced=true;pushed++;
+          // After successfully pushing an offline drug, remove the local _offline
+          // entry so pullFromServer replaces it with the real server record.
+          if(action.type==='drug' && action.method==='POST'){
+            const drugs=this.getTable('drugs');
+            const filtered=drugs.filter(d=>!(d._offline && d.name===action.body.name));
+            this.saveTable('drugs',filtered);
+          }
+        }
       }catch(e){}
     }
     const remaining=queue.filter(a=>!a.synced);
@@ -2998,49 +3006,55 @@ async function submitAddDrug() {
       requires_rx };
     console.log('Frontend: Sending drugData:', drugData);
 
-    // Always save locally first (works offline)
-    if (editingDrugId) {
-      const drugs = MedVaultOffline.getTable('drugs');
-      const idx = drugs.findIndex(d => String(d.id) === String(editingDrugId));
-      if (idx >= 0) {
-        drugs[idx] = { ...drugs[idx], ...drugData, updated_at: new Date().toISOString() };
-        MedVaultOffline.saveTable('drugs', drugs);
-        MedVaultOffline.queueAction({ type:'drug', method:'PUT', url:`/api/inventory/${editingDrugId}`, body: drugData });
-      } else {
-        // fallback to add if missing
-        MedVaultOffline.addDrugLocal(drugData);
-      }
-    } else {
-      MedVaultOffline.addDrugLocal(drugData);
-    }
-
-    // Also try to save to real backend
     if (MedVaultOffline.isOnline() && token) {
+      // ── ONLINE PATH: send directly to server, then refresh local cache from response ──
       try {
-        const r = await MedVaultOffline.requestJSON(editingDrugId ? (`/api/inventory/${editingDrugId}`) : '/api/inventory', {
-          method: editingDrugId ? 'PUT' : 'POST',
-          token,
-          body: drugData,
-          timeoutMs: 12000,
-        });
+        const r = await MedVaultOffline.requestJSON(
+          editingDrugId ? `/api/inventory/${editingDrugId}` : '/api/inventory',
+          { method: editingDrugId ? 'PUT' : 'POST', token, body: drugData, timeoutMs: 12000 }
+        );
         const data = r.data || {};
-        if (r.ok && (data.success || data.drug || data.id)) {
-          // Re-pull fresh inventory from server to get real DB IDs and updated data
-          const pullResult = await MedVaultOffline.requestJSON('/api/inventory', { token, timeoutMs: 10000 });
-          if (pullResult.ok && pullResult.data.drugs) {
-            const db = MedVaultOffline.getDB();
-            db.drugs = pullResult.data.drugs;
-            MedVaultOffline.saveDB(db);
+        if (r.ok && (data.drug || data.success)) {
+          // Update local cache with the real server record (no _offline flag, real id)
+          const serverDrug = data.drug || {};
+          const drugs = MedVaultOffline.getTable('drugs');
+          if (editingDrugId) {
+            const idx = drugs.findIndex(d => String(d.id) === String(editingDrugId));
+            if (idx >= 0) drugs[idx] = { ...drugs[idx], ...drugData, id: editingDrugId, updated_at: new Date().toISOString(), _offline: false };
+            else drugs.push({ ...drugData, id: editingDrugId, _offline: false });
+          } else {
+            // Use server-assigned id so the record is authoritative
+            const newId = serverDrug.id || data.id || ('srv_' + Date.now());
+            drugs.push({ ...drugData, id: newId, stock_status: 'ok', created_at: new Date().toISOString(), _offline: false });
           }
+          MedVaultOffline.saveTable('drugs', drugs);
           showToast(editingDrugId ? ('✅ ' + name + ' updated!') : ('✅ ' + name + ' added to inventory!'));
         } else {
-          showToast('⚠️ Saved locally · ' + (data.error||'server error'), 'warn');
+          // Server responded but with an error — fall back to offline queue
+          MedVaultOffline.addDrugLocal(drugData);
+          showToast('⚠️ Server error — saved offline. ' + (data.error || ''), 'warn');
         }
       } catch(e) {
-        showToast('✅ Saved offline — will sync when connected','warn');
+        // Network error — save offline and queue for sync
+        MedVaultOffline.addDrugLocal(drugData);
+        showToast('✅ Saved offline — will sync when connected', 'warn');
       }
     } else {
-      showToast('✅ ' + name + ' saved offline!','warn');
+      // ── OFFLINE PATH: save locally and queue for sync ──
+      if (editingDrugId) {
+        const drugs = MedVaultOffline.getTable('drugs');
+        const idx = drugs.findIndex(d => String(d.id) === String(editingDrugId));
+        if (idx >= 0) {
+          drugs[idx] = { ...drugs[idx], ...drugData, updated_at: new Date().toISOString() };
+          MedVaultOffline.saveTable('drugs', drugs);
+          MedVaultOffline.queueAction({ type: 'drug', method: 'PUT', url: `/api/inventory/${editingDrugId}`, body: drugData });
+        } else {
+          MedVaultOffline.addDrugLocal(drugData);
+        }
+      } else {
+        MedVaultOffline.addDrugLocal(drugData);
+      }
+      showToast('✅ ' + name + ' saved offline — will sync when reconnected', 'warn');
     }
 
     closeAddDrug();
