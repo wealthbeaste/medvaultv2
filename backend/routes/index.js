@@ -957,7 +957,8 @@ app.post('/api/inventory', auth, async (req, res) => {
       const receipt_number = await getNextReceiptNumber(pharmacyId);
 
       // Transaction: insert sale + items + deduct stock + mark dispatch done
-      const client = await require('../database/db').pool.connect();
+      const { getClient } = require('../database/db');
+      const client = await getClient();
       try {
         await client.query('BEGIN');
         const sr = await client.query(
