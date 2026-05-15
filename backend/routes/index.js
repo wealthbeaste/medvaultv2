@@ -335,25 +335,6 @@ app.post('/api/inventory', auth, async (req, res) => {
 
   try {
 
-    // ── Idempotency guard ────────────────────────────────────────────────────
-    // If a drug with the same name already exists for this pharmacy, return
-    // that record instead of inserting a duplicate. This is the safety net for
-    // any offline-sync retry that somehow fires twice.
-    const existing = await query(
-      `SELECT id, name FROM drugs WHERE pharmacy_id=$1 AND LOWER(name)=LOWER($2) LIMIT 1`,
-      [req.user.pharmacyId, name]
-    );
-    if (existing.rows.length) {
-      return res.json({
-        success: true,
-        message: '✅ Drug already exists (idempotent)',
-        drug: { id: existing.rows[0].id, batch_number: finalBatchNumber },
-        id: existing.rows[0].id,
-        _idempotent: true,
-      });
-    }
-    // ────────────────────────────────────────────────────────────────────────
-
     // 1. Create drug (batch_number lives in drug_batches, not drugs table)
     const drugResult = await query(
       `INSERT INTO drugs (
