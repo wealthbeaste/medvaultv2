@@ -2264,6 +2264,16 @@ const MedVaultOffline = {
   getMeta(){ try{return JSON.parse(localStorage.getItem(this.META_KEY)||'{}')}catch{return{}} },
   saveMeta(m){ localStorage.setItem(this.META_KEY,JSON.stringify({...this.getMeta(),...m})); },
   isOnline(){ return navigator.onLine; },
+  // Real connectivity check — pings the server health endpoint
+  async checkServerReachable(){
+    try{
+      const ctrl = new AbortController();
+      const t = setTimeout(()=>ctrl.abort(), 5000);
+      const res = await fetch(this.API_BASE + '/health', { method:'GET', signal:ctrl.signal });
+      clearTimeout(t);
+      return res.ok;
+    }catch(e){ return false; }
+  },
   async requestJSON(path, options = {}){
     const method = options.method || 'GET';
     const token = options.token;
@@ -2305,25 +2315,34 @@ const MedVaultOffline = {
   async pullFromServer(token){
     if(!this.isOnline()) return {success:false};
     try{
-      const [inv,sales,orders,customers] = await Promise.all([
+      const [inv,sales,orders,customers] = await Promise.allSettled([
         this.requestJSON('/api/inventory', { token, timeoutMs: 10000 }),
         this.requestJSON('/api/sales?limit=100', { token, timeoutMs: 10000 }),
         this.requestJSON('/api/orders', { token, timeoutMs: 10000 }),
         this.requestJSON('/api/customers', { token, timeoutMs: 10000 }),
       ]);
-      if (!inv.ok || !sales.ok || !orders.ok || !customers.ok) {
-        return { success:false, reason:'sync-partial-failure' };
-      }
 
       const db=this.getDB();
-      if(inv.data.drugs) db.drugs=inv.data.drugs;
-      if(sales.data.sales) db.sales=sales.data.sales;
-      if(orders.data.orders) db.orders=orders.data.orders;
-      if(customers.data.customers) db.customers=customers.data.customers;
-      this.saveDB(db);
-      this.saveMeta({lastSync:new Date().toISOString(),status:'synced'});
-      this.updateSyncUI();
-      return {success:true};
+      let anySuccess = false;
+
+      const invR = inv.status==='fulfilled' ? inv.value : null;
+      const salR = sales.status==='fulfilled' ? sales.value : null;
+      const ordR = orders.status==='fulfilled' ? orders.value : null;
+      const cusR = customers.status==='fulfilled' ? customers.value : null;
+
+      if(invR && invR.ok && invR.data.drugs){ db.drugs=invR.data.drugs; anySuccess=true; }
+      if(salR && salR.ok && salR.data.sales){ db.sales=salR.data.sales; anySuccess=true; }
+      if(ordR && ordR.ok && ordR.data.orders){ db.orders=ordR.data.orders; anySuccess=true; }
+      if(cusR && cusR.ok && cusR.data.customers){ db.customers=cusR.data.customers; anySuccess=true; }
+
+      if(anySuccess){
+        this.saveDB(db);
+        this.saveMeta({lastSync:new Date().toISOString(),status:'synced'});
+        this.updateSyncUI();
+        return {success:true};
+      }
+      // All failed — likely auth issue or server down
+      return { success:false, reason:'all-endpoints-failed' };
     }catch(e){ return {success:false,reason:e.message}; }
   },
 
@@ -2350,7 +2369,28 @@ const MedVaultOffline = {
     return {success:true,pushed};
   },
 
-  async sync(token){ const push=await this.pushToServer(token); const pull=await this.pullFromServer(token); return {push,pull}; },
+  async sync(token){
+    const reachable = await this.checkServerReachable();
+    if(!reachable){
+      // Update syncBar to show server unreachable (not just browser offline)
+      const bar=document.getElementById('syncBar');
+      const dot=document.getElementById('syncDot');
+      const txt=document.getElementById('syncTxt');
+      if(bar && !navigator.onLine){
+        bar.style.background='rgba(239,68,68,0.1)';bar.style.borderBottomColor='rgba(239,68,68,0.2)';
+        dot.style.background='#ef4444';dot.style.animation='none';
+        txt.textContent='📴 Offline — changes saved locally, will sync when reconnected';
+      } else if(bar){
+        bar.style.background='rgba(245,158,11,0.08)';bar.style.borderBottomColor='rgba(245,158,11,0.2)';
+        dot.style.background='#f59e0b';dot.style.animation='none';
+        txt.textContent='⚠️ Cannot reach server — working from local data';
+      }
+      return {push:{success:false,pushed:0},pull:{success:false}};
+    }
+    const push=await this.pushToServer(token);
+    const pull=await this.pullFromServer(token);
+    return {push,pull};
+  },
 
   recordSaleLocal(saleData){
     const sales=this.getTable('sales');
@@ -2801,16 +2841,24 @@ async function boot(data) {
   // ── 4. Sync data in background — does not block UI ─────
   setTimeout(async () => {
     try {
+      const reachable = await MedVaultOffline.checkServerReachable();
+      if (!reachable) {
+        MedVaultOffline.updateSyncUI();
+        return;
+      }
       const syncResult = await MedVaultOffline.pullFromServer(token);
       if (syncResult && syncResult.success) {
         allDrugs = MedVaultOffline.getDrugs();
-        if (currentPage === 'dashboard') loadDashboard();
-        showToast('✅ Data synced!');
+        // Refresh whatever page is currently active
+        loadPage(currentPage);
+        showToast('✅ Data synced from server!');
+      } else {
+        MedVaultOffline.updateSyncUI();
       }
     } catch(e) {
       console.log('Background sync skipped:', e.message);
     }
-  }, 500); // half second delay — dashboard already visible by now
+  }, 800);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2975,10 +3023,17 @@ async function submitAddDrug() {
           timeoutMs: 12000,
         });
         const data = r.data || {};
-        if (data.drug) {
+        if (r.ok && (data.success || data.drug || data.id)) {
+          // Re-pull fresh inventory from server to get real DB IDs and updated data
+          const pullResult = await MedVaultOffline.requestJSON('/api/inventory', { token, timeoutMs: 10000 });
+          if (pullResult.ok && pullResult.data.drugs) {
+            const db = MedVaultOffline.getDB();
+            db.drugs = pullResult.data.drugs;
+            MedVaultOffline.saveDB(db);
+          }
           showToast(editingDrugId ? ('✅ ' + name + ' updated!') : ('✅ ' + name + ' added to inventory!'));
         } else {
-          showToast('✅ Saved locally · ' + (data.error||''), 'warn');
+          showToast('⚠️ Saved locally · ' + (data.error||'server error'), 'warn');
         }
       } catch(e) {
         showToast('✅ Saved offline — will sync when connected','warn');
@@ -3670,7 +3725,7 @@ function canSeeStaffPage() {
 
 
 async function manualSync() {
-  showToast('⏳ Syncing…');
+  showToast('⏳ Checking server connection…');
   const result = await MedVaultOffline.sync(token);
   if (result.pull.success) {
     allDrugs = MedVaultOffline.getDrugs();
@@ -3678,8 +3733,10 @@ async function manualSync() {
     showToast(result.push.pushed > 0
       ? `☁️ Pushed ${result.push.pushed} offline changes + pulled latest data!`
       : '✅ All data synced!');
+  } else if (!navigator.onLine) {
+    showToast('📴 No internet connection — working from local data','warn');
   } else {
-    showToast('📴 Offline — sync will happen when connected','warn');
+    showToast('⚠️ Server unreachable — your internet is connected but server may be down. Try again shortly.','warn');
   }
 }
 
