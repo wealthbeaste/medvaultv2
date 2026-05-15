@@ -3311,18 +3311,16 @@ async function dispatchToCashier() {
     const data = await res.json();
     if (!res.ok) { showToast('❌ ' + (data.error||'Failed to dispatch'), 'warn'); return; }
 
-   const dispatchId = data.dispatch.id;
+    const dispatchId = data.dispatch.id;
 showToast('📤 Sent to cashier! Print receipt for customer.', 'warn');
 
 // Snapshot cart data BEFORE clearing — needed to populate the receipt
-const dispatchCart    = [...cart];
-const dispatchCust    = cust;
-const dispatchPhone   = phone;
-const dispatchSub     = sub;
-const dispatchDisc    = disc;
-const dispatchDa      = da;
-const dispatchTot     = tot;
-const dispatchReceiptNum = `DISP-${dispatchId}`;
+const dispatchCart  = [...cart];
+const dispatchCust  = cust;
+const dispatchSub   = sub;
+const dispatchDisc  = disc;
+const dispatchDa    = da;
+const dispatchTot   = tot;
 
 // Clear customer details immediately — they now belong to the cashier's side
 document.getElementById('custNm').value = '';
@@ -3332,8 +3330,16 @@ document.getElementById('custPh').value = '';
 cart = [];
 renderCart(); updTotals();
 
+// Disable BOTH buttons — no further action allowed from dispensor side
+const chargeBtnEl = document.getElementById('chargeBtn');
+if (chargeBtnEl) { chargeBtnEl.disabled = true; chargeBtnEl.style.opacity = '0.4'; chargeBtnEl.title = 'Sale sent to cashier — cannot complete here'; }
+const dispBtnEl = document.getElementById('dispatchBtn');
+if (dispBtnEl) { dispBtnEl.disabled = true; dispBtnEl.style.opacity = '0.4'; }
+
+document.getElementById('dispatchBtn').dataset.dispatchId = dispatchId;
+
 // ── Show receipt popup so dispensor can print for customer to carry to cashier ──
-document.getElementById('rNum').textContent   = dispatchReceiptNum;
+document.getElementById('rNum').textContent   = `DISP-${dispatchId}`;
 document.getElementById('rDate').textContent  = new Date().toLocaleDateString('en-UG', { dateStyle: 'medium' });
 document.getElementById('rCust').textContent  = dispatchCust;
 document.getElementById('rOfflineTag').innerHTML = `<span style="background:rgba(0,212,170,0.15);color:var(--accent);font-size:9px;padding:2px 7px;border-radius:4px;font-weight:700">⏳ PENDING PAYMENT</span>`;
@@ -3346,24 +3352,6 @@ document.getElementById('rItems').innerHTML   = dispatchCart.map(c =>
   `<div class="ri"><span>${c.drug_name}</span><span style="text-align:center">${c.quantity}</span><span style="text-align:right">UGX ${(c.unit_price * c.quantity).toLocaleString()}</span></div>`
 ).join('');
 document.getElementById('overlay').classList.add('open');
-
-// Disable BOTH buttons — no further action allowed from dispensor side
-const chargeBtnEl = document.getElementById('chargeBtn');
-if (chargeBtnEl) { chargeBtnEl.disabled = true; chargeBtnEl.style.opacity = '0.4'; chargeBtnEl.title = 'Sale sent to cashier — cannot complete here'; }
-const dispBtnEl = document.getElementById('dispatchBtn');
-if (dispBtnEl) { dispBtnEl.disabled = true; dispBtnEl.style.opacity = '0.4'; }
-
-document.getElementById('dispatchBtn').dataset.dispatchId = dispatchId;
-
-// Show a prominent notice that it was sent to cashier
-const existingNotice = document.getElementById('dispatchSentNotice');
-if (existingNotice) existingNotice.remove();
-const noticeDiv = document.createElement('div');
-noticeDiv.id = 'dispatchSentNotice';
-noticeDiv.style.cssText = 'background:rgba(0,212,170,0.12);border:1px solid rgba(0,212,170,0.4);border-radius:10px;padding:10px 14px;margin:8px 0;font-size:12px;color:var(--accent);text-align:center;';
-noticeDiv.innerHTML = `✅ Sent to cashier (ID: ${dispatchId})<br><span style="color:var(--muted);font-size:11px">Waiting for cashier to collect payment…</span>`;
-const saleFooter = document.querySelector('.sale-footer') || document.getElementById('chargeBtn')?.parentElement;
-if (saleFooter) saleFooter.insertBefore(noticeDiv, saleFooter.firstChild);
 
 // Poll for collection (check every 6 seconds for up to 10 minutes)
 let polls = 0;
