@@ -2265,16 +2265,6 @@ const MedVaultOffline = {
   getMeta(){ try{return JSON.parse(localStorage.getItem(this.META_KEY)||'{}')}catch{return{}} },
   saveMeta(m){ localStorage.setItem(this.META_KEY,JSON.stringify({...this.getMeta(),...m})); },
   isOnline(){ return navigator.onLine; },
-  // Real connectivity check — pings the server health endpoint
-  async checkServerReachable(){
-    try{
-      const ctrl = new AbortController();
-      const t = setTimeout(()=>ctrl.abort(), 5000);
-      const res = await fetch(this.API_BASE + '/health', { method:'GET', signal:ctrl.signal });
-      clearTimeout(t);
-      return res.ok;
-    }catch(e){ return false; }
-  },
   async requestJSON(path, options = {}){
     const method = options.method || 'GET';
     const token = options.token;
@@ -2316,34 +2306,25 @@ const MedVaultOffline = {
   async pullFromServer(token){
     if(!this.isOnline()) return {success:false};
     try{
-      const [inv,sales,orders,customers] = await Promise.allSettled([
+      const [inv,sales,orders,customers] = await Promise.all([
         this.requestJSON('/api/inventory', { token, timeoutMs: 10000 }),
         this.requestJSON('/api/sales?limit=100', { token, timeoutMs: 10000 }),
         this.requestJSON('/api/orders', { token, timeoutMs: 10000 }),
         this.requestJSON('/api/customers', { token, timeoutMs: 10000 }),
       ]);
+      if (!inv.ok || !sales.ok || !orders.ok || !customers.ok) {
+        return { success:false, reason:'sync-partial-failure' };
+      }
 
       const db=this.getDB();
-      let anySuccess = false;
-
-      const invR = inv.status==='fulfilled' ? inv.value : null;
-      const salR = sales.status==='fulfilled' ? sales.value : null;
-      const ordR = orders.status==='fulfilled' ? orders.value : null;
-      const cusR = customers.status==='fulfilled' ? customers.value : null;
-
-      if(invR && invR.ok && invR.data.drugs){ db.drugs=invR.data.drugs; anySuccess=true; }
-      if(salR && salR.ok && salR.data.sales){ db.sales=salR.data.sales; anySuccess=true; }
-      if(ordR && ordR.ok && ordR.data.orders){ db.orders=ordR.data.orders; anySuccess=true; }
-      if(cusR && cusR.ok && cusR.data.customers){ db.customers=cusR.data.customers; anySuccess=true; }
-
-      if(anySuccess){
-        this.saveDB(db);
-        this.saveMeta({lastSync:new Date().toISOString(),status:'synced'});
-        this.updateSyncUI();
-        return {success:true};
-      }
-      // All failed — likely auth issue or server down
-      return { success:false, reason:'all-endpoints-failed' };
+      if(inv.data.drugs) db.drugs=inv.data.drugs;
+      if(sales.data.sales) db.sales=sales.data.sales;
+      if(orders.data.orders) db.orders=orders.data.orders;
+      if(customers.data.customers) db.customers=customers.data.customers;
+      this.saveDB(db);
+      this.saveMeta({lastSync:new Date().toISOString(),status:'synced'});
+      this.updateSyncUI();
+      return {success:true};
     }catch(e){ return {success:false,reason:e.message}; }
   },
 
@@ -2359,16 +2340,8 @@ const MedVaultOffline = {
           token,
           body: action.body,
           timeoutMs: 12000,
-        if(res.ok){
-          action.synced=true;pushed++;
-          // After successfully pushing an offline drug, remove the local _offline
-          // entry so pullFromServer replaces it with the real server record.
-          if(action.type==='drug' && action.method==='POST'){
-            const drugs=this.getTable('drugs');
-            const filtered=drugs.filter(d=>!(d._offline && d.name===action.body.name));
-            this.saveTable('drugs',filtered);
-          }
-        }
+        });
+        if(res.ok){action.synced=true;pushed++;}
       }catch(e){}
     }
     const remaining=queue.filter(a=>!a.synced);
@@ -2378,28 +2351,7 @@ const MedVaultOffline = {
     return {success:true,pushed};
   },
 
-  async sync(token){
-    const reachable = await this.checkServerReachable();
-    if(!reachable){
-      // Update syncBar to show server unreachable (not just browser offline)
-      const bar=document.getElementById('syncBar');
-      const dot=document.getElementById('syncDot');
-      const txt=document.getElementById('syncTxt');
-      if(bar && !navigator.onLine){
-        bar.style.background='rgba(239,68,68,0.1)';bar.style.borderBottomColor='rgba(239,68,68,0.2)';
-        dot.style.background='#ef4444';dot.style.animation='none';
-        txt.textContent='📴 Offline — changes saved locally, will sync when reconnected';
-      } else if(bar){
-        bar.style.background='rgba(245,158,11,0.08)';bar.style.borderBottomColor='rgba(245,158,11,0.2)';
-        dot.style.background='#f59e0b';dot.style.animation='none';
-        txt.textContent='⚠️ Cannot reach server — working from local data';
-      }
-      return {push:{success:false,pushed:0},pull:{success:false}};
-    }
-    const push=await this.pushToServer(token);
-    const pull=await this.pullFromServer(token);
-    return {push,pull};
-  },
+  async sync(token){ const push=await this.pushToServer(token); const pull=await this.pullFromServer(token); return {push,pull}; },
 
   recordSaleLocal(saleData){
     const sales=this.getTable('sales');
@@ -2850,24 +2802,16 @@ async function boot(data) {
   // ── 4. Sync data in background — does not block UI ─────
   setTimeout(async () => {
     try {
-      const reachable = await MedVaultOffline.checkServerReachable();
-      if (!reachable) {
-        MedVaultOffline.updateSyncUI();
-        return;
-      }
       const syncResult = await MedVaultOffline.pullFromServer(token);
       if (syncResult && syncResult.success) {
         allDrugs = MedVaultOffline.getDrugs();
-        // Refresh whatever page is currently active
-        loadPage(currentPage);
-        showToast('✅ Data synced from server!');
-      } else {
-        MedVaultOffline.updateSyncUI();
+        if (currentPage === 'dashboard') loadDashboard();
+        showToast('✅ Data synced!');
       }
     } catch(e) {
       console.log('Background sync skipped:', e.message);
     }
-  }, 800);
+  }, 500); // half second delay — dashboard already visible by now
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -3006,55 +2950,42 @@ async function submitAddDrug() {
       requires_rx };
     console.log('Frontend: Sending drugData:', drugData);
 
+    // Always save locally first (works offline)
+    if (editingDrugId) {
+      const drugs = MedVaultOffline.getTable('drugs');
+      const idx = drugs.findIndex(d => String(d.id) === String(editingDrugId));
+      if (idx >= 0) {
+        drugs[idx] = { ...drugs[idx], ...drugData, updated_at: new Date().toISOString() };
+        MedVaultOffline.saveTable('drugs', drugs);
+        MedVaultOffline.queueAction({ type:'drug', method:'PUT', url:`/api/inventory/${editingDrugId}`, body: drugData });
+      } else {
+        // fallback to add if missing
+        MedVaultOffline.addDrugLocal(drugData);
+      }
+    } else {
+      MedVaultOffline.addDrugLocal(drugData);
+    }
+
+    // Also try to save to real backend
     if (MedVaultOffline.isOnline() && token) {
-      // ── ONLINE PATH: send directly to server, then refresh local cache from response ──
       try {
-        const r = await MedVaultOffline.requestJSON(
-          editingDrugId ? `/api/inventory/${editingDrugId}` : '/api/inventory',
-          { method: editingDrugId ? 'PUT' : 'POST', token, body: drugData, timeoutMs: 12000 }
-        );
+        const r = await MedVaultOffline.requestJSON(editingDrugId ? (`/api/inventory/${editingDrugId}`) : '/api/inventory', {
+          method: editingDrugId ? 'PUT' : 'POST',
+          token,
+          body: drugData,
+          timeoutMs: 12000,
+        });
         const data = r.data || {};
-        if (r.ok && (data.drug || data.success)) {
-          // Update local cache with the real server record (no _offline flag, real id)
-          const serverDrug = data.drug || {};
-          const drugs = MedVaultOffline.getTable('drugs');
-          if (editingDrugId) {
-            const idx = drugs.findIndex(d => String(d.id) === String(editingDrugId));
-            if (idx >= 0) drugs[idx] = { ...drugs[idx], ...drugData, id: editingDrugId, updated_at: new Date().toISOString(), _offline: false };
-            else drugs.push({ ...drugData, id: editingDrugId, _offline: false });
-          } else {
-            // Use server-assigned id so the record is authoritative
-            const newId = serverDrug.id || data.id || ('srv_' + Date.now());
-            drugs.push({ ...drugData, id: newId, stock_status: 'ok', created_at: new Date().toISOString(), _offline: false });
-          }
-          MedVaultOffline.saveTable('drugs', drugs);
+        if (data.drug) {
           showToast(editingDrugId ? ('✅ ' + name + ' updated!') : ('✅ ' + name + ' added to inventory!'));
         } else {
-          // Server responded but with an error — fall back to offline queue
-          MedVaultOffline.addDrugLocal(drugData);
-          showToast('⚠️ Server error — saved offline. ' + (data.error || ''), 'warn');
+          showToast('✅ Saved locally · ' + (data.error||''), 'warn');
         }
       } catch(e) {
-        // Network error — save offline and queue for sync
-        MedVaultOffline.addDrugLocal(drugData);
-        showToast('✅ Saved offline — will sync when connected', 'warn');
+        showToast('✅ Saved offline — will sync when connected','warn');
       }
-   } else {
-      // ── OFFLINE PATH: save locally and queue for sync ──
-      if (editingDrugId) {
-        const drugs = MedVaultOffline.getTable('drugs');
-        const idx = drugs.findIndex(d => String(d.id) === String(editingDrugId));
-        if (idx >= 0) {
-          drugs[idx] = { ...drugs[idx], ...drugData, updated_at: new Date().toISOString() };
-          MedVaultOffline.saveTable('drugs', drugs);
-          MedVaultOffline.queueAction({ type: 'drug', method: 'PUT', url: `/api/inventory/${editingDrugId}`, body: drugData });
-        } else {
-          MedVaultOffline.addDrugLocal(drugData);
-        }
-      } else {
-        MedVaultOffline.addDrugLocal(drugData);
-      }
-      showToast('✅ ' + name + ' saved offline — will sync when reconnected', 'warn');
+    } else {
+      showToast('✅ ' + name + ' saved offline!','warn');
     }
 
     closeAddDrug();
@@ -3325,7 +3256,7 @@ async function dispatchToCashier() {
     const data = await res.json();
     if (!res.ok) { showToast('❌ ' + (data.error||'Failed to dispatch'), 'warn'); return; }
 
-    const dispatchId = data.dispatch.id;
+   const dispatchId = data.dispatch.id;
 showToast('📤 Sent to cashier! Print receipt for customer.', 'warn');
 
 // Snapshot cart data BEFORE clearing — needed to populate the receipt
@@ -3769,7 +3700,7 @@ function canSeeStaffPage() {
 
 
 async function manualSync() {
-  showToast('⏳ Checking server connection…');
+  showToast('⏳ Syncing…');
   const result = await MedVaultOffline.sync(token);
   if (result.pull.success) {
     allDrugs = MedVaultOffline.getDrugs();
@@ -3777,10 +3708,8 @@ async function manualSync() {
     showToast(result.push.pushed > 0
       ? `☁️ Pushed ${result.push.pushed} offline changes + pulled latest data!`
       : '✅ All data synced!');
-  } else if (!navigator.onLine) {
-    showToast('📴 No internet connection — working from local data','warn');
   } else {
-    showToast('⚠️ Server unreachable — your internet is connected but server may be down. Try again shortly.','warn');
+    showToast('📴 Offline — sync will happen when connected','warn');
   }
 }
 
@@ -4978,6 +4907,7 @@ let denomCounts = {};
 let cashierQueuePoll = null;
 let currentCollectDispatchId = null;
 let currentCollectPayMethod = 'cash';
+let currentCollectSaleData = null;
 
 async function loadDispatchQueue() {
   const list  = document.getElementById('dispatchQueueList');
@@ -5094,7 +5024,8 @@ async function confirmCollectPayment() {
       || '—';
     if (rcpt === '—') console.warn('[MedVault] collect response missing receipt_number:', data);
     showToast('✅ Payment collected! Receipt: '+rcpt);
-// ── Show real payment receipt popup for cashier to print ──
+
+    // ── Show real payment receipt popup for cashier to print ──
     try {
       const collectedUser = getCurrentUser() || currentUser;
       const sd  = snapshotSaleData || {};
@@ -5916,223 +5847,5 @@ boot = async function(data) {
 };
 
 </script>
-<!-- ADD BRANCH MODAL -->
-<div class="overlay" id="addBranchOverlay" onclick="if(event.target===this)closeAddBranchModal()">
-  <div style="background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:28px;width:440px;max-width:94vw;animation:modalIn 0.2s ease">
-    <div style="font-family:var(--display);font-weight:700;font-size:20px;margin-bottom:4px">🏪 Add New Branch</div>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:20px">Add a new pharmacy location to your organisation</div>
-    <form id="addBranchForm" onsubmit="event.preventDefault();submitAddBranch()">
-      <div style="display:flex;flex-direction:column;gap:12px">
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Branch Name *</label>
-          <input id="brName" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Ntinda Branch" required/>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Address</label>
-          <input id="brAddress" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Ntinda Complex, Kampala"/>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Phone</label>
-          <input id="brPhone" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. 0701 234 567"/>
-        </div>
-        <div style="background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.15);border-radius:10px;padding:12px;font-size:12px;color:var(--muted)">
-          💡 Each branch has its own inventory and sales. You can assign staff to this branch after creating it.
-          Pricing: UGX 35,000/month per branch (discount applied automatically).
-        </div>
-      </div>
-      <div style="display:flex;gap:10px;margin-top:18px">
-        <button type="button" onclick="closeAddBranchModal()" style="flex:1;padding:11px;border-radius:10px;background:var(--s2);color:var(--text);border:1px solid var(--border);font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
-        <button type="submit" id="addBranchSubmitBtn" style="flex:2;padding:11px;border-radius:10px;background:var(--accent);color:#000;border:none;font-family:var(--display);font-weight:800;font-size:14px;cursor:pointer">✅ Add Branch</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- STOCK TRANSFER MODAL -->
-<div class="overlay" id="transferOverlay" onclick="if(event.target===this)closeTransferModal()">
-  <div style="background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:28px;width:440px;max-width:94vw;animation:modalIn 0.2s ease">
-    <div style="font-family:var(--display);font-weight:700;font-size:20px;margin-bottom:4px">🔄 Request Stock Transfer</div>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:20px">Move stock from one branch to another</div>
-    <form id="transferForm" onsubmit="event.preventDefault();submitTransfer()">
-      <div style="display:flex;flex-direction:column;gap:12px">
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">From Branch</label>
-          <select id="trFromBranch" style="background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:var(--font);font-size:13px;outline:none"></select>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">To Branch</label>
-          <select id="trToBranch" style="background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:var(--font);font-size:13px;outline:none"></select>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Drug Name</label>
-          <input id="trDrug" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Paracetamol 500mg" required/>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Quantity to Transfer</label>
-          <input id="trQty" type="number" min="1" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. 50" required/>
-        </div>
-      </div>
-      <div style="display:flex;gap:10px;margin-top:18px">
-        <button type="button" onclick="closeTransferModal()" style="flex:1;padding:11px;border-radius:10px;background:var(--s2);color:var(--text);border:1px solid var(--border);font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
-        <button type="submit" id="transferSubmitBtn" style="flex:2;padding:11px;border-radius:10px;background:var(--accent);color:#000;border:none;font-family:var(--display);font-weight:800;font-size:14px;cursor:pointer">✅ Request Transfer</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-
-<!-- CREDIT RECORD MODAL -->
-<div class="overlay" id="creditModal" onclick="if(event.target===this)closeCreditModal()">
-  <div style="background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:28px;width:480px;max-width:94vw;animation:modalIn 0.2s ease">
-    <div style="font-family:var(--display);font-weight:700;font-size:20px;margin-bottom:4px">💳 Record Credit Sale</div>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:20px">Track drugs given on credit — system will remind customer automatically</div>
-    <form id="creditForm" onsubmit="event.preventDefault();submitCredit()">
-      <div style="display:flex;flex-direction:column;gap:12px">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <div style="display:flex;flex-direction:column;gap:5px">
-            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Customer Name *</label>
-            <input id="crName" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. John Mugisha" required/>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:5px">
-            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Phone (for WhatsApp reminder)</label>
-            <input id="crPhone" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="07XX XXX XXX"/>
-          </div>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Drugs / Items Given</label>
-          <input id="crItems" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Paracetamol x10, Coartem x1"/>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <div style="display:flex;flex-direction:column;gap:5px">
-            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Amount Owed (UGX) *</label>
-            <input id="crAmount" type="number" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. 15000" required/>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:5px">
-            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Payment Due Date</label>
-            <input id="crDue" type="date" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px"/>
-          </div>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Notes (optional)</label>
-          <input id="crNotes" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Will pay Friday salary day"/>
-        </div>
-        <div style="background:rgba(0,212,170,0.06);border:1px solid rgba(0,212,170,0.15);border-radius:10px;padding:12px;font-size:12px;color:var(--muted)">
-          💬 If you add a phone number, MedVault will send a WhatsApp reminder automatically when payment is due.
-        </div>
-      </div>
-      <div style="display:flex;gap:10px;margin-top:18px">
-        <button type="button" onclick="closeCreditModal()" style="flex:1;padding:11px;border-radius:10px;background:var(--s2);color:var(--text);border:1px solid var(--border);font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
-        <button type="submit" id="creditSubmitBtn" style="flex:2;padding:11px;border-radius:10px;background:var(--accent);color:#000;border:none;font-family:var(--display);font-weight:800;font-size:14px;cursor:pointer">✅ Record Credit</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-
-<!-- PURCHASE ORDER MODAL -->
-<div class="overlay" id="poModal" onclick="if(event.target===this)closePOModal()">
-  <div style="background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:28px;width:580px;max-width:94vw;max-height:90vh;overflow-y:auto;animation:modalIn 0.2s ease">
-    <div style="font-family:var(--display);font-weight:700;font-size:20px;margin-bottom:4px">🛍️ New Purchase Order</div>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:20px">Order drugs from a supplier</div>
-    <div style="display:flex;flex-direction:column;gap:12px">
-      <div style="display:flex;flex-direction:column;gap:5px">
-        <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Supplier Name *</label>
-        <input id="poSupplier" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Cipla Uganda, Abacus Pharma"/>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:8px">
-        <div style="display:flex;align-items:center;justify-content:space-between">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Order Items *</label>
-          <button type="button" onclick="addPOItemRow()" style="font-size:12px;padding:4px 12px;border-radius:6px;background:var(--s2);color:var(--text);border:1px solid var(--border);cursor:pointer">+ Add Item</button>
-        </div>
-        <div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;margin-bottom:4px">
-          <span style="font-size:10px;color:var(--muted);text-transform:uppercase">Drug Name</span>
-          <span style="font-size:10px;color:var(--muted);text-transform:uppercase">Qty</span>
-          <span style="font-size:10px;color:var(--muted);text-transform:uppercase">Unit Price (UGX)</span>
-          <span></span>
-        </div>
-        <div id="poItemsContainer"></div>
-        <div id="poTotalDisplay" style="font-family:var(--display);font-weight:700;font-size:16px;color:var(--accent);text-align:right">Total: UGX 0</div>
-      </div>
-    </div>
-    <div style="display:flex;gap:10px;margin-top:18px">
-      <button onclick="closePOModal()" style="flex:1;padding:11px;border-radius:10px;background:var(--s2);color:var(--text);border:1px solid var(--border);font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
-      <button onclick="submitPO()" style="flex:2;padding:11px;border-radius:10px;background:var(--accent);color:#000;border:none;font-family:var(--display);font-weight:800;font-size:14px;cursor:pointer">✅ Create Purchase Order</button>
-    </div>
-  </div>
-</div>
-<!-- ADD DRUG MODAL -->
-<div class="overlay" id="addDrugOverlay" onclick="if(event.target===this)closeAddDrug()">
-  <div style="background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:28px;width:500px;max-width:94vw;box-shadow:0 30px 80px rgba(0,0,0,0.6);animation:modalIn 0.2s ease;">
-    <div style="font-family:var(--display);font-weight:700;font-size:20px;margin-bottom:4px">💊 Add New Drug</div>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:22px">Saves to your real database • Works offline too</div>
-    <form id="addDrugForm" onsubmit="event.preventDefault();submitAddDrug()">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
-        <div style="grid-column:1/-1;display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Drug Name *</label>
-          <input id="adName" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Paracetamol 500mg" required/>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Category</label>
-          <select id="adCategory" style="background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:var(--font);font-size:13px;outline:none">
-            <option>General</option><option>Antimalarials</option><option>Antibiotics</option>
-            <option>Analgesics</option><option>Antifungals</option><option>Vitamins</option>
-            <option>Antivirals</option><option>Cardiovascular</option><option>Diabetes</option>
-            <option>Dermatology</option><option>Gastrointestinal</option><option>Other</option>
-          </select>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Quantity in Stock *</label>
-          <input id="adQty" type="number" min="0" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. 200" required/>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Selling Price (UGX) *</label>
-          <input id="adPrice" type="number" min="0" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. 500" required/>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Cost Price (UGX)</label>
-          <input id="adCost" type="number" min="0" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. 300"/>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Expiry Date</label>
-          <input id="adExpiry" type="date" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px"/>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Supplier</label>
-          <input id="adSupplier" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Cipla Uganda"/>
-        </div>
-
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Barcode</label>
-          <input id="drugBarcode" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="Scan or enter barcode"/>
-        </div>
-
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">SKU</label>
-          <input id="drugSku" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="Internal SKU"/>
-        </div>
-
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Batch Number <span style="font-weight:400;text-transform:none;letter-spacing:0">(auto if blank)</span></label>
-          <input id="batch_number" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. BN-2025-001 (auto-generated if empty)"/>
-        </div>
-
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Low Stock Alert (units)</label>
-          <input id="adThreshold" type="number" min="1" value="20" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px"/>
-        </div>
-
-        <div style="grid-column:1/-1;display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--s2);border:1px solid var(--border);border-radius:10px">
-          <input type="checkbox" id="adRx" style="width:16px;height:16px;cursor:pointer"/>
-          <label for="adRx" style="font-size:13px;cursor:pointer">Requires prescription (Rx only)</label>
-        </div>
-      </div>
-
-      <div style="display:flex;gap:10px;margin-top:6px">
-        <button type="button" onclick="closeAddDrug()" style="flex:1;padding:11px;border-radius:10px;background:var(--s2);color:var(--text);border:1px solid var(--border);font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
-        <button type="submit" id="addDrugBtn" style="flex:2;padding:11px;border-radius:10px;background:var(--accent);color:#000;border:none;font-family:var(--display);font-weight:800;font-size:14px;cursor:pointer">✅ Add Drug</button>
-      </div>
-    </form>
-  </div>
-</div>
 </body>
 </html>
