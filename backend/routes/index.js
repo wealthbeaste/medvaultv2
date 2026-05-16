@@ -334,7 +334,7 @@ app.post('/api/inventory', auth, async (req, res) => {
     : `BN-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2,6).toUpperCase()}`;
 
   try {
-   
+
     // ── Idempotency guard ────────────────────────────────────────────────────
     // If a drug with the same name already exists for this pharmacy, return
     // that record instead of inserting a duplicate. This is the safety net for
@@ -353,6 +353,7 @@ app.post('/api/inventory', auth, async (req, res) => {
       });
     }
     // ────────────────────────────────────────────────────────────────────────
+
     // 1. Create drug (batch_number lives in drug_batches, not drugs table)
     const drugResult = await query(
       `INSERT INTO drugs (
@@ -975,8 +976,7 @@ app.post('/api/inventory', auth, async (req, res) => {
       const receipt_number = await getNextReceiptNumber(pharmacyId);
 
       // Transaction: insert sale + items + deduct stock + mark dispatch done
-      const { getClient } = require('../database/db');
-      const client = await getClient();
+      const client = await require('../database/db').pool.connect();
       try {
         await client.query('BEGIN');
         const sr = await client.query(
@@ -1191,31 +1191,207 @@ app.post('/api/inventory', auth, async (req, res) => {
   });
 
   // ── SUPER ADMIN ─────────────────────────────────────────
-  app.get('/api/admin/pharmacies', auth, async (req, res) => {
-    if (req.user.role!=='super_admin') return res.json({ error:'Super admin only' }, 403);
+  function adminOnly(req, res, next) {
+    if (req.user.role !== 'super_admin') return res.status(403).json({ error: 'Super admin only' });
+    next();
+  }
+
+  // GET /api/admin/stats — platform overview numbers
+  app.get('/api/admin/stats', auth, adminOnly, async (req, res) => {
     try {
-      const result = await query(
-        `SELECT o.id as org_id,o.name as org_name,o.email,o.phone,o.plan,o.created_at,
-                COUNT(p.id) as branch_count,s.status as sub_status,s.amount_ugx,s.trial_ends_at,
-                (SELECT COALESCE(SUM(sa.total_amount),0) FROM sales sa JOIN pharmacies bp ON bp.id=sa.pharmacy_id WHERE bp.organisation_id=o.id) as total_revenue
-         FROM organisations o LEFT JOIN pharmacies p ON p.organisation_id=o.id LEFT JOIN subscriptions s ON s.organisation_id=o.id
-         GROUP BY o.id,s.status,s.amount_ugx,s.trial_ends_at ORDER BY o.created_at DESC`
-      );
-      res.json({ organisations:result.rows });
-    } catch(e) { res.json({ error:e.message }, 500); }
+      const [orgs, active, trial, overdue, suspended, mrr, totalSales, totalUsers] = await Promise.all([
+        query(`SELECT COUNT(*) as cnt FROM organisations WHERE email != 'admin@medvault.ug'`),
+        query(`SELECT COUNT(*) as cnt FROM subscriptions s JOIN organisations o ON o.id=s.organisation_id WHERE s.status='active' AND o.email!='admin@medvault.ug'`),
+        query(`SELECT COUNT(*) as cnt FROM subscriptions s JOIN organisations o ON o.id=s.organisation_id WHERE s.status='trial' AND o.email!='admin@medvault.ug'`),
+        query(`SELECT COUNT(*) as cnt FROM subscriptions s JOIN organisations o ON o.id=s.organisation_id WHERE s.status='overdue' AND o.email!='admin@medvault.ug'`),
+        query(`SELECT COUNT(*) as cnt FROM subscriptions s JOIN organisations o ON o.id=s.organisation_id WHERE s.status='suspended' AND o.email!='admin@medvault.ug'`),
+        query(`SELECT COALESCE(SUM(s.amount_ugx),0) as mrr FROM subscriptions s JOIN organisations o ON o.id=s.organisation_id WHERE s.status='active' AND o.email!='admin@medvault.ug'`),
+        query(`SELECT COALESCE(SUM(total_amount),0) as total FROM sales`),
+        query(`SELECT COUNT(*) as cnt FROM users WHERE email!='admin@medvault.ug'`),
+      ]);
+      res.json({
+        totalOrgs:       parseInt(orgs.rows[0].cnt),
+        activeCount:     parseInt(active.rows[0].cnt),
+        trialCount:      parseInt(trial.rows[0].cnt),
+        overdueCount:    parseInt(overdue.rows[0].cnt),
+        suspendedCount:  parseInt(suspended.rows[0].cnt),
+        mrr:             parseFloat(mrr.rows[0].mrr),
+        totalSalesRevenue: parseFloat(totalSales.rows[0].total),
+        totalUsers:      parseInt(totalUsers.rows[0].cnt),
+      });
+    } catch(e) { res.status(500).json({ error: e.message }); }
   });
 
-  app.get('/api/admin/stats', auth, async (req, res) => {
-    if (req.user.role!=='super_admin') return res.json({ error:'Super admin only' }, 403);
+  // GET /api/admin/orgs — full org list with all details
+  app.get('/api/admin/orgs', auth, adminOnly, async (req, res) => {
     try {
-      const [orgs,active,trial,rev] = await Promise.all([
-        query(`SELECT COUNT(*) as cnt FROM organisations`),
-        query(`SELECT COUNT(*) as cnt FROM subscriptions WHERE status='active'`),
-        query(`SELECT COUNT(*) as cnt FROM subscriptions WHERE status='trial'`),
-        query(`SELECT COALESCE(SUM(amount_ugx),0) as mrr FROM subscriptions WHERE status='active'`),
-      ]);
-      res.json({ totalOrganisations:parseInt(orgs.rows[0].cnt), activeSubscriptions:parseInt(active.rows[0].cnt), onTrial:parseInt(trial.rows[0].cnt), mrr:parseFloat(rev.rows[0].mrr) });
-    } catch(e) { res.json({ error:e.message }, 500); }
+      const result = await query(`
+        SELECT
+          o.id, o.name, o.owner_name, o.email, o.phone, o.plan, o.is_active, o.created_at,
+          ph.id         AS pharmacy_id,
+          ph.address    AS location,
+          ph.nda_number AS nda,
+          ph.is_active  AS pharmacy_active,
+          s.id          AS sub_id,
+          s.status      AS sub_status,
+          s.amount_ugx,
+          s.trial_ends_at,
+          s.next_billing,
+          (SELECT COUNT(*) FROM pharmacies pp WHERE pp.organisation_id = o.id) AS branch_count,
+          (SELECT COUNT(*) FROM users u WHERE u.organisation_id = o.id AND u.email != 'admin@medvault.ug') AS user_count,
+          (SELECT COUNT(*) FROM drugs d JOIN pharmacies pp ON pp.id = d.pharmacy_id WHERE pp.organisation_id = o.id) AS drug_count,
+          (SELECT COALESCE(SUM(sa.total_amount),0) FROM sales sa JOIN pharmacies pp ON pp.id = sa.pharmacy_id WHERE pp.organisation_id = o.id) AS total_sales,
+          (SELECT COUNT(*) FROM sales sa JOIN pharmacies pp ON pp.id = sa.pharmacy_id WHERE pp.organisation_id = o.id) AS sale_count,
+          (SELECT MAX(sa.created_at) FROM sales sa JOIN pharmacies pp ON pp.id = sa.pharmacy_id WHERE pp.organisation_id = o.id) AS last_sale_at
+        FROM organisations o
+        LEFT JOIN pharmacies ph ON ph.organisation_id = o.id AND ph.is_head_office = true
+        LEFT JOIN subscriptions s ON s.organisation_id = o.id
+        WHERE o.email != 'admin@medvault.ug'
+        ORDER BY o.created_at DESC
+      `);
+      res.json({ orgs: result.rows });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // GET /api/admin/users — all users across platform
+  app.get('/api/admin/users', auth, adminOnly, async (req, res) => {
+    try {
+      const result = await query(`
+        SELECT u.id, u.name, u.email, u.role, u.is_active, u.created_at,
+               o.name AS org_name, p.name AS pharmacy_name
+        FROM users u
+        JOIN organisations o ON o.id = u.organisation_id
+        LEFT JOIN pharmacies p ON p.id = u.pharmacy_id
+        WHERE u.email != 'admin@medvault.ug'
+        ORDER BY u.created_at DESC
+      `);
+      res.json({ users: result.rows });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // POST /api/admin/orgs — create new organisation + pharmacy + owner user
+  app.post('/api/admin/orgs', auth, adminOnly, async (req, res) => {
+    const { name, owner_name, email, phone, location, plan, nda } = req.body;
+    if (!name || !email || !phone) return res.status(400).json({ error: 'name, email and phone required' });
+    const planAmounts = { drug_shop:20000, basic:20000, single:50000, pro:50000, multi:80000, branch:40000, chain:30000, enterprise:150000 };
+    const amount = planAmounts[plan] || 50000;
+    try {
+      const tempPw = name.replace(/\s+/g,'').slice(0,4) + phone.slice(-4) + '!';
+      const pwHash = await hash(tempPw);
+      const org = await query(
+        `INSERT INTO organisations (name,owner_name,email,phone,plan) VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+        [name, owner_name||name, email.toLowerCase(), phone, plan||'pro']
+      );
+      const orgId = org.rows[0].id;
+      const ph = await query(
+        `INSERT INTO pharmacies (organisation_id,name,address,phone,nda_number,is_head_office) VALUES ($1,$2,$3,$4,$5,true) RETURNING id`,
+        [orgId, name, location||'Uganda', phone, nda||null]
+      );
+      const pharmacyId = ph.rows[0].id;
+      await query(
+        `INSERT INTO users (organisation_id,pharmacy_id,name,email,password_hash,role) VALUES ($1,$2,$3,$4,$5,'owner')`,
+        [orgId, pharmacyId, owner_name||name, email.toLowerCase(), pwHash]
+      );
+      await query(
+        `INSERT INTO subscriptions (organisation_id,plan,amount_ugx,status,trial_ends_at) VALUES ($1,$2,$3,'trial',NOW()+INTERVAL '14 days')`,
+        [orgId, plan||'pro', amount]
+      );
+      res.json({ success: true, org_id: orgId, pharmacy_id: pharmacyId, temp_password: tempPw });
+    } catch(e) {
+      if (e.code === '23505') return res.status(409).json({ error: 'Email already registered' });
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // POST /api/admin/orgs/:id/suspend — deactivate org + all users
+  app.post('/api/admin/orgs/:id/suspend', auth, adminOnly, async (req, res) => {
+    try {
+      await query(`UPDATE organisations SET is_active=false WHERE id=$1`, [req.params.id]);
+      await query(`UPDATE users SET is_active=false WHERE organisation_id=$1`, [req.params.id]);
+      await query(`UPDATE subscriptions SET status='suspended' WHERE organisation_id=$1`, [req.params.id]);
+      res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // POST /api/admin/orgs/:id/activate — reactivate org + all users
+  app.post('/api/admin/orgs/:id/activate', auth, adminOnly, async (req, res) => {
+    try {
+      await query(`UPDATE organisations SET is_active=true WHERE id=$1`, [req.params.id]);
+      await query(`UPDATE users SET is_active=true WHERE organisation_id=$1`, [req.params.id]);
+      await query(`UPDATE subscriptions SET status='active' WHERE organisation_id=$1`, [req.params.id]);
+      res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // POST /api/admin/orgs/:id/mark-overdue
+  app.post('/api/admin/orgs/:id/mark-overdue', auth, adminOnly, async (req, res) => {
+    try {
+      await query(`UPDATE subscriptions SET status='overdue' WHERE organisation_id=$1`, [req.params.id]);
+      res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // POST /api/admin/orgs/:id/convert-trial — convert trial to paid
+  app.post('/api/admin/orgs/:id/convert-trial', auth, adminOnly, async (req, res) => {
+    const { plan } = req.body;
+    const planAmounts = { drug_shop:20000, basic:20000, single:50000, pro:50000, multi:80000, enterprise:150000 };
+    const amount = planAmounts[plan] || 50000;
+    try {
+      await query(`UPDATE subscriptions SET status='active', plan=$1, amount_ugx=$2, next_billing=NOW()+INTERVAL '30 days' WHERE organisation_id=$3`, [plan||'pro', amount, req.params.id]);
+      await query(`UPDATE organisations SET is_active=true, plan=$1 WHERE id=$2`, [plan||'pro', req.params.id]);
+      await query(`UPDATE users SET is_active=true WHERE organisation_id=$1`, [req.params.id]);
+      res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // POST /api/admin/orgs/:id/extend-trial
+  app.post('/api/admin/orgs/:id/extend-trial', auth, adminOnly, async (req, res) => {
+    const days = parseInt(req.body.days) || 7;
+    try {
+      await query(`UPDATE subscriptions SET trial_ends_at = GREATEST(trial_ends_at, NOW()) + INTERVAL '${days} days' WHERE organisation_id=$1`, [req.params.id]);
+      res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // PATCH /api/admin/orgs/:id/plan — change plan
+  app.patch('/api/admin/orgs/:id/plan', auth, adminOnly, async (req, res) => {
+    const { plan } = req.body;
+    const planAmounts = { drug_shop:20000, basic:20000, single:50000, pro:50000, multi:80000, enterprise:150000 };
+    const amount = planAmounts[plan];
+    if (!amount) return res.status(400).json({ error: 'Invalid plan name' });
+    try {
+      await query(`UPDATE subscriptions SET plan=$1, amount_ugx=$2 WHERE organisation_id=$3`, [plan, amount, req.params.id]);
+      await query(`UPDATE organisations SET plan=$1 WHERE id=$2`, [plan, req.params.id]);
+      res.json({ success: true, amount });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // POST /api/admin/users/:id/suspend — suspend one user
+  app.post('/api/admin/users/:id/suspend', auth, adminOnly, async (req, res) => {
+    try {
+      await query(`UPDATE users SET is_active=false WHERE id=$1`, [req.params.id]);
+      res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // POST /api/admin/users/:id/activate — activate one user
+  app.post('/api/admin/users/:id/activate', auth, adminOnly, async (req, res) => {
+    try {
+      await query(`UPDATE users SET is_active=true WHERE id=$1`, [req.params.id]);
+      res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // POST /api/admin/users/:id/reset-password
+  app.post('/api/admin/users/:id/reset-password', auth, adminOnly, async (req, res) => {
+    try {
+      const u = await query(`SELECT email, phone FROM users u LEFT JOIN organisations o ON o.id=u.organisation_id WHERE u.id=$1`, [req.params.id]);
+      if (!u.rows.length) return res.status(404).json({ error: 'User not found' });
+      const newPw = 'MedVault' + Math.floor(1000 + Math.random()*9000) + '!';
+      const pwHash = await hash(newPw);
+      await query(`UPDATE users SET password_hash=$1 WHERE id=$2`, [pwHash, req.params.id]);
+      res.json({ success: true, new_password: newPw });
+    } catch(e) { res.status(500).json({ error: e.message }); }
   });
 
   // ── AI ──────────────────────────────────────────────────
