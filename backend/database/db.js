@@ -13,15 +13,13 @@ function getPool() {
 
   const connStr = process.env.DATABASE_URL || '';
 
-  // Railway uses self-signed SSL certs — strip any conflicting sslmode param
-  // and let the ssl object below handle it
-  const cleanConn = connStr
-    .replace(/[?&]sslmode=[^&]*/g, '')  // remove any existing sslmode
-    .replace(/\?$/, '');                // clean trailing ?
+  const cleanConn = connStr.includes('sslmode=')
+    ? connStr.replace(/sslmode=[^&]+/, 'sslmode=verify-full')
+    : connStr + (connStr.includes('?') ? '&' : '?') + 'sslmode=verify-full';
 
   pool = new Pool({
     connectionString: cleanConn,
-    ssl: connStr ? { rejectUnauthorized: false } : false,
+    ssl: { rejectUnauthorized: false },
     max: 5,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 15000,
@@ -273,33 +271,6 @@ async function runMigrations() {
     )`,
 
     // =========================================================
-    // PENDING SALES (Dispatch queue — dispensor → cashier)
-    // =========================================================
-
-    `CREATE TABLE IF NOT EXISTS pending_sales (
-      id SERIAL PRIMARY KEY,
-      pharmacy_id INTEGER NOT NULL REFERENCES pharmacies(id) ON DELETE CASCADE,
-      dispensor_id INTEGER NOT NULL REFERENCES users(id),
-      customer_name VARCHAR(255) NOT NULL DEFAULT 'Walk-in',
-      customer_phone VARCHAR(50),
-      items JSONB NOT NULL DEFAULT '[]',
-      discount_pct NUMERIC(5,2) NOT NULL DEFAULT 0,
-      subtotal NUMERIC(12,2) NOT NULL DEFAULT 0,
-      discount_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
-      total_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
-      notes TEXT,
-      status VARCHAR(50) NOT NULL DEFAULT 'pending',
-      payment_method VARCHAR(50),
-      collected_at TIMESTAMPTZ,
-      collected_by INTEGER REFERENCES users(id),
-      sale_id INTEGER REFERENCES sales(id),
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`,
-
-    `CREATE INDEX IF NOT EXISTS idx_pending_pharmacy ON pending_sales(pharmacy_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_pending_status ON pending_sales(status)`,
-
-    // =========================================================
     // INDEXES
     // =========================================================
 
@@ -323,6 +294,12 @@ async function runMigrations() {
 
     // Add updated_at to customers if missing (safe to run multiple times)
     `ALTER TABLE customers ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`,
+
+    // Add notes column to customers if missing
+    `ALTER TABLE customers ADD COLUMN IF NOT EXISTS notes TEXT`,
+
+    // Add email column to customers if missing
+    `ALTER TABLE customers ADD COLUMN IF NOT EXISTS email VARCHAR(255)`,
 
     // Add idx for customers
     `CREATE INDEX IF NOT EXISTS idx_customers_pharmacy ON customers(pharmacy_id)`
@@ -437,14 +414,8 @@ async function getNextReceiptNumber(pharmacyId) {
   return `RCP-${new Date().getFullYear()}-${String(n).padStart(4, '0')}`;
 }
 
-async function getClient() {
-  const p = getPool();
-  return p.connect();
-}
-
 module.exports = {
   query,
-  getClient,
   runMigrations,
   seedSuperAdmin,
   getNextReceiptNumber,
