@@ -236,8 +236,7 @@ svg.ring-svg{transform:rotate(-90deg);}
     <div class="ni" onclick="go('trials',this)"><span class="ni-icon">⏳</span>Trials<span class="ni-badge w" id="trialCount">0</span></div>
 
     <div class="nav-section">Operations</div>
-    <div class="ni" onclick="go('payments',this)"><span class="ni-icon">📱</span>MoMo Payments</div>
-    <div class="ni" onclick="go('support',this)"><span class="ni-icon">🎧</span>Support<span class="ni-badge r">2</span></div>
+    <div class="ni" onclick="go('users',this)"><span class="ni-icon">👥</span>All Users</div>
     <div class="ni" onclick="go('activity',this)"><span class="ni-icon">📡</span>Activity Log</div>
 
     <div class="nav-section">System</div>
@@ -524,6 +523,54 @@ svg.ring-svg{transform:rotate(-90deg);}
       </div>
     </div>
   </div>
+
+  <!-- ══ USERS ══ -->
+  <div class="page" id="page-users">
+    <div class="toolbar" style="margin-bottom:18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <div class="search-wrap"><span>🔍</span><input type="text" id="userSearch" placeholder="Search user…" oninput="renderUsers()"/></div>
+      <span style="font-size:12px;color:var(--muted)" id="userCount"></span>
+    </div>
+    <div class="card">
+      <table class="tbl">
+        <thead><tr><th>User</th><th>Role</th><th>Organisation</th><th>Pharmacy</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
+        <tbody id="usersBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══ REVENUE (dynamic) ══ -->
+  <div class="page" id="page-revenue">
+    <div class="stats-row" style="grid-template-columns:repeat(4,1fr)">
+      <div class="stat acc"><div class="stat-ico acc">💰</div><div class="stat-val" id="revMRR">—</div><div class="stat-lbl">Monthly Revenue (MRR)</div></div>
+      <div class="stat blu"><div class="stat-ico blu">📈</div><div class="stat-val" id="revTotal">—</div><div class="stat-lbl">Total Sales Revenue</div></div>
+      <div class="stat gol"><div class="stat-ico gol">💳</div><div class="stat-val" id="revAvg">—</div><div class="stat-lbl">Avg Per Client</div></div>
+      <div class="stat pur"><div class="stat-ico pur">✅</div><div class="stat-val" id="revClients">—</div><div class="stat-lbl">Paying Clients</div></div>
+    </div>
+    <div class="two-col">
+      <div class="card">
+        <div class="ch"><div class="ct">Revenue by Plan</div></div>
+        <div style="padding:18px 20px" id="revByPlan"></div>
+      </div>
+      <div class="card">
+        <div class="ch"><div class="ct">Plan Breakdown</div></div>
+        <div class="metric-rings" id="planRings2"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><div class="ct">Organisation Revenue Table</div><div class="cs">Ranked by total sales</div></div>
+      <table class="tbl">
+        <thead><tr><th>Organisation</th><th>Plan</th><th>Status</th><th>MRR</th><th>Total Sales</th><th>Transactions</th><th>Last Sale</th></tr></thead>
+        <tbody id="revOrgTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══ LOADING OVERLAY ══ -->
+  <div id="globalLoader" style="display:none;position:fixed;inset:0;background:rgba(7,9,15,0.6);z-index:500;align-items:center;justify-content:center;flex-direction:column;gap:12px;">
+    <div style="width:36px;height:36px;border:3px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+    <div style="font-size:13px;color:var(--muted)">Loading live data…</div>
+  </div>
+  <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 </main>
 
 <!-- ADD PHARMACY MODAL -->
@@ -563,70 +610,188 @@ svg.ring-svg{transform:rotate(-90deg);}
 <div class="toast" id="toast"><span id="toastMsg"></span></div>
 
 <script>
-// ══════════════════════════════════════════════════
-// DEMO DATA
-// ══════════════════════════════════════════════════
-const pharmacies = [
-  {id:1,name:'Kato Pharma',owner:'James Kato',phone:'0770123456',email:'admin@katopharma.ug',location:'Kampala Road, Kampala',plan:'pro',status:'active',revenue:50000,billingDate:'2026-04-22',lastActive:'2 min ago',joined:'2025-08-14',nda:'NDA/PH/2024/001',sales:847000,drugs:142},
-  {id:2,name:'City Pharmacy',owner:'Sarah Nambi',phone:'0752891234',email:'admin@citypharma.ug',location:'Entebbe Road, Entebbe',plan:'enterprise',status:'active',revenue:150000,billingDate:'2026-04-18',lastActive:'1 hr ago',joined:'2025-07-02',nda:'NDA/PH/2024/015',sales:2100000,drugs:310},
-  {id:3,name:'Mengo Drug Store',owner:'Robert Ssali',phone:'0701445678',email:'rssali@mengodrugs.ug',location:'Mengo Hill Road',plan:'pro',status:'overdue',revenue:50000,billingDate:'2026-03-15',lastActive:'3 days ago',joined:'2025-09-20',nda:'NDA/PH/2024/028',sales:620000,drugs:98},
-  {id:4,name:'Nakawa Health',owner:'Grace Amoding',phone:'0780334890',email:'grace@nakawahealth.ug',location:'Nakawa Industrial Area',plan:'basic',status:'trial',revenue:20000,billingDate:'2026-04-05',lastActive:'5 hr ago',joined:'2026-03-09',nda:null,sales:120000,drugs:45},
-  {id:5,name:'Wandegeya Pharmacy',owner:'Moses Kizito',phone:'0762567123',email:'mkizito@wandegeyapharma.ug',location:'Wandegeya Market, Kampala',plan:'pro',status:'active',revenue:50000,billingDate:'2026-04-10',lastActive:'30 min ago',joined:'2025-11-03',nda:'NDA/PH/2025/007',sales:780000,drugs:167},
-  {id:6,name:'Mulago Drugs',owner:'Dr. Alice Pero',phone:'0703445678',email:'admin@mulagodrugs.ug',location:'Mulago Hill, Kampala',plan:'enterprise',status:'active',revenue:150000,billingDate:'2026-04-25',lastActive:'Now',joined:'2025-06-15',nda:'NDA/PH/2024/003',sales:3200000,drugs:450},
-  {id:7,name:'Nansana Pharmacy',owner:'Paul Tumwine',phone:'0771234509',email:'ptumwine@nansanapharma.ug',location:'Nansana, Wakiso',plan:'basic',status:'overdue',revenue:20000,billingDate:'2026-03-20',lastActive:'1 week ago',joined:'2025-10-11',nda:'NDA/PH/2025/002',sales:85000,drugs:32},
-  {id:8,name:'Kireka Health Stores',owner:'Fatuma Nabirye',phone:'0754889123',email:'fnabirye@kireka.ug',location:'Kireka Trading Centre',plan:'basic',status:'trial',revenue:20000,billingDate:'2026-04-06',lastActive:'2 hr ago',joined:'2026-03-10',nda:null,sales:45000,drugs:28},
-  {id:9,name:'Ntinda Pharmacy',owner:'Brian Mugabe',phone:'0787334210',email:'brian@ntindapharma.ug',location:'Ntinda Shopping Centre',plan:'pro',status:'suspended',revenue:50000,billingDate:'2026-03-01',lastActive:'3 weeks ago',joined:'2025-08-22',nda:'NDA/PH/2024/044',sales:0,drugs:112},
-  {id:10,name:'Jinja Road Drugs',owner:'Christine Akello',phone:'0701567893',email:'cakello@jinjadrugs.ug',location:'Jinja Road, Kampala',plan:'pro',status:'active',revenue:50000,billingDate:'2026-04-28',lastActive:'4 hr ago',joined:'2025-12-01',nda:'NDA/PH/2025/019',sales:540000,drugs:88},
-];
+'use strict';
+// ═══════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════
+const BASE = window.location.origin;
+const AV   = ['linear-gradient(135deg,#00e5b0,#3b82f6)','linear-gradient(135deg,#f59e0b,#ef4444)',
+               'linear-gradient(135deg,#a855f7,#3b82f6)','linear-gradient(135deg,#10b981,#a855f7)',
+               'linear-gradient(135deg,#3b82f6,#06b6d4)','linear-gradient(135deg,#f97316,#eab308)'];
 
-const transactions = [
-  {ref:'TXN-0034',pharmacy:'Mulago Drugs',phone:'0703445678',amount:150000,network:'MTN',time:'Today 09:14',status:'paid'},
-  {ref:'TXN-0033',pharmacy:'City Pharmacy',phone:'0752891234',amount:150000,network:'Airtel',time:'Today 08:52',status:'paid'},
-  {ref:'TXN-0032',pharmacy:'Kato Pharma',phone:'0770123456',amount:50000,network:'MTN',time:'Yesterday 14:30',status:'paid'},
-  {ref:'TXN-0031',pharmacy:'Wandegeya Pharmacy',phone:'0762567123',amount:50000,network:'MTN',time:'Yesterday 11:18',status:'paid'},
-  {ref:'TXN-0030',pharmacy:'Mengo Drug Store',phone:'0701445678',amount:50000,network:'Airtel',time:'Mar 15',status:'failed'},
-  {ref:'TXN-0029',pharmacy:'Nansana Pharmacy',phone:'0771234509',amount:20000,network:'MTN',time:'Mar 20',status:'failed'},
-  {ref:'TXN-0028',pharmacy:'Jinja Road Drugs',phone:'0701567893',amount:50000,network:'MTN',time:'Mar 22',status:'pending'},
-];
+// ═══════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════
+let TOKEN  = localStorage.getItem('mv_admin_token') || '';
+let orgs   = [];   // raw from /api/admin/orgs
+let users  = [];   // raw from /api/admin/users
+let stats  = {};
+let currentPage = 'overview';
 
-const activities = [
-  {color:'var(--success)',text:'<strong>Mulago Drugs</strong> paid UGX 150,000 — Enterprise plan renewed',time:'2 min ago'},
-  {color:'var(--accent)',text:'<strong>Kireka Health Stores</strong> signed up — 14-day trial started',time:'18 min ago'},
-  {color:'var(--accent2)',text:'<strong>Wandegeya Pharmacy</strong> added 12 new drugs to inventory',time:'35 min ago'},
-  {color:'var(--warn)',text:'<strong>Mengo Drug Store</strong> payment overdue — 8 days past due',time:'1 hr ago'},
-  {color:'var(--success)',text:'<strong>City Pharmacy</strong> completed 24 sales today — UGX 2.1M revenue',time:'2 hr ago'},
-  {color:'var(--danger)',text:'<strong>Ntinda Pharmacy</strong> account suspended — 3 weeks non-payment',time:'3 days ago'},
-  {color:'var(--purple)',text:'<strong>Nakawa Health</strong> trial expires in 3 days — send conversion email',time:'5 hr ago'},
-];
+// ═══════════════════════════════════════════
+// API HELPER
+// ═══════════════════════════════════════════
+async function api(path, opts = {}) {
+  try {
+    const res = await fetch(BASE + path, {
+      headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+TOKEN },
+      ...opts,
+    });
+    const data = await res.json();
+    if (res.status === 401 || res.status === 403) { showLogin(); return null; }
+    return { ok: res.ok, status: res.status, data };
+  } catch(e) {
+    toast('Network error: ' + e.message, 'err');
+    return null;
+  }
+}
 
-const planColors = {basic:'var(--muted2)',pro:'var(--accent)',enterprise:'var(--purple)'};
-const avatarColors = ['linear-gradient(135deg,#00e5b0,#3b82f6)','linear-gradient(135deg,#f59e0b,#ef4444)','linear-gradient(135deg,#a855f7,#3b82f6)','linear-gradient(135deg,#10b981,#a855f7)','linear-gradient(135deg,#3b82f6,#06b6d4)','linear-gradient(135deg,#f97316,#eab308)'];
+// ═══════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════
+function ugx(n) {
+  const v = parseFloat(n)||0;
+  if (v >= 1000000) return 'UGX ' + (v/1000000).toFixed(1) + 'M';
+  if (v >= 1000)    return 'UGX ' + Math.round(v/1000) + 'K';
+  return 'UGX ' + v.toLocaleString();
+}
+function ago(d) {
+  if (!d) return '—';
+  const s = Math.floor((Date.now() - new Date(d))/1000);
+  if (s < 60)     return 'just now';
+  if (s < 3600)   return Math.floor(s/60) + ' min ago';
+  if (s < 86400)  return Math.floor(s/3600) + ' hr ago';
+  if (s < 604800) return Math.floor(s/86400) + ' days ago';
+  return new Date(d).toLocaleDateString();
+}
+function esc(s) { return String(s||'').replace(/'/g,'\''); }
+function initials(name) { return (name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(); }
+function statusPill(st) {
+  const map = { active:'active', trial:'trial', overdue:'overdue', suspended:'suspended',
+                true:'active', false:'suspended' };
+  return `<span class="pill ${map[st]||'basic'}">${st}</span>`;
+}
+function planPill(p) { return `<span class="pill ${p||'basic'}">${p||'—'}</span>`; }
+function daysBetween(d) {
+  if (!d) return null;
+  return Math.ceil((new Date(d) - Date.now()) / 86400000);
+}
 
-let filteredPharmas = [...pharmacies];
+// ═══════════════════════════════════════════
+// LOGIN GATE
+// ═══════════════════════════════════════════
+function showLogin() {
+  TOKEN = '';
+  localStorage.removeItem('mv_admin_token');
+  if (document.getElementById('loginGate')) return;
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="loginGate" style="position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;">
+      <div style="width:340px;background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:32px;">
+        <div style="text-align:center;margin-bottom:24px;">
+          <div style="font-family:var(--display);font-size:22px;font-weight:800;">MedVault Admin</div>
+          <div style="color:var(--muted);font-size:12px;margin-top:4px;">Super Admin Login</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <input id="lgEmail" class="fi" type="email" placeholder="admin@medvault.ug" value="admin@medvault.ug"/>
+          <input id="lgPass"  class="fi" type="password" placeholder="Password"/>
+          <button class="btn btn-accent" style="width:100%;justify-content:center;padding:11px;" onclick="doLogin()">Login to Control Center</button>
+          <div id="lgErr" style="color:var(--danger);font-size:12px;text-align:center;display:none;"></div>
+        </div>
+      </div>
+    </div>`);
+  document.getElementById('lgPass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+}
 
-// ══════════════════════════════════════════════════
+async function doLogin() {
+  const email = document.getElementById('lgEmail').value.trim();
+  const pass  = document.getElementById('lgPass').value;
+  if (!email||!pass) return;
+  const btn = document.querySelector('#loginGate .btn-accent');
+  btn.textContent = 'Logging in…'; btn.disabled = true;
+  try {
+    const r = await fetch(BASE + '/api/auth/login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email, password: pass })
+    });
+    const d = await r.json();
+    if (d.token && d.user?.role === 'super_admin') {
+      TOKEN = d.token;
+      localStorage.setItem('mv_admin_token', TOKEN);
+      document.getElementById('loginGate').remove();
+      // Show admin name
+      document.querySelector('.admin-name').textContent = d.user.name || 'Super Admin';
+      boot();
+    } else {
+      const err = document.getElementById('lgErr');
+      err.style.display = 'block';
+      err.textContent = d.error || 'Invalid credentials or not a super admin';
+      btn.textContent = 'Login to Control Center'; btn.disabled = false;
+    }
+  } catch(e) {
+    document.getElementById('lgErr').style.display = 'block';
+    document.getElementById('lgErr').textContent = 'Connection error: ' + e.message;
+    btn.textContent = 'Login to Control Center'; btn.disabled = false;
+  }
+}
+
+// ═══════════════════════════════════════════
+// BOOT — load all data
+// ═══════════════════════════════════════════
+async function boot() {
+  setLoading(true);
+  const [sRes, oRes] = await Promise.all([
+    api('/api/admin/stats'),
+    api('/api/admin/orgs'),
+  ]);
+  if (!sRes || !oRes) { setLoading(false); return; }
+  if (sRes.ok)  stats = sRes.data;
+  if (oRes.ok)  orgs  = oRes.data.orgs || [];
+  setLoading(false);
+  updateSidebarBadges();
+  loadPage(currentPage);
+}
+
+async function loadUsersData() {
+  const r = await api('/api/admin/users');
+  if (r && r.ok) users = r.data.users || [];
+}
+
+function setLoading(on) {
+  const el = document.getElementById('globalLoader');
+  if (el) el.style.display = on ? 'flex' : 'none';
+}
+
+function updateSidebarBadges() {
+  const over = orgs.filter(o => o.sub_status === 'overdue').length;
+  const trial = orgs.filter(o => o.sub_status === 'trial').length;
+  document.getElementById('pharmCount').textContent   = orgs.length;
+  document.getElementById('overdueCount').textContent = over;
+  document.getElementById('trialCount').textContent   = trial;
+}
+
+// ═══════════════════════════════════════════
 // NAVIGATION
-// ══════════════════════════════════════════════════
+// ═══════════════════════════════════════════
 const pageMeta = {
   overview:     {t:'Overview',         s:'Platform health at a glance'},
-  revenue:      {t:'Revenue',          s:'Financial performance & MRR'},
-  pharmacies:   {t:'All Pharmacies',   s:'Manage all client accounts'},
-  subscriptions:{t:'Subscriptions',    s:'Plans, renewals & overdue accounts'},
-  billing:      {t:'Billing',          s:'Collections, reminders & upcoming payments'},
+  pharmacies:   {t:'All Pharmacies',   s:'Every client account — activate, suspend, manage'},
+  users:        {t:'All Users',        s:'Every user account across all pharmacies'},
+  subscriptions:{t:'Subscriptions',    s:'Plans, billing & overdue accounts'},
   trials:       {t:'Free Trials',      s:'Monitor & convert trial users'},
-  payments:     {t:'MoMo Payments',    s:'MTN & Airtel Money transaction log'},
-  support:      {t:'Support',          s:'Client help requests'},
-  activity:     {t:'Activity Log',     s:'Everything happening on the platform'},
-  pricing:      {t:'Pricing Plans',    s:'Manage subscription tiers & discount codes'},
+  revenue:      {t:'Revenue',          s:'Subscription MRR & financial overview'},
+  activity:     {t:'Activity Log',     s:'Signups, suspensions & key events'},
+  pricing:      {t:'Pricing Plans',    s:'Subscription tiers'},
   settings:     {t:'Settings',         s:'Platform configuration'},
 };
 
 function go(page, el) {
+  currentPage = page;
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.getElementById('page-' + page).classList.add('active');
+  const pg = document.getElementById('page-' + page);
+  if (pg) pg.classList.add('active');
   document.querySelectorAll('.ni').forEach(n => n.classList.remove('active'));
   if (el) el.classList.add('active');
-  const m = pageMeta[page];
+  const m = pageMeta[page] || {t:page, s:''};
   document.getElementById('tb-title').textContent = m.t;
   document.getElementById('tb-sub').textContent   = m.s;
   loadPage(page);
@@ -634,75 +799,128 @@ function go(page, el) {
 
 function loadPage(page) {
   if (page === 'overview')       renderOverview();
-  if (page === 'pharmacies')     renderPharmas(pharmacies);
-  if (page === 'subscriptions')  renderSubscriptions();
-  if (page === 'billing')        renderBilling();
-  if (page === 'trials')         renderTrials();
-  if (page === 'payments')       renderPayments();
-  if (page === 'revenue')        renderRevTimeline();
-  if (page === 'support')        renderSupport();
-  if (page === 'activity')       renderFullActivity();
+  else if (page === 'pharmacies')     renderPharmacies();
+  else if (page === 'users')          renderUsers();
+  else if (page === 'subscriptions')  renderSubscriptions();
+  else if (page === 'trials')         renderTrials();
+  else if (page === 'revenue')        renderRevenue();
+  else if (page === 'activity')       renderActivity();
 }
 
-function refreshPage() {
-  loadPage(document.querySelector('.ni.active')?.textContent?.trim().toLowerCase().replace(/\s+/g, '') || 'overview');
-  toast('🔄 Refreshed');
+async function refreshPage() {
+  await boot();
+  toast('✅ Data refreshed from server');
 }
 
-// ══════════════════════════════════════════════════
+// ═══════════════════════════════════════════
 // OVERVIEW
-// ══════════════════════════════════════════════════
+// ═══════════════════════════════════════════
 function renderOverview() {
-  // Update badges
-  document.getElementById('pharmCount').textContent = pharmacies.length;
-  document.getElementById('overdueCount').textContent = pharmacies.filter(p => p.status === 'overdue').length;
-  document.getElementById('trialCount').textContent = pharmacies.filter(p => p.status === 'trial').length;
+  const mrr  = stats.mrr || 0;
+  const tot  = stats.totalOrgs || orgs.length;
+  const act  = stats.activeCount || orgs.filter(o=>o.sub_status==='active').length;
+  const tr   = stats.trialCount  || orgs.filter(o=>o.sub_status==='trial').length;
+  const ov   = stats.overdueCount|| orgs.filter(o=>o.sub_status==='overdue').length;
+  const sus  = stats.suspendedCount||orgs.filter(o=>o.sub_status==='suspended').length;
 
-  // Revenue chart
-  const months = [{m:'Sep',v:950},{m:'Oct',v:1200},{m:'Nov',v:1450},{m:'Dec',v:1600},{m:'Jan',v:1800},{m:'Feb',v:1950},{m:'Mar',v:2300}];
-  const maxRev = Math.max(...months.map(m => m.v));
+  document.getElementById('sTotalPharma').textContent = tot;
+  document.getElementById('sActive').textContent      = act;
+  document.getElementById('sMRR').textContent         = ugx(mrr);
+  document.getElementById('sOverdue').textContent     = ov;
+  document.getElementById('sTrials').textContent      = tr;
+  updateSidebarBadges();
+
+  // Revenue chart — monthly MRR bars built from org join dates as proxy
+  const monthBuckets = {};
+  const now = new Date();
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = d.toLocaleString('default',{month:'short'});
+    monthBuckets[key] = 0;
+  }
+  orgs.filter(o=>o.sub_status==='active').forEach(o => {
+    const d = new Date(o.created_at);
+    const key = d.toLocaleString('default',{month:'short'});
+    if (key in monthBuckets) monthBuckets[key] += parseFloat(o.amount_ugx)||0;
+  });
+  // Also add all active subs to current month
+  const curKey = now.toLocaleString('default',{month:'short'});
+  monthBuckets[curKey] = orgs.filter(o=>o.sub_status==='active').reduce((s,o)=>s+(parseFloat(o.amount_ugx)||0),0);
+
+  const vals = Object.values(monthBuckets);
+  const maxV = Math.max(...vals, 1);
   const chart = document.getElementById('revChart');
   chart.innerHTML = '';
-  months.forEach((m, i) => {
-    const pct = (m.v / maxRev) * 85;
+  Object.entries(monthBuckets).forEach(([m, v], i, arr) => {
+    const pct = (v / maxV) * 85;
+    const color = i === arr.length-1 ? 'var(--accent)' : `rgba(0,229,176,${0.15+(i/arr.length)*0.5})`;
     const w = document.createElement('div'); w.className = 'rbar-wrap';
-    const color = i === months.length-1 ? 'var(--accent)' : `rgba(0,229,176,${0.2 + (i/months.length)*0.4})`;
-    w.innerHTML = `<div class="rbar" style="height:0%;background:${color};transition-delay:${i*0.08}s" data-h="${pct}" data-tip="UGX ${m.v}K"></div><div class="rbar-lbl">${m.m}</div>`;
+    w.innerHTML = `<div class="rbar" style="height:0%;background:${color};transition-delay:${i*0.07}s" data-h="${pct.toFixed(1)}" data-tip="${ugx(v)}"></div><div class="rbar-lbl">${m}</div>`;
     chart.appendChild(w);
   });
-  requestAnimationFrame(() => requestAnimationFrame(() => document.querySelectorAll('.rbar').forEach(b => b.style.height = b.dataset.h + '%')));
+  requestAnimationFrame(()=>requestAnimationFrame(()=>
+    document.querySelectorAll('.rbar').forEach(b=>b.style.height=b.dataset.h+'%')
+  ));
+
+  // Revenue vs panel
+  const months = Object.values(monthBuckets);
+  const thisM  = months[months.length-1]||0;
+  const lastM  = months[months.length-2]||0;
+  const growth = lastM > 0 ? Math.round(((thisM-lastM)/lastM)*100) : 0;
+  document.querySelector('.revenue-vs').innerHTML = `
+    <div class="rvs-item"><div class="rvs-val" style="color:var(--accent)">${ugx(thisM)}</div><div class="rvs-lbl">This Month</div></div>
+    <div class="rvs-item"><div class="rvs-val" style="color:var(--muted2)">${ugx(lastM)}</div><div class="rvs-lbl">Last Month</div></div>
+    <div class="rvs-item"><div class="rvs-val" style="color:${growth>=0?'var(--success)':'var(--danger)'}">${growth>=0?'↑':'↓'} ${Math.abs(growth)}%</div><div class="rvs-lbl">Growth</div></div>`;
 
   // Plan rings
-  const planCount = { basic: pharmacies.filter(p=>p.plan==='basic').length, pro: pharmacies.filter(p=>p.plan==='pro').length, enterprise: pharmacies.filter(p=>p.plan==='enterprise').length };
-  const total = pharmacies.length;
+  const planCnt = { basic:0, pro:0, enterprise:0 };
+  orgs.forEach(o=>{
+    const p = o.plan||'pro';
+    if (p==='enterprise') planCnt.enterprise++;
+    else if (p==='pro'||p==='single'||p==='multi'||p==='branch'||p==='chain') planCnt.pro++;
+    else planCnt.basic++;
+  });
+  const total = Math.max(orgs.length,1);
   document.getElementById('planRings').innerHTML = [
-    {plan:'Basic', count:planCount.basic, color:'var(--muted2)'},
-    {plan:'Pro', count:planCount.pro, color:'var(--accent)'},
-    {plan:'Enterprise', count:planCount.enterprise, color:'var(--purple)'},
-  ].map(r => {
-    const pct = Math.round(r.count/total*100);
-    const circ = 2*Math.PI*28; const offset = circ - (pct/100)*circ;
+    {label:'Basic', cnt:planCnt.basic, color:'var(--muted2)'},
+    {label:'Pro',   cnt:planCnt.pro,   color:'var(--accent)'},
+    {label:'Enterprise', cnt:planCnt.enterprise, color:'var(--purple)'},
+  ].map(r=>{
+    const pct  = r.cnt/total;
+    const circ = 2*Math.PI*28;
+    const off  = circ-(pct*circ);
     return `<div class="ring-card">
       <svg class="ring-svg" width="70" height="70" viewBox="0 0 70 70">
         <circle class="ring-track" cx="35" cy="35" r="28" stroke-width="7"/>
-        <circle class="ring-fill" cx="35" cy="35" r="28" stroke-width="7" stroke="${r.color}" stroke-dasharray="${circ}" stroke-dashoffset="${offset}"/>
+        <circle class="ring-fill" cx="35" cy="35" r="28" stroke-width="7" stroke="${r.color}"
+          stroke-dasharray="${circ.toFixed(2)}" stroke-dashoffset="${off.toFixed(2)}" style="transition:stroke-dashoffset 1s ease;"/>
       </svg>
-      <div class="ring-label">${r.plan}</div>
-      <div class="ring-val" style="color:${r.color}">${r.count}</div>
+      <div class="ring-label">${r.label}</div>
+      <div class="ring-val" style="color:${r.color}">${r.cnt}</div>
     </div>`;
   }).join('');
 
-  // Recent signups (last 5)
-  const recent = [...pharmacies].sort((a,b) => new Date(b.joined)-new Date(a.joined)).slice(0,5);
-  document.getElementById('recentSignups').innerHTML = recent.map((p,i) => `
-    <div class="pharma-row" onclick="openDetail(${p.id})">
-      <div class="pharma-av" style="background:${avatarColors[i%avatarColors.length]}">${p.name.split(' ').map(w=>w[0]).join('').slice(0,2)}</div>
-      <div class="pharma-info"><div class="pharma-name">${p.name}</div><div class="pharma-meta">${p.location}</div></div>
-      <div class="pharma-right"><span class="pill ${p.plan}">${p.plan}</span><div class="pharma-date">${p.joined}</div></div>
-    </div>`).join('');
+  // Recent signups
+  const recent = [...orgs].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).slice(0,5);
+  document.getElementById('recentSignups').innerHTML = recent.length ? recent.map((o,i)=>`
+    <div class="pharma-row" onclick="openOrgDetail(${o.id})">
+      <div class="pharma-av" style="background:${AV[i%AV.length]}">${initials(o.name)}</div>
+      <div class="pharma-info"><div class="pharma-name">${o.name}</div><div class="pharma-meta">${o.location||'Uganda'} · ${o.owner_name}</div></div>
+      <div class="pharma-right">${planPill(o.plan)}<div class="pharma-date">${new Date(o.created_at).toLocaleDateString()}</div></div>
+    </div>`).join('')
+    : '<div class="empty-state"><div class="empty-icon">🏥</div>No pharmacies yet. Add your first one above.</div>';
 
-  // Activity feed
-  document.getElementById('activityFeed').innerHTML = activities.slice(0,6).map(a => `
+  // Activity feed from real events
+  const events = [];
+  const sorted = [...orgs].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  sorted.slice(0,10).forEach(o=>{
+    if (o.sub_status==='trial')     events.push({color:'var(--accent)',text:`<strong>${o.name}</strong> signed up — 14-day trial started`,time:ago(o.created_at)});
+    if (o.sub_status==='suspended') events.push({color:'var(--danger)',text:`<strong>${o.name}</strong> account is suspended`,time:ago(o.created_at)});
+    if (o.sub_status==='overdue')   events.push({color:'var(--warn)',  text:`<strong>${o.name}</strong> payment is overdue`,time:ago(o.created_at)});
+    if (o.sub_status==='active' && parseFloat(o.total_sales)>0) events.push({color:'var(--success)',text:`<strong>${o.name}</strong> is active — ${ugx(o.total_sales)} total sales`,time:ago(o.last_sale_at)});
+  });
+  if (!events.length) events.push({color:'var(--muted)',text:'No activity yet — data will appear as pharmacies use the system',time:'now'});
+  document.getElementById('activityFeed').innerHTML = events.slice(0,6).map(a=>`
     <div class="activity-item">
       <div class="act-dot" style="background:${a.color}"></div>
       <div class="act-text">${a.text}</div>
@@ -710,204 +928,263 @@ function renderOverview() {
     </div>`).join('');
 }
 
-// ══════════════════════════════════════════════════
-// PHARMACIES TABLE
-// ══════════════════════════════════════════════════
-function renderPharmas(data) {
-  document.getElementById('pharmaBody').innerHTML = data.map((p,i) => `
-    <tr onclick="openDetail(${p.id})">
+// ═══════════════════════════════════════════
+// ALL PHARMACIES / ORGS
+// ═══════════════════════════════════════════
+function renderPharmacies(data) {
+  const list = data || orgs;
+  document.getElementById('pharmaBody').innerHTML = list.length ? list.map((o,i)=>{
+    const days = daysBetween(o.next_billing || o.trial_ends_at);
+    const daysStr = days===null ? '—' : days < 0 ? `${Math.abs(days)}d overdue` : `${days}d`;
+    const dColor  = days===null ? 'var(--muted)' : days < 0 ? 'var(--danger)' : days <= 7 ? 'var(--warn)' : 'var(--muted2)';
+    return `<tr onclick="openOrgDetail(${o.id})">
       <td>
         <div style="display:flex;align-items:center;gap:10px">
-          <div class="pharma-av" style="background:${avatarColors[i%avatarColors.length]};width:30px;height:30px;font-size:11px">${p.name.split(' ').map(w=>w[0]).join('').slice(0,2)}</div>
-          <div><div style="font-weight:600;font-size:13px">${p.name}</div><div style="font-size:10px;color:var(--muted)">${p.owner}</div></div>
+          <div class="pharma-av" style="background:${AV[i%AV.length]};width:30px;height:30px;font-size:11px">${initials(o.name)}</div>
+          <div><div style="font-weight:600;font-size:13px">${o.name}</div><div style="font-size:10px;color:var(--muted)">${o.owner_name||'—'}</div></div>
         </div>
       </td>
-      <td style="color:var(--muted2);font-size:12px">${p.location}</td>
-      <td><span class="pill ${p.plan}">${p.plan}</span></td>
-      <td><span class="pill ${p.status}">${p.status}</span></td>
-      <td style="font-family:var(--mono);color:var(--accent)">UGX ${p.revenue.toLocaleString()}</td>
-      <td style="color:var(--muted2);font-size:12px">${p.billingDate}</td>
-      <td style="color:var(--muted2);font-size:12px">${p.lastActive}</td>
+      <td style="color:var(--muted2);font-size:12px">${o.location||'Uganda'}</td>
+      <td>${planPill(o.plan)}</td>
+      <td>${statusPill(o.sub_status||'trial')}</td>
+      <td style="font-family:var(--mono);color:var(--accent)">${ugx(o.amount_ugx)}/mo</td>
+      <td style="color:${dColor};font-size:12px;font-weight:600">${daysStr}</td>
+      <td style="color:var(--muted2);font-size:11px">${ago(o.last_sale_at)}</td>
       <td>
-        <div style="display:flex;gap:4px">
-          <button class="btn btn-ghost" style="padding:4px 9px;font-size:11px" onclick="event.stopPropagation();loginAs(${p.id},'${p.name}')">Login As</button>
-          <button class="btn btn-warn" style="padding:4px 9px;font-size:11px" onclick="event.stopPropagation();sendReminder(${p.id},'${p.name}')">📱 Remind</button>
-          ${p.status==='suspended'?`<button class="btn btn-accent" style="padding:4px 9px;font-size:11px" onclick="event.stopPropagation();reactivate(${p.id},'${p.name}')">Reactivate</button>`:''}
-          ${p.status==='overdue'?`<button class="btn btn-danger" style="padding:4px 9px;font-size:11px" onclick="event.stopPropagation();suspend(${p.id},'${p.name}')">Suspend</button>`:''}
+        <div style="display:flex;gap:4px" onclick="event.stopPropagation()">
+          <button class="btn btn-ghost" style="padding:3px 8px;font-size:10px" onclick="openOrgDetail(${o.id})">View</button>
+          ${o.sub_status==='suspended'||!o.is_active
+            ? `<button class="btn btn-accent" style="padding:3px 8px;font-size:10px" onclick="activateOrg(${o.id},'${esc(o.name)}')">✅ Activate</button>`
+            : `<button class="btn btn-danger" style="padding:3px 8px;font-size:10px" onclick="suspendOrg(${o.id},'${esc(o.name)}')">🚫 Suspend</button>`}
+          ${o.sub_status==='trial'
+            ? `<button class="btn btn-warn" style="padding:3px 8px;font-size:10px" onclick="convertTrial(${o.id},'${esc(o.name)}')">Convert</button>` : ''}
         </div>
       </td>
-    </tr>`).join('') || `<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">🏥</div>No pharmacies found</div></td></tr>`;
+    </tr>`;
+  }).join('')
+    : '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">🏥</div>No pharmacies found</div></td></tr>';
 }
 
 function filterPharmas() {
   const q = document.getElementById('pharmSearch').value.toLowerCase();
-  const filtered = pharmacies.filter(p => p.name.toLowerCase().includes(q) || p.owner.toLowerCase().includes(q) || p.location.toLowerCase().includes(q));
-  renderPharmas(filtered);
+  renderPharmacies(orgs.filter(o=>
+    (o.name||'').toLowerCase().includes(q) ||
+    (o.owner_name||'').toLowerCase().includes(q) ||
+    (o.email||'').toLowerCase().includes(q) ||
+    (o.location||'').toLowerCase().includes(q)
+  ));
 }
 
 function filterByStatus(status) {
-  const filtered = status ? pharmacies.filter(p => p.status === status) : pharmacies;
-  renderPharmas(filtered);
+  renderPharmacies(status ? orgs.filter(o=>o.sub_status===status) : orgs);
 }
 
-// ══════════════════════════════════════════════════
-// SUBSCRIPTIONS
-// ══════════════════════════════════════════════════
-function renderSubscriptions() {
-  const overdue = pharmacies.filter(p => p.status === 'overdue');
-  const trials = pharmacies.filter(p => p.status === 'trial');
+// ═══════════════════════════════════════════
+// ALL USERS
+// ═══════════════════════════════════════════
+async function renderUsers() {
+  if (!users.length) await loadUsersData();
+  const search = document.getElementById('userSearch');
+  const q = search ? search.value.toLowerCase() : '';
+  const list = q ? users.filter(u=>
+    (u.name||'').toLowerCase().includes(q) ||
+    (u.email||'').toLowerCase().includes(q) ||
+    (u.org_name||'').toLowerCase().includes(q)
+  ) : users;
 
-  document.getElementById('overdueList').innerHTML = overdue.map((p,i) => `
-    <div class="billing-row">
-      <div class="br-icon" style="background:rgba(239,68,68,0.1)">⚠️</div>
-      <div class="br-info"><div class="br-name">${p.name}</div><div class="br-meta">Due: ${p.billingDate} · ${p.plan} plan · ${p.phone}</div></div>
-      <div style="text-align:right">
-        <div class="br-amount" style="color:var(--danger)">UGX ${p.revenue.toLocaleString()}</div>
-        <button class="btn btn-warn" style="padding:3px 9px;font-size:10px;margin-top:4px" onclick="sendReminder(${p.id},'${p.name}')">📱 Send Reminder</button>
-      </div>
-    </div>`).join('') || '<div class="empty-state"><div class="empty-icon">✅</div>No overdue accounts!</div>';
-
-  document.getElementById('trialEndList').innerHTML = trials.map((p,i) => `
-    <div class="billing-row">
-      <div class="br-icon" style="background:rgba(59,130,246,0.1)">⏳</div>
-      <div class="br-info"><div class="br-name">${p.name}</div><div class="br-meta">Trial ends: ${p.billingDate} · ${p.phone}</div></div>
-      <div style="text-align:right">
-        <button class="btn btn-accent" style="padding:3px 9px;font-size:10px" onclick="convertTrial(${p.id},'${p.name}')">Convert to Paid</button>
-      </div>
-    </div>`).join('') || '<div class="empty-state"><div class="empty-icon">✅</div>No trials ending soon</div>';
-
-  document.getElementById('allSubsBody').innerHTML = pharmacies.map(p => {
-    const days = Math.ceil((new Date(p.billingDate) - new Date()) / 86400000);
-    const dColor = days < 0 ? 'var(--danger)' : days < 7 ? 'var(--warn)' : 'var(--muted2)';
-    return `<tr>
-      <td><strong>${p.name}</strong></td>
-      <td><span class="pill ${p.plan}">${p.plan}</span></td>
-      <td class="mono" style="color:var(--accent)">UGX ${p.revenue.toLocaleString()}</td>
-      <td style="color:var(--muted2);font-size:12px">${p.billingDate}</td>
-      <td style="color:${dColor};font-weight:600">${days < 0 ? Math.abs(days)+' days overdue' : days === 0 ? 'Today' : days+' days'}</td>
-      <td><span class="pill ${p.status}">${p.status}</span></td>
+  document.getElementById('usersBody').innerHTML = list.length ? list.map(u=>`
+    <tr>
+      <td><div style="font-weight:600">${u.name}</div><div style="font-size:10px;color:var(--muted)">${u.email}</div></td>
+      <td><span class="tag">${u.role}</span></td>
+      <td style="font-size:12px;color:var(--muted2)">${u.org_name||'—'}</td>
+      <td style="font-size:12px;color:var(--muted2)">${u.pharmacy_name||'—'}</td>
+      <td>${statusPill(u.is_active ? 'active' : 'suspended')}</td>
+      <td style="font-size:11px;color:var(--muted2)">${new Date(u.created_at).toLocaleDateString()}</td>
       <td>
         <div style="display:flex;gap:4px">
-          <button class="btn btn-ghost" style="padding:3px 8px;font-size:10px" onclick="extendTrial(${p.id},'${p.name}')">+7 Days</button>
-          <button class="btn btn-ghost" style="padding:3px 8px;font-size:10px" onclick="changePlan(${p.id},'${p.name}')">Change Plan</button>
+          ${u.is_active
+            ? `<button class="btn btn-danger" style="padding:3px 8px;font-size:10px" onclick="suspendUser(${u.id},'${esc(u.name)}')">Suspend</button>`
+            : `<button class="btn btn-accent" style="padding:3px 8px;font-size:10px" onclick="activateUser(${u.id},'${esc(u.name)}')">Activate</button>`}
+          <button class="btn btn-ghost" style="padding:3px 8px;font-size:10px" onclick="resetPassword(${u.id},'${esc(u.name)}')">Reset PW</button>
+        </div>
+      </td>
+    </tr>`).join('')
+    : '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">👤</div>No users found</div></td></tr>';
+}
+
+// ═══════════════════════════════════════════
+// SUBSCRIPTIONS
+// ═══════════════════════════════════════════
+function renderSubscriptions() {
+  const active    = orgs.filter(o=>o.sub_status==='active');
+  const overdue   = orgs.filter(o=>o.sub_status==='overdue');
+  const trial     = orgs.filter(o=>o.sub_status==='trial');
+  const suspended = orgs.filter(o=>o.sub_status==='suspended');
+
+  document.getElementById('subActive').textContent    = active.length;
+  document.getElementById('subOverdue').textContent   = overdue.length;
+  document.getElementById('subTrial').textContent     = trial.length;
+  document.getElementById('subSuspended').textContent = suspended.length;
+
+  document.getElementById('overdueList').innerHTML = overdue.length ? overdue.map(o=>`
+    <div class="billing-row">
+      <div class="br-icon" style="background:rgba(239,68,68,0.1)">⚠️</div>
+      <div class="br-info">
+        <div class="br-name">${o.name}</div>
+        <div class="br-meta">${o.owner_name} · ${o.phone} · ${o.plan} plan</div>
+      </div>
+      <div style="text-align:right">
+        <div class="br-amount" style="color:var(--danger)">${ugx(o.amount_ugx)}</div>
+        <div style="display:flex;gap:4px;margin-top:5px;justify-content:flex-end">
+          <button class="btn btn-warn" style="padding:3px 8px;font-size:10px" onclick="markPaid(${o.id},'${esc(o.name)}')">✅ Mark Paid</button>
+          <button class="btn btn-danger" style="padding:3px 8px;font-size:10px" onclick="suspendOrg(${o.id},'${esc(o.name)}')">🚫 Suspend</button>
+        </div>
+      </div>
+    </div>`).join('')
+    : '<div class="empty-state"><div class="empty-icon">✅</div>No overdue accounts!</div>';
+
+  document.getElementById('trialEndList').innerHTML = trial.length ? trial.map(o=>{
+    const days = daysBetween(o.trial_ends_at);
+    const dStr = days===null?'—':days<=0?'Expired':days+' days left';
+    const dCol = days<=3?'var(--danger)':days<=7?'var(--warn)':'var(--success)';
+    return `<div class="billing-row">
+      <div class="br-icon" style="background:rgba(59,130,246,0.1)">⏳</div>
+      <div class="br-info">
+        <div class="br-name">${o.name}</div>
+        <div class="br-meta" style="color:${dCol};font-weight:600">${dStr}</div>
+      </div>
+      <div style="display:flex;gap:4px">
+        <button class="btn btn-accent" style="padding:3px 8px;font-size:10px" onclick="convertTrial(${o.id},'${esc(o.name)}')">Convert</button>
+        <button class="btn btn-ghost"  style="padding:3px 8px;font-size:10px" onclick="extendTrial(${o.id},'${esc(o.name)}')">+7 Days</button>
+      </div>
+    </div>`;
+  }).join('')
+    : '<div class="empty-state"><div class="empty-icon">✅</div>No active trials</div>';
+
+  document.getElementById('allSubsBody').innerHTML = orgs.map(o=>{
+    const days   = daysBetween(o.next_billing||o.trial_ends_at);
+    const dColor = days===null?'var(--muted)':days<0?'var(--danger)':days<=7?'var(--warn)':'var(--muted2)';
+    const dStr   = days===null?'—':days<0?Math.abs(days)+' days overdue':days+' days';
+    return `<tr onclick="openOrgDetail(${o.id})">
+      <td><strong>${o.name}</strong><div style="font-size:10px;color:var(--muted)">${o.email}</div></td>
+      <td>${planPill(o.plan)}</td>
+      <td class="mono" style="color:var(--accent)">${ugx(o.amount_ugx)}</td>
+      <td style="font-size:11px;color:var(--muted2)">${o.next_billing?new Date(o.next_billing).toLocaleDateString():o.trial_ends_at?'Trial: '+new Date(o.trial_ends_at).toLocaleDateString():'—'}</td>
+      <td style="color:${dColor};font-weight:600;font-size:12px">${dStr}</td>
+      <td>${statusPill(o.sub_status||'trial')}</td>
+      <td>
+        <div style="display:flex;gap:4px" onclick="event.stopPropagation()">
+          ${o.sub_status==='trial'?`<button class="btn btn-accent" style="padding:3px 7px;font-size:10px" onclick="convertTrial(${o.id},'${esc(o.name)}')">Convert</button>`:''}
+          ${o.sub_status==='overdue'?`<button class="btn btn-warn" style="padding:3px 7px;font-size:10px" onclick="markPaid(${o.id},'${esc(o.name)}')">Mark Paid</button>`:''}
+          <button class="btn btn-ghost" style="padding:3px 7px;font-size:10px" onclick="changePlan(${o.id},'${esc(o.name)}')">Plan</button>
+          ${o.is_active
+            ?`<button class="btn btn-danger" style="padding:3px 7px;font-size:10px" onclick="suspendOrg(${o.id},'${esc(o.name)}')">Suspend</button>`
+            :`<button class="btn btn-accent" style="padding:3px 7px;font-size:10px" onclick="activateOrg(${o.id},'${esc(o.name)}')">Activate</button>`}
         </div>
       </td>
     </tr>`;
   }).join('');
 }
 
-// ══════════════════════════════════════════════════
-// BILLING
-// ══════════════════════════════════════════════════
-function renderBilling() {
-  const upcoming = pharmacies.filter(p => {
-    const days = Math.ceil((new Date(p.billingDate) - new Date()) / 86400000);
-    return days >= 0 && days <= 7 && p.status === 'active';
-  });
-  document.getElementById('upcomingBilling').innerHTML = upcoming.map(p => {
-    const days = Math.ceil((new Date(p.billingDate) - new Date()) / 86400000);
-    return `<div class="billing-row">
-      <div class="br-icon" style="background:rgba(0,229,176,0.08)">📅</div>
-      <div class="br-info"><div class="br-name">${p.name}</div><div class="br-meta">${p.billingDate} · ${days === 0 ? 'Today' : 'In '+days+' days'}</div></div>
-      <div style="text-align:right"><div class="br-amount">UGX ${p.revenue.toLocaleString()}</div><button class="btn btn-warn" style="padding:3px 8px;font-size:10px;margin-top:4px" onclick="chargeMoMo(${p.id},'${p.name}',${p.revenue})">Charge Now</button></div>
-    </div>`;
-  }).join('') || '<div class="empty-state"><div class="empty-icon">📅</div>No billings due this week</div>';
-
-  document.getElementById('recentCollections').innerHTML = transactions.filter(t => t.status === 'paid').slice(0,5).map(t => `
-    <div class="billing-row">
-      <div class="br-icon" style="background:rgba(16,185,129,0.1)">✅</div>
-      <div class="br-info"><div class="br-name">${t.pharmacy}</div><div class="br-meta">${t.network} · ${t.time}</div></div>
-      <div class="br-amount" style="color:var(--success)">UGX ${t.amount.toLocaleString()}</div>
-    </div>`).join('');
-}
-
-// ══════════════════════════════════════════════════
+// ═══════════════════════════════════════════
 // TRIALS
-// ══════════════════════════════════════════════════
+// ═══════════════════════════════════════════
 function renderTrials() {
-  const trials = pharmacies.filter(p => p.status === 'trial');
-  document.getElementById('trialsBody').innerHTML = trials.map(p => {
-    const days = Math.max(0, Math.ceil((new Date(p.billingDate) - new Date()) / 86400000));
-    const dColor = days <= 3 ? 'var(--danger)' : days <= 7 ? 'var(--warn)' : 'var(--success)';
-    return `<tr>
-      <td><strong>${p.name}</strong><div style="font-size:10px;color:var(--muted)">${p.owner}</div></td>
-      <td style="color:var(--muted2);font-size:12px">${p.joined}</td>
+  const trials = orgs.filter(o=>o.sub_status==='trial');
+  document.getElementById('trialsBody').innerHTML = trials.length ? trials.map(o=>{
+    const days  = Math.max(0, daysBetween(o.trial_ends_at)||0);
+    const dColor= days<=3?'var(--danger)':days<=7?'var(--warn)':'var(--success)';
+    const usage = Math.min(100, Math.round((parseInt(o.drug_count)||0)/3));
+    return `<tr onclick="openOrgDetail(${o.id})">
+      <td><strong>${o.name}</strong><div style="font-size:10px;color:var(--muted)">${o.owner_name}</div></td>
+      <td style="font-size:12px;color:var(--muted2)">${new Date(o.created_at).toLocaleDateString()}</td>
       <td style="color:${dColor};font-weight:700">${days} days</td>
-      <td><div style="height:5px;width:80px;background:var(--s3);border-radius:3px;overflow:hidden"><div style="height:100%;width:${Math.round(p.drugs/5)}%;background:var(--accent);border-radius:3px"></div></div><div style="font-size:10px;color:var(--muted);margin-top:3px">${p.drugs} drugs added</div></td>
-      <td style="font-family:var(--mono);font-size:12px">${p.phone}</td>
       <td>
-        <div style="display:flex;gap:4px">
-          <button class="btn btn-accent" style="padding:4px 10px;font-size:11px" onclick="convertTrial(${p.id},'${p.name}')">Convert → Paid</button>
-          <button class="btn btn-ghost" style="padding:4px 10px;font-size:11px" onclick="extendTrial(${p.id},'${p.name}')">+7 Days</button>
+        <div style="height:5px;width:80px;background:var(--s3);border-radius:3px;overflow:hidden">
+          <div style="height:100%;width:${usage}%;background:var(--accent);border-radius:3px"></div>
+        </div>
+        <div style="font-size:10px;color:var(--muted);margin-top:3px">${o.drug_count||0} drugs · ${o.sale_count||0} sales</div>
+      </td>
+      <td style="font-family:var(--mono);font-size:12px">${o.phone}</td>
+      <td>
+        <div style="display:flex;gap:4px" onclick="event.stopPropagation()">
+          <button class="btn btn-accent" style="padding:4px 10px;font-size:11px" onclick="convertTrial(${o.id},'${esc(o.name)}')">Convert → Paid</button>
+          <button class="btn btn-ghost"  style="padding:4px 10px;font-size:11px" onclick="extendTrial(${o.id},'${esc(o.name)}')">+7 Days</button>
+          <button class="btn btn-danger" style="padding:4px 10px;font-size:11px" onclick="suspendOrg(${o.id},'${esc(o.name)}')">Suspend</button>
         </div>
       </td>
     </tr>`;
-  }).join('') || `<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">⏳</div>No active trials</div></td></tr>`;
+  }).join('')
+    : '<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">⏳</div>No active trials</div></td></tr>';
 }
 
-// ══════════════════════════════════════════════════
-// PAYMENTS
-// ══════════════════════════════════════════════════
-function renderPayments() {
-  document.getElementById('momoLog').innerHTML = transactions.map(t => `
-    <tr>
-      <td class="mono" style="color:var(--accent);font-size:11px">${t.ref}</td>
-      <td><strong>${t.pharmacy}</strong></td>
-      <td class="mono" style="font-size:11px">${t.phone}</td>
-      <td style="font-family:var(--mono);font-weight:700">UGX ${t.amount.toLocaleString()}</td>
-      <td><span style="font-size:12px">${t.network === 'MTN' ? '📱 MTN MoMo' : '📲 Airtel Money'}</span></td>
-      <td style="color:var(--muted2);font-size:11px">${t.time}</td>
-      <td><span class="pill ${t.status}">${t.status}</span></td>
-    </tr>`).join('');
-}
+// ═══════════════════════════════════════════
+// REVENUE
+// ═══════════════════════════════════════════
+function renderRevenue() {
+  const mrr  = orgs.filter(o=>o.sub_status==='active').reduce((s,o)=>s+(parseFloat(o.amount_ugx)||0),0);
+  const tot  = orgs.reduce((s,o)=>s+(parseFloat(o.total_sales)||0),0);
+  const avg  = orgs.filter(o=>o.sub_status==='active').length > 0
+    ? mrr / orgs.filter(o=>o.sub_status==='active').length : 0;
 
-// ══════════════════════════════════════════════════
-// REVENUE TIMELINE
-// ══════════════════════════════════════════════════
-function renderRevTimeline() {
-  document.getElementById('revTimeline').innerHTML = transactions.map(t => `
-    <tr>
-      <td style="color:var(--muted2);font-size:12px">${t.time}</td>
-      <td><strong>${t.pharmacy}</strong></td>
-      <td><span class="pill pro">pro</span></td>
-      <td style="font-family:var(--mono);color:var(--accent)">UGX ${t.amount.toLocaleString()}</td>
-      <td>${t.network === 'MTN' ? '📱 MTN MoMo' : '📲 Airtel Money'}</td>
-      <td><span class="pill ${t.status}">${t.status}</span></td>
-    </tr>`).join('');
-}
+  document.getElementById('revMRR').textContent   = ugx(mrr);
+  document.getElementById('revTotal').textContent = ugx(tot);
+  document.getElementById('revAvg').textContent   = ugx(avg);
+  document.getElementById('revClients').textContent = orgs.filter(o=>o.sub_status==='active').length;
 
-// ══════════════════════════════════════════════════
-// SUPPORT
-// ══════════════════════════════════════════════════
-function renderSupport() {
-  const tickets = [
-    {id:'TKT-001',pharmacy:'Kato Pharma',issue:'Cannot print receipts — printer not detected',priority:'high',status:'open'},
-    {id:'TKT-002',pharmacy:'Mengo Drug Store',issue:'Low stock alert not sending SMS notifications',priority:'medium',status:'open'},
-    {id:'TKT-003',pharmacy:'Nansana Pharmacy',issue:'Payment page shows error after MoMo prompt',priority:'high',status:'pending'},
-    {id:'TKT-004',pharmacy:'Nakawa Health',issue:'How to add bulk drugs from CSV file?',priority:'low',status:'resolved'},
-  ];
-  const pColor = {high:'var(--danger)',medium:'var(--warn)',low:'var(--success)'};
-  document.getElementById('supportBody').innerHTML = tickets.map(t => `
-    <tr>
-      <td class="mono" style="color:var(--accent);font-size:11px">${t.id}</td>
-      <td><strong>${t.pharmacy}</strong></td>
-      <td style="font-size:12px;color:var(--muted2);max-width:200px">${t.issue}</td>
-      <td><span style="color:${pColor[t.priority]};font-size:12px;font-weight:600">● ${t.priority}</span></td>
-      <td><span class="pill ${t.status==='open'?'overdue':t.status==='pending'?'trial':'active'}">${t.status}</span></td>
-      <td>
-        <div style="display:flex;gap:4px">
-          <button class="btn btn-ghost" style="padding:4px 9px;font-size:11px" onclick="loginAs(1,'${t.pharmacy}')">View Account</button>
-          <button class="btn btn-accent" style="padding:4px 9px;font-size:11px" onclick="toast('Ticket ${t.id} marked resolved ✅')">Resolve</button>
+  // Revenue by plan
+  const byPlan = {};
+  orgs.filter(o=>o.sub_status==='active').forEach(o=>{
+    const p = o.plan||'pro';
+    byPlan[p] = (byPlan[p]||0) + (parseFloat(o.amount_ugx)||0);
+  });
+  const maxPlanRev = Math.max(...Object.values(byPlan), 1);
+  document.getElementById('revByPlan').innerHTML = Object.entries(byPlan)
+    .sort((a,b)=>b[1]-a[1])
+    .map(([plan,rev])=>{
+      const cnt  = orgs.filter(o=>o.plan===plan&&o.sub_status==='active').length;
+      const pct  = Math.round((rev/maxPlanRev)*100);
+      const col  = plan==='enterprise'?'var(--purple)':plan==='pro'||plan==='single'?'var(--accent)':'var(--muted2)';
+      return `<div style="margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+          <span style="font-size:12px">${plan.charAt(0).toUpperCase()+plan.slice(1)}</span>
+          <span style="font-size:12px;font-family:var(--mono);color:${col}">${ugx(rev)} · ${cnt} client${cnt!==1?'s':''}</span>
         </div>
-      </td>
-    </tr>`).join('');
+        <div style="height:8px;background:var(--s3);border-radius:4px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:${col};border-radius:4px;transition:width 0.8s ease"></div>
+        </div>
+      </div>`;
+    }).join('') || '<div style="color:var(--muted);font-size:12px;padding:12px">No active subscriptions yet</div>';
+
+  // Org revenue table
+  document.getElementById('revOrgTable').innerHTML = [...orgs]
+    .sort((a,b)=>(parseFloat(b.total_sales)||0)-(parseFloat(a.total_sales)||0))
+    .slice(0,20)
+    .map(o=>`<tr onclick="openOrgDetail(${o.id})">
+      <td><strong>${o.name}</strong></td>
+      <td>${planPill(o.plan)}</td>
+      <td>${statusPill(o.sub_status||'trial')}</td>
+      <td class="mono" style="color:var(--accent)">${ugx(o.amount_ugx)}/mo</td>
+      <td class="mono" style="color:var(--success)">${ugx(o.total_sales)}</td>
+      <td style="color:var(--muted2);font-size:11px">${o.sale_count||0} sales</td>
+      <td style="color:var(--muted2);font-size:11px">${ago(o.last_sale_at)}</td>
+    </tr>`).join('') || '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">💰</div>No revenue data yet</div></td></tr>';
 }
 
-// ══════════════════════════════════════════════════
-// FULL ACTIVITY
-// ══════════════════════════════════════════════════
-function renderFullActivity() {
-  document.getElementById('fullActivityLog').innerHTML = [...activities, ...activities].map(a => `
+// ═══════════════════════════════════════════
+// ACTIVITY
+// ═══════════════════════════════════════════
+function renderActivity() {
+  const events = [];
+  [...orgs].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).forEach(o=>{
+    events.push({
+      color: o.sub_status==='active'?'var(--success)':o.sub_status==='overdue'?'var(--warn)':o.sub_status==='suspended'?'var(--danger)':'var(--accent2)',
+      text: `<strong>${o.name}</strong> · ${o.owner_name} · ${o.plan} plan · Status: <strong>${o.sub_status}</strong>`,
+      time: ago(o.created_at),
+    });
+  });
+  if (!events.length) events.push({color:'var(--muted)',text:'No activity yet',time:'now'});
+  document.getElementById('fullActivityLog').innerHTML = events.map(a=>`
     <div class="activity-item">
       <div class="act-dot" style="background:${a.color}"></div>
       <div class="act-text">${a.text}</div>
@@ -915,91 +1192,227 @@ function renderFullActivity() {
     </div>`).join('');
 }
 
-// ══════════════════════════════════════════════════
-// PHARMACY DETAIL MODAL
-// ══════════════════════════════════════════════════
-function openDetail(id) {
-  const p = pharmacies.find(x => x.id === id);
-  if (!p) return;
-  document.getElementById('detailTitle').textContent = p.name;
-  document.getElementById('detailSub').textContent = p.location + ' · ' + p.owner;
+// ═══════════════════════════════════════════
+// ORG DETAIL MODAL
+// ═══════════════════════════════════════════
+function openOrgDetail(id) {
+  const o = orgs.find(x=>x.id===id);
+  if (!o) return;
+  const days = daysBetween(o.next_billing||o.trial_ends_at);
+  document.getElementById('detailTitle').textContent = o.name;
+  document.getElementById('detailSub').textContent   = (o.location||'Uganda') + ' · ' + (o.owner_name||'—');
   document.getElementById('detailContent').innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
-      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">PLAN</div><span class="pill ${p.plan}" style="font-size:12px">${p.plan}</span></div>
-      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">STATUS</div><span class="pill ${p.status}" style="font-size:12px">${p.status}</span></div>
-      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">MONTHLY REVENUE</div><div style="font-family:var(--mono);color:var(--accent);font-weight:700">UGX ${p.revenue.toLocaleString()}</div></div>
-      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">TOTAL SALES</div><div style="font-family:var(--mono);color:var(--success);font-weight:700">UGX ${p.sales.toLocaleString()}</div></div>
-      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">PHONE</div><div style="font-size:13px">${p.phone}</div></div>
-      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">EMAIL</div><div style="font-size:12px;color:var(--muted2)">${p.email}</div></div>
-      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">NEXT BILLING</div><div style="font-size:13px">${p.billingDate}</div></div>
-      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">DRUGS IN STOCK</div><div style="font-size:13px">${p.drugs} types</div></div>
+      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">PLAN</div>${planPill(o.plan)}</div>
+      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">STATUS</div>${statusPill(o.sub_status||'trial')}</div>
+      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">SUBSCRIPTION FEE</div><div style="font-family:var(--mono);color:var(--accent);font-weight:700">${ugx(o.amount_ugx)}/mo</div></div>
+      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">TOTAL SALES REVENUE</div><div style="font-family:var(--mono);color:var(--success);font-weight:700">${ugx(o.total_sales)}</div></div>
+      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">PHONE</div><div style="font-size:13px">${o.phone||'—'}</div></div>
+      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">EMAIL</div><div style="font-size:12px;color:var(--muted2)">${o.email}</div></div>
+      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">BRANCHES</div><div style="font-size:13px">${o.branch_count||1}</div></div>
+      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">DRUGS IN STOCK</div><div style="font-size:13px">${o.drug_count||0} types</div></div>
+      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">USERS</div><div style="font-size:13px">${o.user_count||0} staff</div></div>
+      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">TOTAL SALES</div><div style="font-size:13px">${o.sale_count||0} transactions</div></div>
     </div>
-    <div style="background:var(--s2);border-radius:8px;padding:12px;margin-bottom:8px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">NDA REGISTRATION</div><div style="font-family:var(--mono);font-size:12px">${p.nda || '⚠️ Not registered'}</div></div>
-    <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">MEMBER SINCE</div><div style="font-size:13px">${p.joined}</div></div>
-  `;
-  document.getElementById('detailActions').innerHTML = `
-    <button class="btn btn-ghost" onclick="closeModal('detailModal')">Close</button>
-    <button class="btn btn-ghost" onclick="sendReminder(${p.id},'${p.name}');closeModal('detailModal')">📱 Send Reminder</button>
-    <button class="btn btn-ghost" onclick="changePlan(${p.id},'${p.name}');closeModal('detailModal')">Change Plan</button>
-    <button class="btn btn-accent" onclick="loginAs(${p.id},'${p.name}');closeModal('detailModal')">🔐 Login As</button>
-  `;
+    <div style="background:var(--s2);border-radius:8px;padding:12px;margin-bottom:8px">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:4px">NDA REGISTRATION</div>
+      <div style="font-family:var(--mono);font-size:12px">${o.nda||'⚠️ Not provided'}</div>
+    </div>
+    <div style="background:var(--s2);border-radius:8px;padding:12px;margin-bottom:8px">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:4px">BILLING / TRIAL ENDS</div>
+      <div style="font-size:13px;color:${days!==null&&days<0?'var(--danger)':'var(--text)'}">${
+        o.next_billing ? new Date(o.next_billing).toLocaleDateString() :
+        o.trial_ends_at ? 'Trial ends ' + new Date(o.trial_ends_at).toLocaleDateString() : '—'
+      }${days!==null&&days<0?' ('+Math.abs(days)+' days overdue)':days!==null?' ('+days+' days left)':''}</div>
+    </div>
+    <div style="background:var(--s2);border-radius:8px;padding:12px">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:4px">JOINED</div>
+      <div style="font-size:13px">${new Date(o.created_at).toLocaleDateString()}</div>
+    </div>`;
+
+  // Build action buttons based on current status
+  const actions = [`<button class="btn btn-ghost" onclick="closeModal('detailModal')">Close</button>`];
+  if (o.sub_status==='trial') {
+    actions.push(`<button class="btn btn-ghost" onclick="extendTrial(${o.id},'${esc(o.name)}')">+7 Days Trial</button>`);
+    actions.push(`<button class="btn btn-accent" onclick="convertTrial(${o.id},'${esc(o.name)}');closeModal('detailModal')">✅ Convert to Paid</button>`);
+  }
+  if (o.sub_status==='overdue') {
+    actions.push(`<button class="btn btn-warn" onclick="markPaid(${o.id},'${esc(o.name)}');closeModal('detailModal')">✅ Mark as Paid</button>`);
+    actions.push(`<button class="btn btn-danger" onclick="suspendOrg(${o.id},'${esc(o.name)}');closeModal('detailModal')">🚫 Suspend</button>`);
+  }
+  if (o.sub_status==='active') {
+    actions.push(`<button class="btn btn-ghost" onclick="changePlan(${o.id},'${esc(o.name)}')">Change Plan</button>`);
+    actions.push(`<button class="btn btn-danger" onclick="suspendOrg(${o.id},'${esc(o.name)}');closeModal('detailModal')">🚫 Suspend</button>`);
+  }
+  if (o.sub_status==='suspended' || !o.is_active) {
+    actions.push(`<button class="btn btn-accent" onclick="activateOrg(${o.id},'${esc(o.name)}');closeModal('detailModal')">✅ Reactivate</button>`);
+  }
+  document.getElementById('detailActions').innerHTML = actions.join('');
   document.getElementById('detailModal').classList.add('open');
 }
 
-// ══════════════════════════════════════════════════
-// ADD PHARMACY
-// ══════════════════════════════════════════════════
+// ═══════════════════════════════════════════
+// ADD PHARMACY MODAL
+// ═══════════════════════════════════════════
 function openAddPharmacy() { document.getElementById('addModal').classList.add('open'); }
 
-function createPharmacy() {
-  const name = document.getElementById('newPharmName').value.trim();
+async function createPharmacy() {
+  const name  = document.getElementById('newPharmName').value.trim();
   const phone = document.getElementById('newPhone').value.trim();
   const email = document.getElementById('newEmail').value.trim();
-  if (!name || !phone) { toast('⚠️ Pharmacy name and phone are required', 'warn'); return; }
-  const plan = document.getElementById('newPlan').value;
-  // Simulate adding
-  const newP = {
-    id: pharmacies.length + 1, name, owner: document.getElementById('newOwner').value || name,
-    phone, email, location: document.getElementById('newLocation').value || 'Uganda',
-    plan, status: 'trial', revenue: {basic:20000,pro:50000,enterprise:150000}[plan],
-    billingDate: new Date(Date.now() + 14*86400000).toISOString().split('T')[0],
-    lastActive: 'Just now', joined: new Date().toISOString().split('T')[0],
-    nda: document.getElementById('newNDA').value || null, sales: 0, drugs: 0
-  };
-  pharmacies.unshift(newP);
-  closeModal('addModal');
-  toast(`✅ ${name} created! Login details sent to ${phone} via SMS.`);
-  renderPharmas(pharmacies);
-  document.getElementById('pharmCount').textContent = pharmacies.length;
+  if (!name||!phone||!email) { toast('⚠️ Name, phone and email are required','warn'); return; }
+  const btn = document.querySelector('#addModal .btn-accent');
+  btn.textContent='Creating…'; btn.disabled=true;
+  const r = await api('/api/admin/orgs', {
+    method:'POST',
+    body: JSON.stringify({
+      name, owner_name: document.getElementById('newOwner').value.trim()||name,
+      email, phone,
+      location: document.getElementById('newLocation').value.trim(),
+      plan: document.getElementById('newPlan').value,
+      nda: document.getElementById('newNDA').value.trim(),
+    })
+  });
+  btn.textContent='Create Account & Send Login'; btn.disabled=false;
+  if (r && r.ok && r.data.success) {
+    closeModal('addModal');
+    ['newPharmName','newOwner','newPhone','newEmail','newLocation','newNDA']
+      .forEach(id=>document.getElementById(id).value='');
+    toast(`✅ ${name} created! Temp password: ${r.data.temp_password}`);
+    await boot();
+    go('pharmacies', document.querySelectorAll('.ni')[2]);
+  } else {
+    toast('❌ ' + (r?.data?.error||'Failed to create pharmacy'), 'err');
+  }
 }
 
-// ══════════════════════════════════════════════════
-// ACTIONS
-// ══════════════════════════════════════════════════
-function sendReminder(id, name) { toast(`📱 Payment reminder sent to ${name} via WhatsApp & SMS`); }
-function sendAllReminders() { toast(`📱 Payment reminders sent to ${pharmacies.filter(p=>p.status==='overdue').length} overdue pharmacies!`); }
-function loginAs(id, name) { toast(`🔐 Opening ${name}'s dashboard as admin…`); setTimeout(() => window.open('medvault-connected.html', '_blank'), 800); }
-function suspend(id, name) { const p = pharmacies.find(x=>x.id===id); if(p){p.status='suspended';} toast(`🚫 ${name} account suspended — they cannot log in`,'err'); renderPharmas(pharmacies); }
-function reactivate(id, name) { const p = pharmacies.find(x=>x.id===id); if(p){p.status='active';} toast(`✅ ${name} reactivated!`); renderPharmas(pharmacies); }
-function convertTrial(id, name) { const p = pharmacies.find(x=>x.id===id); if(p){p.status='active';} toast(`✅ ${name} converted to paid account!`); }
-function extendTrial(id, name) { toast(`⏳ ${name} trial extended by 7 days`); }
-function changePlan(id, name) { toast(`💳 Plan change for ${name} — form coming!`); }
-function chargeMoMo(id, name, amount) { toast(`📱 Charging UGX ${amount.toLocaleString()} to ${name} via MTN MoMo…`); }
-function editPlan(plan) { toast(`✏️ Edit ${plan} plan — pricing editor coming!`); }
-function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+// ═══════════════════════════════════════════
+// CONTROL ACTIONS — all hit real API
+// ═══════════════════════════════════════════
+async function suspendOrg(id, name) {
+  if (!confirm(`Suspend "${name}"? All their users will lose access immediately.`)) return;
+  const r = await api(`/api/admin/orgs/${id}/suspend`, {method:'POST'});
+  if (r&&r.ok) {
+    const o = orgs.find(x=>x.id===id);
+    if (o) { o.sub_status='suspended'; o.is_active=false; }
+    toast(`🚫 ${name} suspended`, 'err');
+    updateSidebarBadges(); loadPage(currentPage);
+  } else { toast('❌ '+(r?.data?.error||'Failed'),'err'); }
+}
 
+async function activateOrg(id, name) {
+  const r = await api(`/api/admin/orgs/${id}/activate`, {method:'POST'});
+  if (r&&r.ok) {
+    const o = orgs.find(x=>x.id===id);
+    if (o) { o.sub_status='active'; o.is_active=true; }
+    toast(`✅ ${name} reactivated!`);
+    updateSidebarBadges(); loadPage(currentPage);
+  } else { toast('❌ '+(r?.data?.error||'Failed'),'err'); }
+}
+
+async function markPaid(id, name) {
+  const r = await api(`/api/admin/orgs/${id}/activate`, {method:'POST'});
+  if (r&&r.ok) {
+    const o = orgs.find(x=>x.id===id);
+    if (o) { o.sub_status='active'; o.is_active=true; }
+    toast(`✅ ${name} marked as paid & reactivated!`);
+    updateSidebarBadges(); loadPage(currentPage);
+  } else { toast('❌ '+(r?.data?.error||'Failed'),'err'); }
+}
+
+async function convertTrial(id, name) {
+  const plan = prompt(`Convert "${name}" to paid.
+Enter plan: basic, pro, enterprise`, 'pro');
+  if (!plan) return;
+  const r = await api(`/api/admin/orgs/${id}/convert-trial`, {method:'POST', body:JSON.stringify({plan})});
+  if (r&&r.ok) {
+    const o = orgs.find(x=>x.id===id);
+    if (o) { o.sub_status='active'; o.is_active=true; o.plan=plan; }
+    toast(`✅ ${name} converted to ${plan}!`);
+    updateSidebarBadges(); loadPage(currentPage);
+  } else { toast('❌ '+(r?.data?.error||'Failed'),'err'); }
+}
+
+async function extendTrial(id, name) {
+  const r = await api(`/api/admin/orgs/${id}/extend-trial`, {method:'POST', body:JSON.stringify({days:7})});
+  if (r&&r.ok) {
+    toast(`⏳ ${name} trial extended 7 days`);
+    await boot();
+    loadPage(currentPage);
+  } else { toast('❌ '+(r?.data?.error||'Failed'),'err'); }
+}
+
+async function changePlan(id, name) {
+  const plan = prompt(`Change plan for "${name}".
+Options: basic, pro, enterprise`, 'pro');
+  if (!plan) return;
+  const r = await api(`/api/admin/orgs/${id}/plan`, {method:'PATCH', body:JSON.stringify({plan})});
+  if (r&&r.ok) {
+    const o = orgs.find(x=>x.id===id);
+    if (o) { o.plan=plan; o.amount_ugx=r.data.amount; }
+    toast(`✅ ${name} moved to ${plan} plan`);
+    loadPage(currentPage);
+  } else { toast('❌ '+(r?.data?.error||'Failed'),'err'); }
+}
+
+async function suspendUser(id, name) {
+  if (!confirm(`Suspend user "${name}"?`)) return;
+  const r = await api(`/api/admin/users/${id}/suspend`, {method:'POST'});
+  if (r&&r.ok) {
+    const u = users.find(x=>x.id===id); if(u) u.is_active=false;
+    toast(`🚫 ${name} suspended`,'err');
+    renderUsers();
+  } else { toast('❌ '+(r?.data?.error||'Failed'),'err'); }
+}
+
+async function activateUser(id, name) {
+  const r = await api(`/api/admin/users/${id}/activate`, {method:'POST'});
+  if (r&&r.ok) {
+    const u = users.find(x=>x.id===id); if(u) u.is_active=true;
+    toast(`✅ ${name} activated`);
+    renderUsers();
+  } else { toast('❌ '+(r?.data?.error||'Failed'),'err'); }
+}
+
+async function resetPassword(id, name) {
+  if (!confirm(`Reset password for "${name}"? A new password will be generated.`)) return;
+  const r = await api(`/api/admin/users/${id}/reset-password`, {method:'POST'});
+  if (r&&r.ok) {
+    toast(`🔑 New password for ${name}: ${r.data.new_password}`);
+    alert(`New password for ${name}:
+
+${r.data.new_password}
+
+Share this with the user securely.`);
+  } else { toast('❌ '+(r?.data?.error||'Failed'),'err'); }
+}
+
+function sendReminder(id, name)  { toast(`📱 SMS/WhatsApp reminder integration needed to send to ${name}`,'warn'); }
+function sendAllReminders()       { toast('📱 Bulk reminder integration required','warn'); }
+function editPlan(plan)           { toast(`✏️ ${plan} plan editor coming soon`); }
+function closeModal(id)           { document.getElementById(id).classList.remove('open'); }
+
+// ═══════════════════════════════════════════
 // TOAST
+// ═══════════════════════════════════════════
 let _tt;
 function toast(msg, type='') {
   const t = document.getElementById('toast');
   document.getElementById('toastMsg').textContent = msg;
   t.className = 'toast ' + type;
   t.classList.add('show');
-  clearTimeout(_tt); _tt = setTimeout(() => t.classList.remove('show'), 3500);
+  clearTimeout(_tt);
+  _tt = setTimeout(()=>t.classList.remove('show'), 4500);
 }
 
+// ═══════════════════════════════════════════
 // INIT
-renderOverview();
+// ═══════════════════════════════════════════
+(function init() {
+  if (!TOKEN) { showLogin(); return; }
+  boot();
+  setInterval(boot, 60000); // refresh every 60s
+})();
 </script>
 </body>
 </html>
