@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2305,27 +2304,35 @@ const MedVaultOffline = {
   },
 
   async pullFromServer(token){
-    if(!this.isOnline()) return {success:false};
+    if(!this.isOnline()) return {success:false, reason:'offline'};
     try{
       const [inv,sales,orders,customers] = await Promise.all([
-        this.requestJSON('/api/inventory', { token, timeoutMs: 10000 }),
-        this.requestJSON('/api/sales?limit=100', { token, timeoutMs: 10000 }),
-        this.requestJSON('/api/orders', { token, timeoutMs: 10000 }),
-        this.requestJSON('/api/customers', { token, timeoutMs: 10000 }),
+        this.requestJSON('/api/inventory', { token, timeoutMs: 15000 }),
+        this.requestJSON('/api/sales?limit=100', { token, timeoutMs: 15000 }),
+        this.requestJSON('/api/orders', { token, timeoutMs: 15000 }),
+        this.requestJSON('/api/customers', { token, timeoutMs: 15000 }),
       ]);
-      if (!inv.ok || !sales.ok || !orders.ok || !customers.ok) {
-        return { success:false, reason:'sync-partial-failure' };
+
+      // If we get a 401 on any request, token is expired
+      if ([inv,sales,orders,customers].some(r => r.status === 401)) {
+        return { success:false, reason:'401-auth-expired' };
       }
 
       const db=this.getDB();
-      if(inv.data.drugs) db.drugs=inv.data.drugs;
-      if(sales.data.sales) db.sales=sales.data.sales;
-      if(orders.data.orders) db.orders=orders.data.orders;
-      if(customers.data.customers) db.customers=customers.data.customers;
-      this.saveDB(db);
-      this.saveMeta({lastSync:new Date().toISOString(),status:'synced'});
-      this.updateSyncUI();
-      return {success:true};
+      let gotAny = false;
+      if(inv.ok && inv.data.drugs)           { db.drugs=inv.data.drugs;           gotAny=true; }
+      if(sales.ok && sales.data.sales)       { db.sales=sales.data.sales;         gotAny=true; }
+      if(orders.ok && orders.data.orders)    { db.orders=orders.data.orders;      gotAny=true; }
+      if(customers.ok && customers.data.customers){ db.customers=customers.data.customers; gotAny=true; }
+      if(gotAny){
+        this.saveDB(db);
+        this.saveMeta({lastSync:new Date().toISOString(),status:'synced'});
+        this.updateSyncUI();
+        return {success:true};
+      }
+      // Got responses but none had data — likely server error
+      const firstError = [inv,sales,orders,customers].find(r=>!r.ok);
+      return { success:false, reason: firstError ? `server-${firstError.status}` : 'no-data' };
     }catch(e){ return {success:false,reason:e.message}; }
   },
 
@@ -2800,19 +2807,37 @@ async function boot(data) {
     go('dashboard', document.querySelector('.nav-item'));
   }
 
-  // ── 4. Sync data in background — does not block UI ─────
-  setTimeout(async () => {
+  // ── 4. Pull fresh data from server right after login ────
+  // Do this BEFORE loadPage so the dashboard shows real data, not an empty cache.
+  // We already cleared localStorage on login, so without this pull the dashboard
+  // shows zeros for every pharmacy.
+  if (token) {
     try {
+      // Show a gentle loading hint in the sync bar
+      const txt = document.getElementById('syncTxt');
+      if (txt) txt.textContent = '⏳ Loading your pharmacy data…';
+
       const syncResult = await MedVaultOffline.pullFromServer(token);
       if (syncResult && syncResult.success) {
         allDrugs = MedVaultOffline.getDrugs();
-        if (currentPage === 'dashboard') loadDashboard();
-        showToast('✅ Data synced!');
+        loadPage(currentPage);  // re-render now that we have real data
+        showToast('✅ Data loaded!');
+      } else if (syncResult.reason === '401-auth-expired') {
+        showToast('🔐 Session expired — please log in again', 'warn');
+      } else if (!navigator.onLine) {
+        showToast('📴 Offline — showing cached data', 'warn');
+      } else {
+        // Server reachable but returned an error — still render whatever cache exists
+        allDrugs = MedVaultOffline.getDrugs();
+        loadPage(currentPage);
+        showToast('⚠️ Could not load latest data — showing cached data', 'warn');
       }
+      MedVaultOffline.updateSyncUI();
     } catch(e) {
-      console.log('Background sync skipped:', e.message);
+      console.log('Boot sync error:', e.message);
+      MedVaultOffline.updateSyncUI();
     }
-  }, 500); // half second delay — dashboard already visible by now
+  }
 
   // ── 5. Trial expiry check ───────────────────────────────
   checkTrialStatus(user);
@@ -2822,6 +2847,7 @@ async function boot(data) {
 // TRIAL WALL
 // ═══════════════════════════════════════════════════════════
 function checkTrialStatus(user) {
+  if (!user) return;
   const wall = document.getElementById('trialWall');
   if (!wall) return;
 
@@ -2829,33 +2855,20 @@ function checkTrialStatus(user) {
   const trialEndsAt = user.trial_ends_at ? new Date(user.trial_ends_at) : null;
   const now         = new Date();
 
-  // Super admins and active/paid subscriptions always bypass
   if (user.role === 'super_admin') return;
   if (status === 'active') return;
 
-  // Check if grace period was already activated this session
   const gracePeriodKey = 'mv_grace_until_' + (user.organisation_id || user.id);
   const graceUntil     = localStorage.getItem(gracePeriodKey);
-  if (graceUntil && new Date(graceUntil) > now) return; // still within grace
+  if (graceUntil && new Date(graceUntil) > now) return;
 
-  // Trial expired: show wall
-  if (status === 'trial' && trialEndsAt && now > trialEndsAt) {
-    showTrialWall();
-    return;
-  }
+  if (status === 'trial' && trialEndsAt && now > trialEndsAt) { showTrialWall(); return; }
+  if (['expired','overdue','suspended'].includes(status))      { showTrialWall(); return; }
 
-  // Subscription expired / overdue / suspended
-  if (['expired', 'overdue', 'suspended'].includes(status)) {
-    showTrialWall();
-    return;
-  }
-
-  // Trial ending soon (within 2 days) — show a soft warning toast
   if (status === 'trial' && trialEndsAt) {
-    const msLeft = trialEndsAt - now;
-    const daysLeft = Math.ceil(msLeft / (1000 * 60 * 60 * 24));
+    const daysLeft = Math.ceil((trialEndsAt - now) / (1000*60*60*24));
     if (daysLeft <= 2 && daysLeft > 0) {
-      setTimeout(() => showToast(`⚠️ Your free trial ends in ${daysLeft} day${daysLeft>1?'s':''}. Contact Sam to subscribe.`, 'warn'), 2000);
+      setTimeout(() => showToast(`⚠️ Your free trial ends in ${daysLeft} day${daysLeft>1?'s':''}. Contact Sam to subscribe.`, 'warn'), 2500);
     }
   }
 }
@@ -2864,31 +2877,19 @@ function showTrialWall() {
   const wall = document.getElementById('trialWall');
   if (!wall) return;
   wall.style.display = 'flex';
-  // Prevent any scrolling / interaction behind the wall
   document.body.style.overflow = 'hidden';
 }
 
 function activateGracePeriod() {
   const user = currentUser;
   if (!user) return;
-
-  // Store grace period locally — 3 days from now
   const graceUntil = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
-  const gracePeriodKey = 'mv_grace_until_' + (user.organisation_id || user.id);
-  localStorage.setItem(gracePeriodKey, graceUntil);
-
-  // Dismiss the wall
+  localStorage.setItem('mv_grace_until_' + (user.organisation_id || user.id), graceUntil);
   const wall = document.getElementById('trialWall');
   if (wall) wall.style.display = 'none';
   document.body.style.overflow = '';
-
-  // Warm reminder toast
   showToast('⏳ 3-day grace period activated. Please contact Sam to subscribe before it ends.', 'warn');
-
-  // Schedule a reminder toast after 60 seconds in this session
-  setTimeout(() => {
-    showToast('🔔 Reminder: Contact Sam on +256 759 327 843 (Airtel) or +256 774 563 591 (MTN) to activate your subscription.', 'warn');
-  }, 60000);
+  setTimeout(() => showToast('🔔 Reminder: Contact Sam on +256 759 327 843 (Airtel) or +256 774 563 591 (MTN) to activate your subscription.', 'warn'), 60000);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -3777,16 +3778,29 @@ function canSeeStaffPage() {
 
 
 async function manualSync() {
-  showToast('⏳ Syncing…');
+  showToast('⏳ Syncing with server…');
   const result = await MedVaultOffline.sync(token);
   if (result.pull.success) {
     allDrugs = MedVaultOffline.getDrugs();
     loadPage(currentPage);
     showToast(result.push.pushed > 0
-      ? `☁️ Pushed ${result.push.pushed} offline changes + pulled latest data!`
-      : '✅ All data synced!');
+      ? `☁️ Pushed ${result.push.pushed} offline change${result.push.pushed>1?'s':''} + pulled latest data!`
+      : '✅ All data synced successfully!');
   } else {
-    showToast('📴 Offline — sync will happen when connected','warn');
+    // Distinguish: truly offline vs server-side error while online
+    if (!navigator.onLine) {
+      showToast('📴 No internet connection — sync will happen automatically when you reconnect', 'warn');
+    } else {
+      // Online but server unreachable — still load whatever is cached
+      allDrugs = MedVaultOffline.getDrugs();
+      loadPage(currentPage);
+      const reason = (result.pull.reason || '').toString();
+      if (reason.includes('401') || reason.includes('auth')) {
+        showToast('🔐 Session expired — please log out and log back in', 'warn');
+      } else {
+        showToast('⚠️ Could not reach server — showing cached data. Try again in a moment.', 'warn');
+      }
+    }
   }
 }
 
@@ -5931,34 +5945,18 @@ boot = async function(data) {
 
 <!-- ══════════════════════════════════════════════════════
      TRIAL EXPIRED WALL
-     Shown when 14-day free trial ends. Blocks the app.
-     Dismissed only after user confirms 3-day grace period.
 ══════════════════════════════════════════════════════ -->
 <div id="trialWall" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(5,8,18,0.96);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);align-items:center;justify-content:center;padding:20px;">
   <div style="max-width:520px;width:100%;background:linear-gradient(160deg,#0d1117 0%,#111827 100%);border:1px solid rgba(239,68,68,0.25);border-radius:24px;padding:40px 36px;box-shadow:0 40px 100px rgba(0,0,0,0.7),0 0 60px rgba(239,68,68,0.06);position:relative;overflow:hidden;">
-
-    <!-- red glow blob top-right -->
     <div style="position:absolute;top:-40px;right:-40px;width:180px;height:180px;background:radial-gradient(circle,rgba(239,68,68,0.15) 0%,transparent 70%);pointer-events:none;"></div>
-    <!-- accent glow blob bottom-left -->
     <div style="position:absolute;bottom:-40px;left:-40px;width:160px;height:160px;background:radial-gradient(circle,rgba(0,212,170,0.07) 0%,transparent 70%);pointer-events:none;"></div>
-
-    <!-- lock icon -->
     <div style="width:64px;height:64px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:28px;margin-bottom:24px;">🔒</div>
-
-    <!-- headline -->
-    <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:22px;line-height:1.25;margin-bottom:10px;color:#f0f4ff;">
-      Your 14-Day Free Trial Has Ended
-    </div>
-
-    <!-- message -->
+    <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:22px;line-height:1.25;margin-bottom:10px;color:#f0f4ff;">Your 14-Day Free Trial Has Ended</div>
     <div style="font-size:14px;color:#8899aa;line-height:1.75;margin-bottom:28px;">
-      Thank you for trying <strong style="color:#f0f4ff;">MedVault</strong> — we hope it's been useful for your pharmacy. Your free trial period is now complete and your account has been temporarily paused.<br><br>
-      To keep using MedVault without losing any of your data, please get in touch with Sam to activate your subscription. We've made it easy — just send a mobile money payment and your account will be unlocked within minutes.
+      Thank you for trying <strong style="color:#f0f4ff;">MedVault</strong> — we hope it's been useful for your pharmacy. Your free trial is now complete and your account has been temporarily paused.<br><br>
+      To keep using MedVault without losing any of your data, please get in touch with Sam to activate your subscription. Send a mobile money payment and your account will be unlocked within minutes.
     </div>
-
-    <!-- contact cards -->
     <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:28px;">
-
       <div style="display:flex;align-items:center;gap:14px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:14px;padding:14px 18px;">
         <div style="width:40px;height:40px;border-radius:12px;background:rgba(254,196,0,0.12);border:1px solid rgba(254,196,0,0.2);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">📲</div>
         <div>
@@ -5968,7 +5966,6 @@ boot = async function(data) {
         </div>
         <a href="tel:+256759327843" style="margin-left:auto;padding:7px 14px;border-radius:8px;background:rgba(254,196,0,0.1);border:1px solid rgba(254,196,0,0.2);color:#fec400;font-size:11px;font-weight:700;text-decoration:none;white-space:nowrap;">Call</a>
       </div>
-
       <div style="display:flex;align-items:center;gap:14px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:14px;padding:14px 18px;">
         <div style="width:40px;height:40px;border-radius:12px;background:rgba(255,204,0,0.1);border:1px solid rgba(255,204,0,0.2);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">💛</div>
         <div>
@@ -5978,28 +5975,18 @@ boot = async function(data) {
         </div>
         <a href="tel:+256774563591" style="margin-left:auto;padding:7px 14px;border-radius:8px;background:rgba(255,204,0,0.08);border:1px solid rgba(255,204,0,0.2);color:#ffcc00;font-size:11px;font-weight:700;text-decoration:none;white-space:nowrap;">Call</a>
       </div>
-
     </div>
-
-    <!-- grace period info box -->
     <div style="background:rgba(0,212,170,0.06);border:1px solid rgba(0,212,170,0.15);border-radius:12px;padding:14px 16px;margin-bottom:24px;display:flex;gap:12px;align-items:flex-start;">
       <div style="font-size:18px;flex-shrink:0;margin-top:1px;">⏳</div>
       <div>
         <div style="font-size:12px;font-weight:700;color:#00d4aa;margin-bottom:4px;">3-Day Grace Period Available</div>
-        <div style="font-size:12px;color:#6b7a99;line-height:1.6;">Not ready to pay right now? No problem. You can activate a <strong style="color:#f0f4ff;">3-day grace period</strong> to keep accessing your pharmacy data while you arrange payment. After those 3 days, the account will be fully locked until a subscription is activated.</div>
+        <div style="font-size:12px;color:#6b7a99;line-height:1.6;">Not ready to pay right now? No problem. Activate a <strong style="color:#f0f4ff;">3-day grace period</strong> to keep accessing your data while you arrange payment. After those 3 days, the account will be fully locked.</div>
       </div>
     </div>
-
-    <!-- action buttons -->
     <div style="display:flex;flex-direction:column;gap:10px;">
-      <button onclick="activateGracePeriod()" style="width:100%;padding:15px;border-radius:12px;background:linear-gradient(135deg,#00d4aa,#00b894);color:#000;border:none;font-family:'Syne',sans-serif;font-weight:800;font-size:15px;cursor:pointer;transition:filter 0.2s;" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='brightness(1)'">
-        ⏳ Continue with 3-Day Grace Period
-      </button>
-      <div style="text-align:center;font-size:11px;color:#5a6a82;line-height:1.6;padding:0 8px;">
-        Already paid? Contact Sam on the numbers above and your account will be activated shortly. This screen will disappear automatically once your subscription is confirmed.
-      </div>
+      <button onclick="activateGracePeriod()" style="width:100%;padding:15px;border-radius:12px;background:linear-gradient(135deg,#00d4aa,#00b894);color:#000;border:none;font-family:'Syne',sans-serif;font-weight:800;font-size:15px;cursor:pointer;transition:filter 0.2s;" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='brightness(1)'">⏳ Continue with 3-Day Grace Period</button>
+      <div style="text-align:center;font-size:11px;color:#5a6a82;line-height:1.6;padding:0 8px;">Already paid? Contact Sam and your account will be activated shortly. This screen disappears automatically once your subscription is confirmed.</div>
     </div>
-
   </div>
 </div>
 
