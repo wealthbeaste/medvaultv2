@@ -9,6 +9,7 @@ module.exports = function registerRoutes(app) {
   const { sign }          = require('../core/jwt');
   const auth              = require('../middleware/auth');
   const { can }           = require('../middleware/permissions');
+  const { validate, schemas } = require('../middleware/validate');
 
   function callAnthropicAPI(payload) {
     return new Promise((resolve, reject) => {
@@ -226,7 +227,7 @@ module.exports = function registerRoutes(app) {
  
 
 // UPDATE INVENTORY ITEM
-  app.put('/api/inventory/:id', auth, can('inventory:write'), async (req, res) => {
+  app.put('/api/inventory/:id', auth, can('inventory:write'), validate(schemas.drug), async (req, res) => {
     const { pharmacyId } = req.user;
 
     const {
@@ -295,7 +296,7 @@ module.exports = function registerRoutes(app) {
 
 
   // ADD NEW DRUG + INITIAL BATCH
-  app.post('/api/inventory', auth, can('inventory:write'), async (req, res) => {
+  app.post('/api/inventory', auth, can('inventory:write'), validate(schemas.drug), async (req, res) => {
 
     const {
       name,
@@ -311,10 +312,6 @@ module.exports = function registerRoutes(app) {
       sku,
       batch_number,
     } = req.body;
-
-    if (!name || !name.trim()) {
-      return res.status(400).json({ error: 'Drug name is required' });
-    }
 
     const finalBatchNumber = (batch_number && typeof batch_number === 'string' && batch_number.trim())
       ? batch_number.trim()
@@ -411,12 +408,11 @@ module.exports = function registerRoutes(app) {
     } catch(e) { res.json({ error:e.message }, 500); }
   });
 
-  app.post('/api/sales', auth, async (req, res) => {
+  app.post('/api/sales', auth, validate(schemas.sale), async (req, res) => {
     const { pharmacyId, userId, role } = req.user;
     if (role === 'cashier')
       return res.status(403).json({ success:false, error:'Cashiers cannot record sales directly. Use the dispatch queue.' });
     const { customer_name,customer_phone,items,discount_pct,payment_method,subtotal,discount_amount,total_amount } = req.body;
-    if (!items||!items.length) return res.status(400).json({ error:'No items' });
 
     // ── STEP 1 FIX: Full DB transaction ────────────────────────────────────
     // Previously this route did NOT use a transaction. If the server crashed
@@ -550,10 +546,9 @@ module.exports = function registerRoutes(app) {
   });
 
   // Manually add/edit a customer (from the customer management UI)
-  app.post('/api/customers/manual', auth, async (req, res) => {
+  app.post('/api/customers/manual', auth, validate(schemas.customer), async (req, res) => {
     const { pharmacyId } = req.user;
     const { name, phone, email, notes } = req.body;
-    if (!name) return res.status(400).json({ error: 'Name is required' });
     try {
       // Check for duplicate by phone (if provided) or name
       const existing = phone
@@ -572,10 +567,9 @@ module.exports = function registerRoutes(app) {
   });
 
   // Update customer details
-  app.put('/api/customers/:id', auth, async (req, res) => {
+  app.put('/api/customers/:id', auth, validate(schemas.customer), async (req, res) => {
     const { pharmacyId } = req.user;
     const { name, phone, email, notes } = req.body;
-    if (!name) return res.status(400).json({ error: 'Name is required' });
     try {
       const r = await query(
         `UPDATE customers SET name=$1, phone=$2, email=$3, notes=$4, updated_at=NOW()
@@ -639,10 +633,12 @@ module.exports = function registerRoutes(app) {
     } catch(e) { res.json({ error:e.message }, 500); }
   });
 
-  app.post('/api/branches', auth, can('branches:write'), async (req, res) => {
+  app.post('/api/branches', auth, can('branches:write'), validate({
+    name: { required: true, type: 'string', minLen: 1, maxLen: 255 },
+    phone: { maxLen: 50 },
+  }), async (req, res) => {
     const { orgId } = req.user;
     const { name,address,phone } = req.body;
-    if (!name) return res.json({ error:'Branch name required' }, 400);
     try {
       const result = await query(
         `INSERT INTO pharmacies (organisation_id,name,address,phone) VALUES ($1,$2,$3,$4) RETURNING *`,
@@ -724,10 +720,13 @@ module.exports = function registerRoutes(app) {
     } catch(e) { res.json({ error:e.message }, 500); }
   });
 
-  app.post('/api/staff/invite', auth, can('staff:invite'), async (req, res) => {
+  app.post('/api/staff/invite', auth, can('staff:invite'), validate({
+    name:     { required: true, type: 'string', minLen: 1, maxLen: 255 },
+    email:    { required: true, type: 'string', minLen: 3, maxLen: 255 },
+    password: { required: true, type: 'string', minLen: 6 },
+  }), async (req, res) => {
     const { orgId, pharmacyId: ownerPharmacyId } = req.user;
     const { name,email,password,staffRole,pharmacyId } = req.body;
-    if (!name||!email||!password) return res.status(400).json({ error:'Name, email and password required' });
     try {
       const exists = await query(`SELECT id FROM users WHERE email=$1`,[email.toLowerCase()]);
       if (exists.rows.length) return res.status(409).json({ error:'Email already registered' });
@@ -769,10 +768,12 @@ module.exports = function registerRoutes(app) {
     } catch(e) { res.json({ error:e.message }, 500); }
   });
 
-  app.post('/api/credit', auth, async (req, res) => {
+  app.post('/api/credit', auth, validate({
+    customer_name: { required: true, type: 'string', minLen: 1, maxLen: 255 },
+    amount_owed:   { required: true, type: 'number', min: 0 },
+  }), async (req, res) => {
     const { pharmacyId, userId } = req.user;
     const { customer_name,customer_phone,items_description,amount_owed,due_date,notes } = req.body;
-    if (!customer_name||!amount_owed) return res.json({ error:'Customer name and amount required' }, 400);
     try {
       const result = await query(
         `INSERT INTO credit_sales (pharmacy_id,user_id,customer_name,customer_phone,items_description,amount_owed,due_date,notes,status)
@@ -883,7 +884,10 @@ module.exports = function registerRoutes(app) {
   // DISPATCH SYSTEM — dispensor sends cart → cashier collects
   // ════════════════════════════════════════════════════════════
 
-  app.post('/api/dispatch', auth, async (req, res) => {
+  app.post('/api/dispatch', auth, validate({
+    items:        { required: true, type: 'array' },
+    total_amount: { required: true, type: 'number', min: 0 },
+  }), async (req, res) => {
     const { pharmacyId, userId, role } = req.user;
     if (role === 'cashier')
       return res.status(403).json({ error:'Cashiers do not dispense. They collect payment.' });
