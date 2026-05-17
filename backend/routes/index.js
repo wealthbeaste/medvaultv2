@@ -10,7 +10,7 @@ module.exports = function registerRoutes(app) {
   const auth              = require('../middleware/auth');
   const { can }           = require('../middleware/permissions');
   const { validate, schemas } = require('../middleware/validate');
-
+  const { audit } = require('../utils/audit');
   function callAnthropicAPI(payload) {
     return new Promise((resolve, reject) => {
       const body = JSON.stringify(payload);
@@ -280,6 +280,14 @@ module.exports = function registerRoutes(app) {
       return res.status(404).json({ error: 'Drug not found' });
     }
 
+    await audit(query, {
+      req,
+      action:   'drug.update',
+      entity:   'drug',
+      entityId: req.params.id,
+      payload:  { name, quantity, unit_price, category },
+    });
+
     res.json({
       message: '✅ Updated!',
       drug: result.rows[0]
@@ -368,6 +376,15 @@ module.exports = function registerRoutes(app) {
       );
 
       await client.query('COMMIT');
+
+      await audit(query, {
+        req,
+        action:   'drug.create',
+        entity:   'drug',
+        entityId: drugId,
+        payload:  { name: name.trim(), quantity, unit_price, category: category || 'General' },
+      });
+
       res.json({
         success: true,
         message: '✅ Drug added successfully',
@@ -390,6 +407,13 @@ module.exports = function registerRoutes(app) {
     try {
       const result = await query(`DELETE FROM drugs WHERE id=$1 AND pharmacy_id=$2 RETURNING id`,[req.params.id,pharmacyId]);
       if (!result.rows.length) return res.json({ error:'Not found' }, 404);
+      await audit(query, {
+        req,
+        action:   'drug.delete',
+        entity:   'drug',
+        entityId: req.params.id,
+        payload:  null,
+      });
       res.json({ message:'✅ Deleted' });
     } catch(e) { res.json({ error:e.message }, 500); }
   });
@@ -453,6 +477,15 @@ module.exports = function registerRoutes(app) {
       }
 
       await client.query('COMMIT');
+
+      await audit(query, {
+        req,
+        action:   'sale.create',
+        entity:   'sale',
+        entityId: sale.id,
+        payload:  { receipt_number: receiptNum, total_amount, payment_method, item_count: items.length },
+      });
+
       res.json({ message:'✅ Sale recorded!', sale, receipt_number:receiptNum });
 
     } catch(e) {
@@ -736,6 +769,13 @@ module.exports = function registerRoutes(app) {
         `INSERT INTO users (organisation_id,pharmacy_id,name,email,password_hash,role) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id,name,email,role`,
         [orgId, assignedPharmacyId, name, email.toLowerCase(), pw, staffRole||'staff']
       );
+      await audit(query, {
+        req,
+        action:   'staff.invite',
+        entity:   'user',
+        entityId: result.rows[0].id,
+        payload:  { name, email: email.toLowerCase(), role: staffRole || 'staff' },
+      });
       res.json({ success:true, message:'✅ Staff member added!', user:result.rows[0] });
     } catch(e) { res.status(500).json({ error:e.message }); }
   });
@@ -744,6 +784,13 @@ module.exports = function registerRoutes(app) {
     const { orgId } = req.user;
     try {
       await query(`UPDATE users SET is_active=false WHERE id=$1 AND organisation_id=$2`,[req.params.id,orgId]);
+      await audit(query, {
+        req,
+        action:   'staff.deactivate',
+        entity:   'user',
+        entityId: req.params.id,
+        payload:  null,
+      });
       res.json({ message:'✅ Deactivated' });
     } catch(e) { res.json({ error:e.message }, 500); }
   });
@@ -752,6 +799,13 @@ module.exports = function registerRoutes(app) {
     const { orgId } = req.user;
     try {
       await query(`UPDATE users SET is_active=true WHERE id=$1 AND organisation_id=$2`,[req.params.id,orgId]);
+      await audit(query, {
+        req,
+        action:   'staff.activate',
+        entity:   'user',
+        entityId: req.params.id,
+        payload:  null,
+      });
       res.json({ message:'✅ Reactivated' });
     } catch(e) { res.json({ error:e.message }, 500); }
   });
@@ -780,6 +834,13 @@ module.exports = function registerRoutes(app) {
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending') RETURNING *`,
         [pharmacyId,userId,customer_name,customer_phone||null,items_description||null,parseFloat(amount_owed),due_date||null,notes||null]
       );
+      await audit(query, {
+        req,
+        action:   'credit.create',
+        entity:   'credit_sale',
+        entityId: result.rows[0].id,
+        payload:  { customer_name, amount_owed, due_date: due_date || null },
+      });
       res.json({ message:'✅ Credit recorded!', credit:result.rows[0] });
     } catch(e) { res.json({ error:e.message }, 500); }
   });
@@ -794,6 +855,13 @@ module.exports = function registerRoutes(app) {
         [parseFloat(amount_paid||0),req.params.id,pharmacyId]
       );
       if (!result.rows.length) return res.json({ error:'Not found' }, 404);
+      await audit(query, {
+        req,
+        action:   'credit.payment',
+        entity:   'credit_sale',
+        entityId: req.params.id,
+        payload:  { amount_paid },
+      });
       res.json({ message:'✅ Payment recorded!', credit:result.rows[0] });
     } catch(e) { res.json({ error:e.message }, 500); }
   });

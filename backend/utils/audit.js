@@ -1,59 +1,58 @@
 'use strict';
 
 // ============================================================
-// MedVault — Audit Logger
-// Phase 1: Write audit rows for all data-modifying actions.
-// Healthcare compliance requirement for licensed pharmacies.
+// MedVault — Audit Log Helper
+// Phase 1: Every action touching money, stock, or users is
+// recorded. This is a legal requirement for licensed pharmacies.
+//
+// Usage:
+//   const { audit } = require('../middleware/audit');
+//   await audit(query, { req, action: 'drug.create', entity: 'drug', entityId: drugId, payload: { name } });
+//
+// The helper is fire-and-forget safe: it never throws.
+// If the audit write fails, it logs to console but does NOT
+// fail the parent request — the business operation already
+// succeeded and we must not roll it back over an audit error.
 // ============================================================
 
-const { query } = require('../database/db');
-
 /**
- * Write an audit log entry.
- * Fire-and-forget — never throws (audit failure should not fail the request).
- *
- * @param {object} params
- * @param {number}  params.orgId
- * @param {number}  [params.pharmacyId]
- * @param {number}  [params.userId]
- * @param {string}  params.action      e.g. 'sale.create', 'drug.delete'
- * @param {string}  [params.entity]    e.g. 'sale', 'drug', 'user'
- * @param {*}       [params.entityId]  row id of the affected record
- * @param {object}  [params.payload]   what changed (keep concise)
- * @param {string}  [params.ip]        client IP address
+ * @param {Function} query   - The db query function from db.js
+ * @param {Object}   opts
+ * @param {Object}   opts.req        - Express request (for user + IP)
+ * @param {string}   opts.action     - Dot-namespaced action e.g. 'drug.create'
+ * @param {string}   [opts.entity]   - Entity type e.g. 'drug', 'sale', 'user'
+ * @param {string|number} [opts.entityId] - ID of the affected record
+ * @param {Object}   [opts.payload]  - What changed (sanitised — no passwords)
  */
-async function audit({ orgId, pharmacyId, userId, action, entity, entityId, payload, ip }) {
+async function audit(query, { req, action, entity, entityId, payload }) {
   try {
+    const user       = req.user || {};
+    const orgId      = user.orgId      || null;
+    const pharmacyId = user.pharmacyId || null;
+    const userId     = user.userId     || user.id || null;
+    const ip         = req.headers['x-forwarded-for']?.split(',')[0].trim()
+                    || req.socket?.remoteAddress
+                    || null;
+
     await query(
       `INSERT INTO audit_logs
          (org_id, pharmacy_id, user_id, action, entity, entity_id, payload, ip_address)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
         orgId,
-        pharmacyId || null,
-        userId || null,
+        pharmacyId,
+        userId,
         action,
-        entity || null,
-        entityId !== undefined ? String(entityId) : null,
-        payload ? JSON.stringify(payload) : null,
-        ip || null,
+        entity     || null,
+        entityId   != null ? String(entityId) : null,
+        payload    ? JSON.stringify(payload)  : null,
+        ip,
       ]
     );
-  } catch (e) {
-    // Audit failure must never crash the request — log and continue
-    console.error('⚠️  Audit log failed:', e.message, { action, entity, entityId });
+  } catch (err) {
+    // Never let an audit failure break the main request
+    console.error('[audit] write failed:', err.message, '| action:', action);
   }
 }
 
-/**
- * Helper to extract client IP from a request object.
- */
-function getIp(req) {
-  return (
-    req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
-    req.connection?.remoteAddress ||
-    null
-  );
-}
-
-module.exports = { audit, getIp };
+module.exports = { audit };
