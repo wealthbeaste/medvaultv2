@@ -53,7 +53,7 @@ const app = new App();
 registerRoutes(app);
 
 // ── Optional modules ──────────────────────────────────────
-['./payments/momo', './notifications/whatsapp'].forEach(mod => {
+['./payments/momo', './notifications/whatsapp', './jobs/scheduler'].forEach(mod => {
   try {
     const m = require(mod);
     if (m.registerMomoRoutes)     m.registerMomoRoutes(app);

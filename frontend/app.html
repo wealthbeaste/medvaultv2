@@ -11,7 +11,10 @@
 <title>MedVault — Pharmacy Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
 <style>
-  :root{--bg:#0a0f1e;--surface:#111827;--surface2:#1a2235;--surface3:#212d42;--border:rgba(255,255,255,0.07);--accent:#00d4aa;--accent2:#3b82f6;--warn:#f59e0b;--danger:#ef4444;--success:#10b981;--text:#f0f4ff;--muted:#6b7a99;}
+  :root{--bg:#0a0f1e;--surface:#111827;--surface2:#1a2235;--surface3:#212d42;--border:rgba(255,255,255,0.07);--accent:#00d4aa;--accent2:#3b82f6;--warn:#f59e0b;--danger:#ef4444;--success:#10b981;--text:#f0f4ff;--muted:#6b7a99;
+    /* Shorthand aliases used across the UI */
+    --s1:var(--surface);--s2:var(--surface2);--s3:var(--surface3);--border2:rgba(255,255,255,0.12);
+    --display:'Syne',sans-serif;--font:'DM Sans',sans-serif;}
   *{margin:0;padding:0;box-sizing:border-box;}
   body{
   font-family:'DM Sans',sans-serif;
@@ -2230,6 +2233,7 @@ Or open: https://app.medvault.ug</div>
         <div class="rtr"><span>Discount</span><span id="rDisc"></span></div>
         <div class="rtr rgrand"><span>TOTAL</span><span id="rTot"></span></div>
         <div class="rtr" style="margin-top:5px"><span>Payment</span><span id="rPay"></span></div>
+        <div class="rtr" style="margin-top:5px"><span>Dispensed by</span><span id="rDisp" style="color:var(--muted)"></span></div>
       </div>
       <div class="rfooter">Thank you for your purchase!<br>Keep medicines out of reach of children.<br><strong>MedVault</strong> · medvault.ug</div>
     </div>
@@ -2303,27 +2307,35 @@ const MedVaultOffline = {
   },
 
   async pullFromServer(token){
-    if(!this.isOnline()) return {success:false};
+    if(!this.isOnline()) return {success:false, reason:'offline'};
     try{
       const [inv,sales,orders,customers] = await Promise.all([
-        this.requestJSON('/api/inventory', { token, timeoutMs: 10000 }),
-        this.requestJSON('/api/sales?limit=100', { token, timeoutMs: 10000 }),
-        this.requestJSON('/api/orders', { token, timeoutMs: 10000 }),
-        this.requestJSON('/api/customers', { token, timeoutMs: 10000 }),
+        this.requestJSON('/api/inventory', { token, timeoutMs: 15000 }),
+        this.requestJSON('/api/sales?limit=100', { token, timeoutMs: 15000 }),
+        this.requestJSON('/api/orders', { token, timeoutMs: 15000 }),
+        this.requestJSON('/api/customers', { token, timeoutMs: 15000 }),
       ]);
-      if (!inv.ok || !sales.ok || !orders.ok || !customers.ok) {
-        return { success:false, reason:'sync-partial-failure' };
+
+      // If we get a 401 on any request, token is expired
+      if ([inv,sales,orders,customers].some(r => r.status === 401)) {
+        return { success:false, reason:'401-auth-expired' };
       }
 
       const db=this.getDB();
-      if(inv.data.drugs) db.drugs=inv.data.drugs;
-      if(sales.data.sales) db.sales=sales.data.sales;
-      if(orders.data.orders) db.orders=orders.data.orders;
-      if(customers.data.customers) db.customers=customers.data.customers;
-      this.saveDB(db);
-      this.saveMeta({lastSync:new Date().toISOString(),status:'synced'});
-      this.updateSyncUI();
-      return {success:true};
+      let gotAny = false;
+      if(inv.ok && inv.data.drugs)           { db.drugs=inv.data.drugs;           gotAny=true; }
+      if(sales.ok && sales.data.sales)       { db.sales=sales.data.sales;         gotAny=true; }
+      if(orders.ok && orders.data.orders)    { db.orders=orders.data.orders;      gotAny=true; }
+      if(customers.ok && customers.data.customers){ db.customers=customers.data.customers; gotAny=true; }
+      if(gotAny){
+        this.saveDB(db);
+        this.saveMeta({lastSync:new Date().toISOString(),status:'synced'});
+        this.updateSyncUI();
+        return {success:true};
+      }
+      // Got responses but none had data — likely server error
+      const firstError = [inv,sales,orders,customers].find(r=>!r.ok);
+      return { success:false, reason: firstError ? `server-${firstError.status}` : 'no-data' };
     }catch(e){ return {success:false,reason:e.message}; }
   },
 
@@ -2798,19 +2810,89 @@ async function boot(data) {
     go('dashboard', document.querySelector('.nav-item'));
   }
 
-  // ── 4. Sync data in background — does not block UI ─────
-  setTimeout(async () => {
+  // ── 4. Pull fresh data from server right after login ────
+  // Do this BEFORE loadPage so the dashboard shows real data, not an empty cache.
+  // We already cleared localStorage on login, so without this pull the dashboard
+  // shows zeros for every pharmacy.
+  if (token) {
     try {
+      // Show a gentle loading hint in the sync bar
+      const txt = document.getElementById('syncTxt');
+      if (txt) txt.textContent = '⏳ Loading your pharmacy data…';
+
       const syncResult = await MedVaultOffline.pullFromServer(token);
       if (syncResult && syncResult.success) {
         allDrugs = MedVaultOffline.getDrugs();
-        if (currentPage === 'dashboard') loadDashboard();
-        showToast('✅ Data synced!');
+        loadPage(currentPage);  // re-render now that we have real data
+        showToast('✅ Data loaded!');
+      } else if (syncResult.reason === '401-auth-expired') {
+        showToast('🔐 Session expired — please log in again', 'warn');
+      } else if (!navigator.onLine) {
+        showToast('📴 Offline — showing cached data', 'warn');
+      } else {
+        // Server reachable but returned an error — still render whatever cache exists
+        allDrugs = MedVaultOffline.getDrugs();
+        loadPage(currentPage);
+        showToast('⚠️ Could not load latest data — showing cached data', 'warn');
       }
+      MedVaultOffline.updateSyncUI();
     } catch(e) {
-      console.log('Background sync skipped:', e.message);
+      console.log('Boot sync error:', e.message);
+      MedVaultOffline.updateSyncUI();
     }
-  }, 500); // half second delay — dashboard already visible by now
+  }
+
+  // ── 5. Trial expiry check ───────────────────────────────
+  checkTrialStatus(user);
+}
+
+// ═══════════════════════════════════════════════════════════
+// TRIAL WALL
+// ═══════════════════════════════════════════════════════════
+function checkTrialStatus(user) {
+  if (!user) return;
+  const wall = document.getElementById('trialWall');
+  if (!wall) return;
+
+  const status      = user.sub_status || 'trial';
+  const trialEndsAt = user.trial_ends_at ? new Date(user.trial_ends_at) : null;
+  const now         = new Date();
+
+  if (user.role === 'super_admin') return;
+  if (status === 'active') return;
+
+  const gracePeriodKey = 'mv_grace_until_' + (user.organisation_id || user.id);
+  const graceUntil     = localStorage.getItem(gracePeriodKey);
+  if (graceUntil && new Date(graceUntil) > now) return;
+
+  if (status === 'trial' && trialEndsAt && now > trialEndsAt) { showTrialWall(); return; }
+  if (['expired','overdue','suspended'].includes(status))      { showTrialWall(); return; }
+
+  if (status === 'trial' && trialEndsAt) {
+    const daysLeft = Math.ceil((trialEndsAt - now) / (1000*60*60*24));
+    if (daysLeft <= 2 && daysLeft > 0) {
+      setTimeout(() => showToast(`⚠️ Your free trial ends in ${daysLeft} day${daysLeft>1?'s':''}. Contact Sam to subscribe.`, 'warn'), 2500);
+    }
+  }
+}
+
+function showTrialWall() {
+  const wall = document.getElementById('trialWall');
+  if (!wall) return;
+  wall.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function activateGracePeriod() {
+  const user = currentUser;
+  if (!user) return;
+  const graceUntil = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+  localStorage.setItem('mv_grace_until_' + (user.organisation_id || user.id), graceUntil);
+  const wall = document.getElementById('trialWall');
+  if (wall) wall.style.display = 'none';
+  document.body.style.overflow = '';
+  showToast('⏳ 3-day grace period activated. Please contact Sam to subscribe before it ends.', 'warn');
+  setTimeout(() => showToast('🔔 Reminder: Contact Sam on +256 759 327 843 (Airtel) or +256 774 563 591 (MTN) to activate your subscription.', 'warn'), 60000);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -3178,6 +3260,7 @@ function completeSale() {
   document.getElementById('rDisc').textContent = disc?`- UGX ${da.toLocaleString()} (${disc}%)`:'None';
   document.getElementById('rTot').textContent  = 'UGX '+tot.toLocaleString();
   document.getElementById('rPay').textContent  = payMethod;
+  document.getElementById('rDisp').textContent = (getCurrentUser()?.name) || currentUser?.name || '—';
   document.getElementById('rItems').innerHTML  = cart.map(c=>`<div class="ri"><span>${c.drug_name}</span><span style="text-align:center">${c.quantity}</span><span style="text-align:right">UGX ${(c.unit_price*c.quantity).toLocaleString()}</span></div>`).join('');
   document.getElementById('overlay').classList.add('open');
 
@@ -3254,51 +3337,79 @@ async function dispatchToCashier() {
     const data = await res.json();
     if (!res.ok) { showToast('❌ ' + (data.error||'Failed to dispatch'), 'warn'); return; }
 
-    const dispatchId = data.dispatch.id;
-    showToast('📤 Sent to cashier! You can also complete sale here.', 'warn');
+   const dispatchId = data.dispatch.id;
+showToast('📤 Sent to cashier! Print receipt for customer.', 'warn');
 
-    // Store dispatch ID for reference but DO NOT clear cart
-    // This allows the dispensor to still complete sale & print receipt if needed
-    document.getElementById('dispatchBtn').dataset.dispatchId = dispatchId;
+// Snapshot cart data BEFORE clearing — needed to populate the receipt
+const dispatchCart  = [...cart];
+const dispatchCust  = cust;
+const dispatchSub   = sub;
+const dispatchDisc  = disc;
+const dispatchDa    = da;
+const dispatchTot   = tot;
 
-    // Show a prominent notice that it was sent to cashier
-    const existingNotice = document.getElementById('dispatchSentNotice');
-    if (existingNotice) existingNotice.remove();
-    const cartEl = document.getElementById('cartList') || document.querySelector('.cart-list');
-    const noticeDiv = document.createElement('div');
-    noticeDiv.id = 'dispatchSentNotice';
-    noticeDiv.style.cssText = 'background:rgba(0,212,170,0.12);border:1px solid rgba(0,212,170,0.4);border-radius:10px;padding:10px 14px;margin:8px 0;font-size:12px;color:var(--accent);text-align:center;';
-    noticeDiv.innerHTML = `✅ Sent to cashier (ID: ${dispatchId})<br><span style="color:var(--muted);font-size:11px">Cart kept — you can still complete sale & print receipt below</span>`;
-    const saleFooter = document.querySelector('.sale-footer') || document.getElementById('chargeBtn')?.parentElement;
-    if (saleFooter) saleFooter.insertBefore(noticeDiv, saleFooter.firstChild);
+// Clear customer details immediately — they now belong to the cashier's side
+document.getElementById('custNm').value = '';
+document.getElementById('custPh').value = '';
 
-    // Poll for collection (check every 6 seconds for up to 10 minutes)
-    let polls = 0;
-    if (dispatchPollTimer) clearInterval(dispatchPollTimer);
-    dispatchPollTimer = setInterval(async () => {
-      polls++;
-      if (polls > 100) { clearInterval(dispatchPollTimer); return; }
-      try {
-        const pr  = await fetch(API() + '/api/dispatch/mine', { headers: H() });
-        const pd  = await pr.json();
-        const match = (pd.dispatched||[]).find(d => d.id === dispatchId);
-        if (match && match.status === 'collected') {
-          clearInterval(dispatchPollTimer);
-          const rcpt = match.receipt_number || match.receiptNumber || match.receipt || match.sale?.receipt_number || '—';
-          showToast('✅ Cashier collected payment! Receipt: ' + rcpt);
-          // Now clear cart since cashier handled it
-          cart = [];
-          document.getElementById('custNm').value = '';
-          document.getElementById('custPh').value = '';
-          document.getElementById('discInp').value = '';
-          renderCart(); updTotals();
-          const n = document.getElementById('dispatchSentNotice'); if(n) n.remove();
-          loadSalesHistory();
-        } else if (match && match.status === 'cancelled') {
-          clearInterval(dispatchPollTimer);
-          showToast('⚠️ Cashier cancelled this sale — cart restored, you can complete it here', 'warn');
-          const n = document.getElementById('dispatchSentNotice'); if(n) n.remove();
-        }
+// Clear the cart on the dispensor's side — cashier now owns this sale
+cart = [];
+renderCart(); updTotals();
+
+// Disable BOTH buttons — no further action allowed from dispensor side
+const chargeBtnEl = document.getElementById('chargeBtn');
+if (chargeBtnEl) { chargeBtnEl.disabled = true; chargeBtnEl.style.opacity = '0.4'; chargeBtnEl.title = 'Sale sent to cashier — cannot complete here'; }
+const dispBtnEl = document.getElementById('dispatchBtn');
+if (dispBtnEl) { dispBtnEl.disabled = true; dispBtnEl.style.opacity = '0.4'; }
+
+document.getElementById('dispatchBtn').dataset.dispatchId = dispatchId;
+
+// ── Show receipt popup so dispensor can print for customer to carry to cashier ──
+document.getElementById('rNum').textContent   = `DISP-${dispatchId}`;
+document.getElementById('rDate').textContent  = new Date().toLocaleDateString('en-UG', { dateStyle: 'medium' });
+document.getElementById('rCust').textContent  = dispatchCust;
+document.getElementById('rOfflineTag').innerHTML = `<span style="background:rgba(0,212,170,0.15);color:var(--accent);font-size:9px;padding:2px 7px;border-radius:4px;font-weight:700">⏳ PENDING PAYMENT</span>`;
+document.getElementById('rSub').textContent   = 'UGX ' + dispatchSub.toLocaleString();
+document.getElementById('rDisc').textContent  = dispatchDisc ? `- UGX ${dispatchDa.toLocaleString()} (${dispatchDisc}%)` : 'None';
+document.getElementById('rTot').textContent   = 'UGX ' + dispatchTot.toLocaleString();
+document.getElementById('rPay').textContent   = '⏳ Proceed to Cashier';
+document.getElementById('rDisp').textContent  = (getCurrentUser()?.name) || currentUser?.name || '—';
+document.getElementById('rItems').innerHTML   = dispatchCart.map(c =>
+  `<div class="ri"><span>${c.drug_name}</span><span style="text-align:center">${c.quantity}</span><span style="text-align:right">UGX ${(c.unit_price * c.quantity).toLocaleString()}</span></div>`
+).join('');
+document.getElementById('overlay').classList.add('open');
+
+// Poll for collection (check every 6 seconds for up to 10 minutes)
+let polls = 0;
+if (dispatchPollTimer) clearInterval(dispatchPollTimer);
+dispatchPollTimer = setInterval(async () => {
+  polls++;
+  if (polls > 100) { clearInterval(dispatchPollTimer); return; }
+  try {
+    const pr  = await fetch(API() + '/api/dispatch/mine', { headers: H() });
+    const pd  = await pr.json();
+    const match = (pd.dispatched||[]).find(d => d.id === dispatchId);
+    if (match && match.status === 'collected') {
+      clearInterval(dispatchPollTimer);
+      const rcpt = match.receipt_number || match.receiptNumber || match.receipt || match.sale?.receipt_number || '—';
+      showToast('✅ Cashier collected payment! Receipt: ' + rcpt);
+      // Re-enable dispatch button for next sale
+      const chargeBtnEl2 = document.getElementById('chargeBtn');
+      if (chargeBtnEl2) { chargeBtnEl2.style.opacity = ''; chargeBtnEl2.title = ''; }
+      const dispBtnEl2 = document.getElementById('dispatchBtn');
+      if (dispBtnEl2) { dispBtnEl2.style.opacity = ''; }
+      const n = document.getElementById('dispatchSentNotice'); if(n) n.remove();
+      loadSalesHistory();
+    } else if (match && match.status === 'cancelled') {
+      clearInterval(dispatchPollTimer);
+      showToast('⚠️ Cashier cancelled — add items again to retry', 'warn');
+      // Restore both buttons to usable state for a fresh sale
+      const chargeBtnEl3 = document.getElementById('chargeBtn');
+      if (chargeBtnEl3) { chargeBtnEl3.disabled = true; chargeBtnEl3.style.opacity = ''; chargeBtnEl3.title = ''; }
+      const dispBtnEl3 = document.getElementById('dispatchBtn');
+      if (dispBtnEl3) { dispBtnEl3.disabled = true; dispBtnEl3.style.opacity = ''; }
+      const n = document.getElementById('dispatchSentNotice'); if(n) n.remove();
+    }
       } catch(e) {}
     }, 6000);
 
@@ -3670,16 +3781,29 @@ function canSeeStaffPage() {
 
 
 async function manualSync() {
-  showToast('⏳ Syncing…');
+  showToast('⏳ Syncing with server…');
   const result = await MedVaultOffline.sync(token);
   if (result.pull.success) {
     allDrugs = MedVaultOffline.getDrugs();
     loadPage(currentPage);
     showToast(result.push.pushed > 0
-      ? `☁️ Pushed ${result.push.pushed} offline changes + pulled latest data!`
-      : '✅ All data synced!');
+      ? `☁️ Pushed ${result.push.pushed} offline change${result.push.pushed>1?'s':''} + pulled latest data!`
+      : '✅ All data synced successfully!');
   } else {
-    showToast('📴 Offline — sync will happen when connected','warn');
+    // Distinguish: truly offline vs server-side error while online
+    if (!navigator.onLine) {
+      showToast('📴 No internet connection — sync will happen automatically when you reconnect', 'warn');
+    } else {
+      // Online but server unreachable — still load whatever is cached
+      allDrugs = MedVaultOffline.getDrugs();
+      loadPage(currentPage);
+      const reason = (result.pull.reason || '').toString();
+      if (reason.includes('401') || reason.includes('auth')) {
+        showToast('🔐 Session expired — please log out and log back in', 'warn');
+      } else {
+        showToast('⚠️ Could not reach server — showing cached data. Try again in a moment.', 'warn');
+      }
+    }
   }
 }
 
@@ -3705,269 +3829,6 @@ function printRcpt(){
   const c=document.getElementById('rcptPaper').innerHTML;
   const w=window.open('','_blank','width=400,height=620');
   w.document.write(`<html><head><title>Receipt</title><link href="https://fonts.googleapis.com/css2?family=Syne:wght@800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet"><style>body{font-family:'DM Sans',sans-serif;padding:20px;max-width:320px;margin:0 auto;color:#111}.rlogo{font-family:'Syne',sans-serif;font-weight:800;font-size:20px}.rdiv{border:none;border-top:1px dashed #ccc;margin:12px 0}.rmr{display:flex;justify-content:space-between;font-size:11px;color:#666;margin-bottom:7px}.rih{display:grid;grid-template-columns:2fr 1fr 1fr;font-size:10px;color:#999;text-transform:uppercase;margin-bottom:6px}.ri{display:grid;grid-template-columns:2fr 1fr 1fr;font-size:12px;padding:4px 0;border-bottom:1px solid #f0f0f0}.rtr{display:flex;justify-content:space-between;font-size:12px;padding:3px 0}.rgrand{font-family:'Syne',sans-serif;font-weight:800;font-size:15px;border-top:2px solid #111;margin-top:5px;padding-top:6px}.rtop{text-align:center;margin-bottom:14px}.raddr{font-size:11px;color:#666;line-height:1.6;margin-top:3px}.rfooter{text-align:center;margin-top:12px;padding-top:12px;border-top:1px dashed #ccc;font-size:11px;color:#888;line-height:1.7}.offline-tag{background:#fef3c7;color:#92400e;font-size:9px;padding:2px 6px;border-radius:4px;margin-left:4px}</style></head><body>${c}
-<!-- ADD DRUG MODAL -->
-<div class="overlay" id="addDrugOverlay" onclick="if(event.target===this)closeAddDrug()">
-  <div style="background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:28px;width:500px;max-width:94vw;box-shadow:0 30px 80px rgba(0,0,0,0.6);animation:modalIn 0.2s ease;">
-    <div style="font-family:var(--display);font-weight:700;font-size:20px;margin-bottom:4px">💊 Add New Drug</div>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:22px">Saves to your real database • Works offline too</div>
-    <form id="addDrugForm" onsubmit="event.preventDefault();submitAddDrug()">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
-        <div style="grid-column:1/-1;display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Drug Name *</label>
-          <input id="adName" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Paracetamol 500mg" required/>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Category</label>
-          <select id="adCategory" style="background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:var(--font);font-size:13px;outline:none">
-            <option>General</option><option>Antimalarials</option><option>Antibiotics</option>
-            <option>Analgesics</option><option>Antifungals</option><option>Vitamins</option>
-            <option>Antivirals</option><option>Cardiovascular</option><option>Diabetes</option>
-            <option>Dermatology</option><option>Gastrointestinal</option><option>Other</option>
-          </select>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Quantity in Stock *</label>
-          <input id="adQty" type="number" min="0" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. 200" required/>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Selling Price (UGX) *</label>
-          <input id="adPrice" type="number" min="0" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. 500" required/>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Cost Price (UGX)</label>
-          <input id="adCost" type="number" min="0" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. 300"/>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Expiry Date</label>
-          <input id="adExpiry" type="date" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px"/>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Supplier</label>
-          <input id="adSupplier" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Cipla Uganda"/>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Low Stock Alert (units)</label>
-          <input id="adThreshold" type="number" min="1" value="20" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px"/>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Barcode</label>
-          <input id="drugBarcode" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. 1234567890123"/>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">SKU</label>
-          <input id="drugSku" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. DRUG-ABC-001"/>
-        </div>
-        <div style="grid-column:1/-1;display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Batch Number <span style="color:var(--warn)">*</span> <span style="font-weight:400;text-transform:none;letter-spacing:0">(leave blank to auto-generate)</span></label>
-          <input id="batch_number" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. BN-2025-001 (auto-generated if empty)"/>
-        </div>
-        <div style="grid-column:1/-1;display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--s2);border:1px solid var(--border);border-radius:10px">
-          <input type="checkbox" id="adRx" style="width:16px;height:16px;cursor:pointer"/>
-          <label for="adRx" style="font-size:13px;cursor:pointer">Requires prescription (Rx only)</label>
-        </div>
-      </div>
-      <div style="display:flex;gap:10px;margin-top:6px">
-        <button type="button" onclick="closeAddDrug()" style="flex:1;padding:11px;border-radius:10px;background:var(--s2);color:var(--text);border:1px solid var(--border);font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
-        <button type="submit" id="addDrugBtn" style="flex:2;padding:11px;border-radius:10px;background:var(--accent);color:#000;border:none;font-family:var(--display);font-weight:800;font-size:14px;cursor:pointer">✅ Add Drug</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-
-<!-- INVITE STAFF MODAL -->
-<div class="overlay" id="inviteOverlay" onclick="if(event.target===this)closeInviteModal()">
-  <div style="background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:28px;width:480px;max-width:94vw;animation:modalIn 0.2s ease">
-    <div style="font-family:var(--display);font-weight:700;font-size:20px;margin-bottom:4px">👤 Invite Staff Member</div>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:20px">Create a login account for your staff. Give them the email and password you set here.</div>
-    <form id="inviteForm" onsubmit="event.preventDefault();submitInvite()">
-      <div style="display:flex;flex-direction:column;gap:12px">
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Full Name *</label>
-          <input id="invName" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Sarah Nakato" required/>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Email Address *</label>
-          <input id="invEmail" type="email" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="sarah@yourpharmacy.com" required/>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Password *</label>
-          <input id="invPassword" type="password" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="Min 6 characters" required/>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <div style="display:flex;flex-direction:column;gap:5px">
-            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Role</label>
-            <select id="invRole" style="background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:var(--font);font-size:13px;outline:none">
-              <option value="manager">Manager</option>
-              <option value="pharmacist">Pharmacy Inventory Manager</option>
-              <option value="cashier">Cashier (Till &amp; Payments)</option>
-              <option value="staff">Staff (Dispensing)</option>
-            </select>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:5px">
-            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Assign to Branch</label>
-            <select id="invBranch" style="background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:var(--font);font-size:13px;outline:none">
-              <option value="">Loading branches...</option>
-            </select>
-          </div>
-        </div>
-        <div style="background:rgba(0,212,170,0.06);border:1px solid rgba(0,212,170,0.15);border-radius:10px;padding:12px;font-size:12px;color:var(--muted)">
-          💡 <strong style="color:var(--text)">How staff log in:</strong> They go to your pharmacy app URL and enter the email and password you set above. They will only see their assigned branch.
-        </div>
-      </div>
-      <div style="display:flex;gap:10px;margin-top:18px">
-        <button type="button" onclick="closeInviteModal()" style="flex:1;padding:11px;border-radius:10px;background:var(--s2);color:var(--text);border:1px solid var(--border);font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
-        <button type="submit" id="inviteSubmitBtn" style="flex:2;padding:11px;border-radius:10px;background:var(--accent);color:#000;border:none;font-family:var(--display);font-weight:800;font-size:14px;cursor:pointer">✅ Add Staff Member</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- ADD BRANCH MODAL -->
-<div class="overlay" id="addBranchOverlay" onclick="if(event.target===this)closeAddBranchModal()">
-  <div style="background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:28px;width:440px;max-width:94vw;animation:modalIn 0.2s ease">
-    <div style="font-family:var(--display);font-weight:700;font-size:20px;margin-bottom:4px">🏪 Add New Branch</div>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:20px">Add a new pharmacy location to your organisation</div>
-    <form id="addBranchForm" onsubmit="event.preventDefault();submitAddBranch()">
-      <div style="display:flex;flex-direction:column;gap:12px">
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Branch Name *</label>
-          <input id="brName" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Ntinda Branch" required/>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Address</label>
-          <input id="brAddress" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Ntinda Complex, Kampala"/>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Phone</label>
-          <input id="brPhone" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. 0701 234 567"/>
-        </div>
-        <div style="background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.15);border-radius:10px;padding:12px;font-size:12px;color:var(--muted)">
-          💡 Each branch has its own inventory and sales. You can assign staff to this branch after creating it.
-          Pricing: UGX 35,000/month per branch (discount applied automatically).
-        </div>
-      </div>
-      <div style="display:flex;gap:10px;margin-top:18px">
-        <button type="button" onclick="closeAddBranchModal()" style="flex:1;padding:11px;border-radius:10px;background:var(--s2);color:var(--text);border:1px solid var(--border);font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
-        <button type="submit" id="addBranchSubmitBtn" style="flex:2;padding:11px;border-radius:10px;background:var(--accent);color:#000;border:none;font-family:var(--display);font-weight:800;font-size:14px;cursor:pointer">✅ Add Branch</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- STOCK TRANSFER MODAL -->
-<div class="overlay" id="transferOverlay" onclick="if(event.target===this)closeTransferModal()">
-  <div style="background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:28px;width:440px;max-width:94vw;animation:modalIn 0.2s ease">
-    <div style="font-family:var(--display);font-weight:700;font-size:20px;margin-bottom:4px">🔄 Request Stock Transfer</div>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:20px">Move stock from one branch to another</div>
-    <form id="transferForm" onsubmit="event.preventDefault();submitTransfer()">
-      <div style="display:flex;flex-direction:column;gap:12px">
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">From Branch</label>
-          <select id="trFromBranch" style="background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:var(--font);font-size:13px;outline:none"></select>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">To Branch</label>
-          <select id="trToBranch" style="background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:var(--font);font-size:13px;outline:none"></select>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Drug Name</label>
-          <input id="trDrug" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Paracetamol 500mg" required/>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Quantity to Transfer</label>
-          <input id="trQty" type="number" min="1" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. 50" required/>
-        </div>
-      </div>
-      <div style="display:flex;gap:10px;margin-top:18px">
-        <button type="button" onclick="closeTransferModal()" style="flex:1;padding:11px;border-radius:10px;background:var(--s2);color:var(--text);border:1px solid var(--border);font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
-        <button type="submit" id="transferSubmitBtn" style="flex:2;padding:11px;border-radius:10px;background:var(--accent);color:#000;border:none;font-family:var(--display);font-weight:800;font-size:14px;cursor:pointer">✅ Request Transfer</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-
-<!-- CREDIT RECORD MODAL -->
-<div class="overlay" id="creditModal" onclick="if(event.target===this)closeCreditModal()">
-  <div style="background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:28px;width:480px;max-width:94vw;animation:modalIn 0.2s ease">
-    <div style="font-family:var(--display);font-weight:700;font-size:20px;margin-bottom:4px">💳 Record Credit Sale</div>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:20px">Track drugs given on credit — system will remind customer automatically</div>
-    <form id="creditForm" onsubmit="event.preventDefault();submitCredit()">
-      <div style="display:flex;flex-direction:column;gap:12px">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <div style="display:flex;flex-direction:column;gap:5px">
-            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Customer Name *</label>
-            <input id="crName" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. John Mugisha" required/>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:5px">
-            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Phone (for WhatsApp reminder)</label>
-            <input id="crPhone" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="07XX XXX XXX"/>
-          </div>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Drugs / Items Given</label>
-          <input id="crItems" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Paracetamol x10, Coartem x1"/>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <div style="display:flex;flex-direction:column;gap:5px">
-            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Amount Owed (UGX) *</label>
-            <input id="crAmount" type="number" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. 15000" required/>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:5px">
-            <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Payment Due Date</label>
-            <input id="crDue" type="date" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px"/>
-          </div>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Notes (optional)</label>
-          <input id="crNotes" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Will pay Friday salary day"/>
-        </div>
-        <div style="background:rgba(0,212,170,0.06);border:1px solid rgba(0,212,170,0.15);border-radius:10px;padding:12px;font-size:12px;color:var(--muted)">
-          💬 If you add a phone number, MedVault will send a WhatsApp reminder automatically when payment is due.
-        </div>
-      </div>
-      <div style="display:flex;gap:10px;margin-top:18px">
-        <button type="button" onclick="closeCreditModal()" style="flex:1;padding:11px;border-radius:10px;background:var(--s2);color:var(--text);border:1px solid var(--border);font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
-        <button type="submit" id="creditSubmitBtn" style="flex:2;padding:11px;border-radius:10px;background:var(--accent);color:#000;border:none;font-family:var(--display);font-weight:800;font-size:14px;cursor:pointer">✅ Record Credit</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-
-<!-- PURCHASE ORDER MODAL -->
-<div class="overlay" id="poModal" onclick="if(event.target===this)closePOModal()">
-  <div style="background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:28px;width:580px;max-width:94vw;max-height:90vh;overflow-y:auto;animation:modalIn 0.2s ease">
-    <div style="font-family:var(--display);font-weight:700;font-size:20px;margin-bottom:4px">🛍️ New Purchase Order</div>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:20px">Order drugs from a supplier</div>
-    <div style="display:flex;flex-direction:column;gap:12px">
-      <div style="display:flex;flex-direction:column;gap:5px">
-        <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Supplier Name *</label>
-        <input id="poSupplier" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Cipla Uganda, Abacus Pharma"/>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:8px">
-        <div style="display:flex;align-items:center;justify-content:space-between">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Order Items *</label>
-          <button type="button" onclick="addPOItemRow()" style="font-size:12px;padding:4px 12px;border-radius:6px;background:var(--s2);color:var(--text);border:1px solid var(--border);cursor:pointer">+ Add Item</button>
-        </div>
-        <div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;margin-bottom:4px">
-          <span style="font-size:10px;color:var(--muted);text-transform:uppercase">Drug Name</span>
-          <span style="font-size:10px;color:var(--muted);text-transform:uppercase">Qty</span>
-          <span style="font-size:10px;color:var(--muted);text-transform:uppercase">Unit Price (UGX)</span>
-          <span></span>
-        </div>
-        <div id="poItemsContainer"></div>
-        <div id="poTotalDisplay" style="font-family:var(--display);font-weight:700;font-size:16px;color:var(--accent);text-align:right">Total: UGX 0</div>
-      </div>
-    </div>
-    <div style="display:flex;gap:10px;margin-top:18px">
-      <button onclick="closePOModal()" style="flex:1;padding:11px;border-radius:10px;background:var(--s2);color:var(--text);border:1px solid var(--border);font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
-      <button onclick="submitPO()" style="flex:2;padding:11px;border-radius:10px;background:var(--accent);color:#000;border:none;font-family:var(--display);font-weight:800;font-size:14px;cursor:pointer">✅ Create Purchase Order</button>
-    </div>
-  </div>
-</div>
-
 </body></html>`);
   w.document.close(); w.focus(); setTimeout(()=>{w.print();w.close();},500);
   showToast('🖨️ Sent to printer!'); closeModal();
@@ -4877,6 +4738,7 @@ let denomCounts = {};
 let cashierQueuePoll = null;
 let currentCollectDispatchId = null;
 let currentCollectPayMethod = 'cash';
+let currentCollectSaleData = null;
 
 async function loadDispatchQueue() {
   const list  = document.getElementById('dispatchQueueList');
@@ -4931,9 +4793,10 @@ async function refreshQueue() {
 }
 
 function openCollectModal(dispatchId) {
-  currentCollectDispatchId = dispatchId; currentCollectPayMethod = 'cash';
+  currentCollectDispatchId = dispatchId; currentCollectPayMethod = 'cash'; currentCollectSaleData = null;
   fetch(API()+'/api/dispatch/pending',{headers:H()}).then(r=>r.json()).then(data=>{
     const d=(data.pending||[]).find(x=>x.id===dispatchId); if(!d) return;
+    currentCollectSaleData = d;
     const its=typeof d.items==='string'?JSON.parse(d.items):d.items;
     document.getElementById('collectSummary').innerHTML=
       `<strong>${d.customer_name}</strong> · Total: <strong style="color:var(--accent)">UGX ${Number(d.total_amount).toLocaleString()}</strong>`;
@@ -4960,6 +4823,7 @@ function closeCollectModal() {
   if(m) { m.style.display='none'; m.style.removeProperty('display'); m.style.display='none'; }
   currentCollectDispatchId=null;
   currentCollectPayMethod='cash';
+  currentCollectSaleData=null;
 }
 async function confirmCollectPayment() {
   if(!currentCollectDispatchId) return;
@@ -4976,6 +4840,9 @@ async function confirmCollectPayment() {
       if(btn){btn.textContent='✅ Confirm Payment';btn.disabled=false;}
       return;
     }
+    // Snapshot before closeCollectModal() wipes currentCollectSaleData and currentCollectPayMethod
+    const snapshotSaleData  = currentCollectSaleData;
+    const snapshotPayMethod = currentCollectPayMethod;
     // Close modal FIRST so cashier sees the queue
     closeCollectModal();
     const rcpt = data.receipt_number
@@ -4988,6 +4855,33 @@ async function confirmCollectPayment() {
       || '—';
     if (rcpt === '—') console.warn('[MedVault] collect response missing receipt_number:', data);
     showToast('✅ Payment collected! Receipt: '+rcpt);
+
+    // ── Show real payment receipt popup for cashier to print ──
+    try {
+      const collectedUser = getCurrentUser() || currentUser;
+      const sd  = snapshotSaleData || {};
+      const its = typeof sd.items === 'string' ? JSON.parse(sd.items) : (sd.items || []);
+      const saleSub  = parseFloat(sd.subtotal        || 0);
+      const saleDisc = parseFloat(sd.discount_pct    || 0);
+      const saleDa   = parseFloat(sd.discount_amount || 0);
+      const saleTot  = parseFloat(sd.total_amount    || 0);
+
+      document.getElementById('rNum').textContent   = rcpt;
+      document.getElementById('rDate').textContent  = new Date().toLocaleDateString('en-UG', { dateStyle: 'medium' });
+      document.getElementById('rCust').textContent  = sd.customer_name || '—';
+      document.getElementById('rOfflineTag').innerHTML = '';
+      document.getElementById('rSub').textContent   = saleSub  ? 'UGX ' + saleSub.toLocaleString()  : '—';
+      document.getElementById('rDisc').textContent  = saleDisc ? `- UGX ${saleDa.toLocaleString()} (${saleDisc}%)` : 'None';
+      document.getElementById('rTot').textContent   = saleTot  ? 'UGX ' + saleTot.toLocaleString()  : '—';
+      document.getElementById('rPay').textContent   = snapshotPayMethod.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+      document.getElementById('rDisp').textContent  = collectedUser?.name || '—';
+      document.getElementById('rItems').innerHTML   = its.length
+        ? its.map(i => `<div class="ri"><span>${i.drug_name||i.name||'Item'}</span><span style="text-align:center">${i.quantity}</span><span style="text-align:right">UGX ${Number((i.unit_price||0)*i.quantity).toLocaleString()}</span></div>`).join('')
+        : `<div class="ri"><span>Sale items</span><span style="text-align:center">—</span><span style="text-align:right">UGX ${saleTot.toLocaleString()}</span></div>`;
+      document.getElementById('overlay').classList.add('open');
+    } catch(receiptErr) {
+      console.warn('[MedVault] Could not show receipt popup:', receiptErr);
+    }
     // Flash the queue list to show it's refreshing
     const list=document.getElementById('dispatchQueueList');
     if(list) list.style.opacity='0.4';
@@ -6051,5 +5945,53 @@ boot = async function(data) {
     </form>
   </div>
 </div>
+
+<!-- ══════════════════════════════════════════════════════
+     TRIAL EXPIRED WALL
+══════════════════════════════════════════════════════ -->
+<div id="trialWall" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(5,8,18,0.96);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);align-items:center;justify-content:center;padding:20px;">
+  <div style="max-width:520px;width:100%;background:linear-gradient(160deg,#0d1117 0%,#111827 100%);border:1px solid rgba(239,68,68,0.25);border-radius:24px;padding:40px 36px;box-shadow:0 40px 100px rgba(0,0,0,0.7),0 0 60px rgba(239,68,68,0.06);position:relative;overflow:hidden;">
+    <div style="position:absolute;top:-40px;right:-40px;width:180px;height:180px;background:radial-gradient(circle,rgba(239,68,68,0.15) 0%,transparent 70%);pointer-events:none;"></div>
+    <div style="position:absolute;bottom:-40px;left:-40px;width:160px;height:160px;background:radial-gradient(circle,rgba(0,212,170,0.07) 0%,transparent 70%);pointer-events:none;"></div>
+    <div style="width:64px;height:64px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:28px;margin-bottom:24px;">🔒</div>
+    <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:22px;line-height:1.25;margin-bottom:10px;color:#f0f4ff;">Your 14-Day Free Trial Has Ended</div>
+    <div style="font-size:14px;color:#8899aa;line-height:1.75;margin-bottom:28px;">
+      Thank you for trying <strong style="color:#f0f4ff;">MedVault</strong> — we hope it's been useful for your pharmacy. Your free trial is now complete and your account has been temporarily paused.<br><br>
+      To keep using MedVault without losing any of your data, please get in touch with Sam to activate your subscription. Send a mobile money payment and your account will be unlocked within minutes.
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:28px;">
+      <div style="display:flex;align-items:center;gap:14px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:14px;padding:14px 18px;">
+        <div style="width:40px;height:40px;border-radius:12px;background:rgba(254,196,0,0.12);border:1px solid rgba(254,196,0,0.2);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">📲</div>
+        <div>
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#5a6a82;font-weight:600;margin-bottom:3px;">Airtel Money</div>
+          <div style="font-family:'DM Mono',monospace;font-size:18px;font-weight:700;color:#f0f4ff;letter-spacing:1px;">+256 759 327 843</div>
+          <div style="font-size:11px;color:#5a6a82;margin-top:2px;">Contact Sam · Airtel Uganda</div>
+        </div>
+        <a href="tel:+256759327843" style="margin-left:auto;padding:7px 14px;border-radius:8px;background:rgba(254,196,0,0.1);border:1px solid rgba(254,196,0,0.2);color:#fec400;font-size:11px;font-weight:700;text-decoration:none;white-space:nowrap;">Call</a>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:14px;padding:14px 18px;">
+        <div style="width:40px;height:40px;border-radius:12px;background:rgba(255,204,0,0.1);border:1px solid rgba(255,204,0,0.2);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">💛</div>
+        <div>
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#5a6a82;font-weight:600;margin-bottom:3px;">MTN Mobile Money</div>
+          <div style="font-family:'DM Mono',monospace;font-size:18px;font-weight:700;color:#f0f4ff;letter-spacing:1px;">+256 774 563 591</div>
+          <div style="font-size:11px;color:#5a6a82;margin-top:2px;">Contact Sam · MTN Uganda</div>
+        </div>
+        <a href="tel:+256774563591" style="margin-left:auto;padding:7px 14px;border-radius:8px;background:rgba(255,204,0,0.08);border:1px solid rgba(255,204,0,0.2);color:#ffcc00;font-size:11px;font-weight:700;text-decoration:none;white-space:nowrap;">Call</a>
+      </div>
+    </div>
+    <div style="background:rgba(0,212,170,0.06);border:1px solid rgba(0,212,170,0.15);border-radius:12px;padding:14px 16px;margin-bottom:24px;display:flex;gap:12px;align-items:flex-start;">
+      <div style="font-size:18px;flex-shrink:0;margin-top:1px;">⏳</div>
+      <div>
+        <div style="font-size:12px;font-weight:700;color:#00d4aa;margin-bottom:4px;">3-Day Grace Period Available</div>
+        <div style="font-size:12px;color:#6b7a99;line-height:1.6;">Not ready to pay right now? No problem. Activate a <strong style="color:#f0f4ff;">3-day grace period</strong> to keep accessing your data while you arrange payment. After those 3 days, the account will be fully locked.</div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <button onclick="activateGracePeriod()" style="width:100%;padding:15px;border-radius:12px;background:linear-gradient(135deg,#00d4aa,#00b894);color:#000;border:none;font-family:'Syne',sans-serif;font-weight:800;font-size:15px;cursor:pointer;transition:filter 0.2s;" onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='brightness(1)'">⏳ Continue with 3-Day Grace Period</button>
+      <div style="text-align:center;font-size:11px;color:#5a6a82;line-height:1.6;padding:0 8px;">Already paid? Contact Sam and your account will be activated shortly. This screen disappears automatically once your subscription is confirmed.</div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

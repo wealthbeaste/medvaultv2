@@ -4,7 +4,7 @@ const https = require('https');
 
 module.exports = function registerRoutes(app) {
 
-  const { query, getNextReceiptNumber } = require('../database/db');
+  const { query, getPool, getNextReceiptNumber } = require('../database/db');
   const { hash, compare } = require('../core/password');
   const { sign }          = require('../core/jwt');
   const auth              = require('../middleware/auth');
@@ -204,17 +204,27 @@ module.exports = function registerRoutes(app) {
       return res.status(403).json({ error: 'Not allowed' });
     }
     const { search, category } = req.query;
+    // ✅ Pagination added — ?page=1&limit=50
+    const page  = Math.max(1, parseInt(req.query.page  || '1'));
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit || '50')));
+    const offset = (page - 1) * limit;
     try {
+      let countSql = `SELECT COUNT(*) as total FROM drugs WHERE pharmacy_id=$1`;
       let sql = `SELECT *,
         CASE WHEN quantity=0 THEN 'out' WHEN quantity<=threshold THEN 'critical' WHEN quantity<=threshold*1.5 THEN 'low' ELSE 'ok' END as stock_status,
         CASE WHEN expiry_date IS NOT NULL THEN (expiry_date-CURRENT_DATE)::int ELSE 999 END as days_to_expiry
         FROM drugs WHERE pharmacy_id=$1`;
       const params = [pharmacyId]; let i = 2;
-      if (search) { sql+=` AND name ILIKE $${i++}`; params.push('%'+search+'%'); }
-      if (category) { sql+=` AND category=$${i++}`; params.push(category); }
-      sql += ' ORDER BY name';
-      const result = await query(sql, params);
-      res.json({ drugs:result.rows, total:result.rows.length });
+      if (search) { sql+=` AND name ILIKE $${i}`; countSql+=` AND name ILIKE $${i}`; params.push('%'+search+'%'); i++; }
+      if (category) { sql+=` AND category=$${i}`; countSql+=` AND category=$${i}`; params.push(category); i++; }
+      sql += ` ORDER BY name LIMIT $${i} OFFSET $${i+1}`;
+      const paginatedParams = [...params, limit, offset];
+      const [countRes, result] = await Promise.all([
+        query(countSql, params),
+        query(sql, paginatedParams),
+      ]);
+      const total = parseInt(countRes.rows[0].total);
+      res.json({ drugs:result.rows, total, page, limit, pages: Math.ceil(total/limit) });
     } catch(e) { res.json({ error:e.message }, 500); }
   });
 
@@ -335,6 +345,25 @@ app.post('/api/inventory', auth, async (req, res) => {
 
   try {
 
+    // ── Idempotency guard ────────────────────────────────────────────────────
+    // If a drug with the same name already exists for this pharmacy, return
+    // that record instead of inserting a duplicate. This is the safety net for
+    // any offline-sync retry that somehow fires twice.
+    const existing = await query(
+      `SELECT id, name FROM drugs WHERE pharmacy_id=$1 AND LOWER(name)=LOWER($2) LIMIT 1`,
+      [req.user.pharmacyId, name]
+    );
+    if (existing.rows.length) {
+      return res.json({
+        success: true,
+        message: '✅ Drug already exists (idempotent)',
+        drug: { id: existing.rows[0].id, batch_number: finalBatchNumber },
+        id: existing.rows[0].id,
+        _idempotent: true,
+      });
+    }
+    // ────────────────────────────────────────────────────────────────────────
+
     // 1. Create drug (batch_number lives in drug_batches, not drugs table)
     const drugResult = await query(
       `INSERT INTO drugs (
@@ -400,6 +429,12 @@ app.post('/api/inventory', auth, async (req, res) => {
   
     // Note: batch/:id update endpoint is defined later in this file.
 
+    // Audit log
+    const { audit, getIp } = require('../utils/audit');
+    audit({ orgId:req.user.orgId, pharmacyId:req.user.pharmacyId, userId:req.user.userId,
+            action:'drug.create', entity:'drug', entityId:drugId,
+            payload:{ name, quantity, unit_price }, ip:getIp(req) });
+
     res.json({
       success: true,
       message: '✅ Drug added successfully',
@@ -419,49 +454,93 @@ app.post('/api/inventory', auth, async (req, res) => {
 
 
   app.delete('/api/inventory/:id', auth, async (req, res) => {
-    const { pharmacyId } = req.user;
+    const { pharmacyId, orgId, userId } = req.user;
     try {
+      const existing = await query(`SELECT name FROM drugs WHERE id=$1 AND pharmacy_id=$2`,[req.params.id,pharmacyId]);
       const result = await query(`DELETE FROM drugs WHERE id=$1 AND pharmacy_id=$2 RETURNING id`,[req.params.id,pharmacyId]);
       if (!result.rows.length) return res.json({ error:'Not found' }, 404);
-      res.json({ message:'✅ Deleted' });
+      const { audit, getIp } = require('../utils/audit');
+      audit({ orgId, pharmacyId, userId, action:'drug.delete', entity:'drug', entityId:req.params.id,
+              payload:{ name: existing.rows[0]?.name }, ip:getIp(req) });
+      res.json({ success:true, message:'✅ Deleted' });
     } catch(e) { res.json({ error:e.message }, 500); }
   });
 
   // ── SALES ───────────────────────────────────────────────
   app.get('/api/sales', auth, async (req, res) => {
     const { pharmacyId } = req.user;
+    // ✅ Pagination added — ?page=1&limit=50
+    const page  = Math.max(1, parseInt(req.query.page  || '1'));
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit || '50')));
+    const offset = (page - 1) * limit;
     try {
-      const result = await query(
-        `SELECT s.*,json_agg(json_build_object('drug_name',si.drug_name,'quantity',si.quantity,'unit_price',si.unit_price,'total_price',si.total_price)) as items
-         FROM sales s LEFT JOIN sale_items si ON si.sale_id=s.id
-         WHERE s.pharmacy_id=$1 GROUP BY s.id ORDER BY s.created_at DESC LIMIT 100`,
-        [pharmacyId]
-      );
-      res.json({ sales:result.rows, total:result.rows.length });
+      const [countRes, result] = await Promise.all([
+        query(`SELECT COUNT(*) as total FROM sales WHERE pharmacy_id=$1 AND voided=false`, [pharmacyId]),
+        query(
+          `SELECT s.*,json_agg(json_build_object('drug_name',si.drug_name,'quantity',si.quantity,'unit_price',si.unit_price,'total_price',si.total_price)) as items
+           FROM sales s LEFT JOIN sale_items si ON si.sale_id=s.id
+           WHERE s.pharmacy_id=$1 AND s.voided=false
+           GROUP BY s.id ORDER BY s.created_at DESC LIMIT $2 OFFSET $3`,
+          [pharmacyId, limit, offset]
+        ),
+      ]);
+      const total = parseInt(countRes.rows[0].total);
+      res.json({ sales:result.rows, total, page, limit, pages: Math.ceil(total/limit) });
     } catch(e) { res.json({ error:e.message }, 500); }
   });
 
   app.post('/api/sales', auth, async (req, res) => {
-    const { pharmacyId, userId, role } = req.user;
+    const { pharmacyId, userId, orgId, role } = req.user;
     if (role === 'cashier')
       return res.status(403).json({ success:false, error:'Cashiers cannot record sales directly. Use the dispatch queue.' });
     const { customer_name,customer_phone,items,discount_pct,payment_method,subtotal,discount_amount,total_amount } = req.body;
-    if (!items||!items.length) return res.json({ error:'No items' }, 400);
+    if (!items||!items.length) return res.status(400).json({ success:false, error:'No items provided' });
+
+    // ✅ FIXED: Full DB transaction — if anything fails, stock is NOT decremented
+    const pool = getPool();
+    const client = await pool.connect();
     try {
-      const receiptNum = await getNextReceiptNumber(pharmacyId);
-      const sale = await query(
+      await client.query('BEGIN');
+
+      // ✅ FIXED: Atomic receipt number — no race condition
+      const receiptNum = await getNextReceiptNumber(pharmacyId, client);
+
+      const sale = await client.query(
         `INSERT INTO sales (pharmacy_id,user_id,receipt_number,customer_name,customer_phone,subtotal,discount_pct,discount_amount,total_amount,payment_method)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
         [pharmacyId,userId||null,receiptNum,customer_name||'Walk-in',customer_phone||null,
          parseFloat(subtotal||0),parseFloat(discount_pct||0),parseFloat(discount_amount||0),parseFloat(total_amount||0),payment_method||'cash']
       );
+      const saleId = sale.rows[0].id;
+
       for (const item of items) {
-        await query(`INSERT INTO sale_items (sale_id,drug_id,drug_name,quantity,unit_price,total_price) VALUES ($1,$2,$3,$4,$5,$6)`,
-          [sale.rows[0].id,item.drug_id||null,item.drug_name,item.quantity,item.unit_price,item.unit_price*item.quantity]);
-        if (item.drug_id) await query(`UPDATE drugs SET quantity=GREATEST(0,quantity-$1),updated_at=NOW() WHERE id=$2 AND pharmacy_id=$3`,[item.quantity,item.drug_id,pharmacyId]);
+        await client.query(
+          `INSERT INTO sale_items (sale_id,drug_id,drug_name,quantity,unit_price,total_price) VALUES ($1,$2,$3,$4,$5,$6)`,
+          [saleId, item.drug_id||null, item.drug_name, item.quantity, item.unit_price, item.unit_price*item.quantity]
+        );
+        if (item.drug_id) {
+          await client.query(
+            `UPDATE drugs SET quantity=GREATEST(0,quantity-$1),updated_at=NOW(),updated_by=$4 WHERE id=$2 AND pharmacy_id=$3`,
+            [item.quantity, item.drug_id, pharmacyId, userId||null]
+          );
+        }
       }
-      res.json({ message:'✅ Sale recorded!', sale:sale.rows[0], receipt_number:receiptNum });
-    } catch(e) { res.json({ error:'Sale failed: '+e.message }, 500); }
+
+      await client.query('COMMIT');
+
+      // Audit log (fire-and-forget, outside transaction)
+      const { audit, getIp } = require('../utils/audit');
+      audit({ orgId, pharmacyId, userId, action:'sale.create', entity:'sale', entityId:saleId,
+              payload:{ receipt:receiptNum, total:total_amount, items:items.length }, ip:getIp(req) });
+
+      res.json({ success:true, message:'✅ Sale recorded!', sale:sale.rows[0], receipt_number:receiptNum });
+    } catch(e) {
+      await client.query('ROLLBACK');
+      console.error('Sale failed:', e.message);
+      res.status(500).json({ success:false, error:'Sale failed: '+e.message, code:'SALE_ERROR' });
+    } finally {
+      client.release();
+    }
   });
 
   // ── ORDERS ──────────────────────────────────────────────
@@ -957,7 +1036,7 @@ app.post('/api/inventory', auth, async (req, res) => {
       const receipt_number = await getNextReceiptNumber(pharmacyId);
 
       // Transaction: insert sale + items + deduct stock + mark dispatch done
-      const client = await require('../database/db').pool.connect();
+      const client = await getPool().connect();
       try {
         await client.query('BEGIN');
         const sr = await client.query(
@@ -1172,31 +1251,207 @@ app.post('/api/inventory', auth, async (req, res) => {
   });
 
   // ── SUPER ADMIN ─────────────────────────────────────────
-  app.get('/api/admin/pharmacies', auth, async (req, res) => {
-    if (req.user.role!=='super_admin') return res.json({ error:'Super admin only' }, 403);
+  function adminOnly(req, res, next) {
+    if (req.user.role !== 'super_admin') return res.status(403).json({ error: 'Super admin only' });
+    next();
+  }
+
+  // GET /api/admin/stats — platform overview numbers
+  app.get('/api/admin/stats', auth, adminOnly, async (req, res) => {
     try {
-      const result = await query(
-        `SELECT o.id as org_id,o.name as org_name,o.email,o.phone,o.plan,o.created_at,
-                COUNT(p.id) as branch_count,s.status as sub_status,s.amount_ugx,s.trial_ends_at,
-                (SELECT COALESCE(SUM(sa.total_amount),0) FROM sales sa JOIN pharmacies bp ON bp.id=sa.pharmacy_id WHERE bp.organisation_id=o.id) as total_revenue
-         FROM organisations o LEFT JOIN pharmacies p ON p.organisation_id=o.id LEFT JOIN subscriptions s ON s.organisation_id=o.id
-         GROUP BY o.id,s.status,s.amount_ugx,s.trial_ends_at ORDER BY o.created_at DESC`
-      );
-      res.json({ organisations:result.rows });
-    } catch(e) { res.json({ error:e.message }, 500); }
+      const [orgs, active, trial, overdue, suspended, mrr, totalSales, totalUsers] = await Promise.all([
+        query(`SELECT COUNT(*) as cnt FROM organisations WHERE email != 'admin@medvault.ug'`),
+        query(`SELECT COUNT(*) as cnt FROM subscriptions s JOIN organisations o ON o.id=s.organisation_id WHERE s.status='active' AND o.email!='admin@medvault.ug'`),
+        query(`SELECT COUNT(*) as cnt FROM subscriptions s JOIN organisations o ON o.id=s.organisation_id WHERE s.status='trial' AND o.email!='admin@medvault.ug'`),
+        query(`SELECT COUNT(*) as cnt FROM subscriptions s JOIN organisations o ON o.id=s.organisation_id WHERE s.status='overdue' AND o.email!='admin@medvault.ug'`),
+        query(`SELECT COUNT(*) as cnt FROM subscriptions s JOIN organisations o ON o.id=s.organisation_id WHERE s.status='suspended' AND o.email!='admin@medvault.ug'`),
+        query(`SELECT COALESCE(SUM(s.amount_ugx),0) as mrr FROM subscriptions s JOIN organisations o ON o.id=s.organisation_id WHERE s.status='active' AND o.email!='admin@medvault.ug'`),
+        query(`SELECT COALESCE(SUM(total_amount),0) as total FROM sales`),
+        query(`SELECT COUNT(*) as cnt FROM users WHERE email!='admin@medvault.ug'`),
+      ]);
+      res.json({
+        totalOrgs:       parseInt(orgs.rows[0].cnt),
+        activeCount:     parseInt(active.rows[0].cnt),
+        trialCount:      parseInt(trial.rows[0].cnt),
+        overdueCount:    parseInt(overdue.rows[0].cnt),
+        suspendedCount:  parseInt(suspended.rows[0].cnt),
+        mrr:             parseFloat(mrr.rows[0].mrr),
+        totalSalesRevenue: parseFloat(totalSales.rows[0].total),
+        totalUsers:      parseInt(totalUsers.rows[0].cnt),
+      });
+    } catch(e) { res.status(500).json({ error: e.message }); }
   });
 
-  app.get('/api/admin/stats', auth, async (req, res) => {
-    if (req.user.role!=='super_admin') return res.json({ error:'Super admin only' }, 403);
+  // GET /api/admin/orgs — full org list with all details
+  app.get('/api/admin/orgs', auth, adminOnly, async (req, res) => {
     try {
-      const [orgs,active,trial,rev] = await Promise.all([
-        query(`SELECT COUNT(*) as cnt FROM organisations`),
-        query(`SELECT COUNT(*) as cnt FROM subscriptions WHERE status='active'`),
-        query(`SELECT COUNT(*) as cnt FROM subscriptions WHERE status='trial'`),
-        query(`SELECT COALESCE(SUM(amount_ugx),0) as mrr FROM subscriptions WHERE status='active'`),
-      ]);
-      res.json({ totalOrganisations:parseInt(orgs.rows[0].cnt), activeSubscriptions:parseInt(active.rows[0].cnt), onTrial:parseInt(trial.rows[0].cnt), mrr:parseFloat(rev.rows[0].mrr) });
-    } catch(e) { res.json({ error:e.message }, 500); }
+      const result = await query(`
+        SELECT
+          o.id, o.name, o.owner_name, o.email, o.phone, o.plan, o.is_active, o.created_at,
+          ph.id         AS pharmacy_id,
+          ph.address    AS location,
+          ph.nda_number AS nda,
+          ph.is_active  AS pharmacy_active,
+          s.id          AS sub_id,
+          s.status      AS sub_status,
+          s.amount_ugx,
+          s.trial_ends_at,
+          s.next_billing,
+          (SELECT COUNT(*) FROM pharmacies pp WHERE pp.organisation_id = o.id) AS branch_count,
+          (SELECT COUNT(*) FROM users u WHERE u.organisation_id = o.id AND u.email != 'admin@medvault.ug') AS user_count,
+          (SELECT COUNT(*) FROM drugs d JOIN pharmacies pp ON pp.id = d.pharmacy_id WHERE pp.organisation_id = o.id) AS drug_count,
+          (SELECT COALESCE(SUM(sa.total_amount),0) FROM sales sa JOIN pharmacies pp ON pp.id = sa.pharmacy_id WHERE pp.organisation_id = o.id) AS total_sales,
+          (SELECT COUNT(*) FROM sales sa JOIN pharmacies pp ON pp.id = sa.pharmacy_id WHERE pp.organisation_id = o.id) AS sale_count,
+          (SELECT MAX(sa.created_at) FROM sales sa JOIN pharmacies pp ON pp.id = sa.pharmacy_id WHERE pp.organisation_id = o.id) AS last_sale_at
+        FROM organisations o
+        LEFT JOIN pharmacies ph ON ph.organisation_id = o.id AND ph.is_head_office = true
+        LEFT JOIN subscriptions s ON s.organisation_id = o.id
+        WHERE o.email != 'admin@medvault.ug'
+        ORDER BY o.created_at DESC
+      `);
+      res.json({ orgs: result.rows });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // GET /api/admin/users — all users across platform
+  app.get('/api/admin/users', auth, adminOnly, async (req, res) => {
+    try {
+      const result = await query(`
+        SELECT u.id, u.name, u.email, u.role, u.is_active, u.created_at,
+               o.name AS org_name, p.name AS pharmacy_name
+        FROM users u
+        JOIN organisations o ON o.id = u.organisation_id
+        LEFT JOIN pharmacies p ON p.id = u.pharmacy_id
+        WHERE u.email != 'admin@medvault.ug'
+        ORDER BY u.created_at DESC
+      `);
+      res.json({ users: result.rows });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // POST /api/admin/orgs — create new organisation + pharmacy + owner user
+  app.post('/api/admin/orgs', auth, adminOnly, async (req, res) => {
+    const { name, owner_name, email, phone, location, plan, nda } = req.body;
+    if (!name || !email || !phone) return res.status(400).json({ error: 'name, email and phone required' });
+    const planAmounts = { drug_shop:20000, basic:20000, single:50000, pro:50000, multi:80000, branch:40000, chain:30000, enterprise:150000 };
+    const amount = planAmounts[plan] || 50000;
+    try {
+      const tempPw = name.replace(/\s+/g,'').slice(0,4) + phone.slice(-4) + '!';
+      const pwHash = await hash(tempPw);
+      const org = await query(
+        `INSERT INTO organisations (name,owner_name,email,phone,plan) VALUES ($1,$2,$3,$4,$5) RETURNING id`,
+        [name, owner_name||name, email.toLowerCase(), phone, plan||'pro']
+      );
+      const orgId = org.rows[0].id;
+      const ph = await query(
+        `INSERT INTO pharmacies (organisation_id,name,address,phone,nda_number,is_head_office) VALUES ($1,$2,$3,$4,$5,true) RETURNING id`,
+        [orgId, name, location||'Uganda', phone, nda||null]
+      );
+      const pharmacyId = ph.rows[0].id;
+      await query(
+        `INSERT INTO users (organisation_id,pharmacy_id,name,email,password_hash,role) VALUES ($1,$2,$3,$4,$5,'owner')`,
+        [orgId, pharmacyId, owner_name||name, email.toLowerCase(), pwHash]
+      );
+      await query(
+        `INSERT INTO subscriptions (organisation_id,plan,amount_ugx,status,trial_ends_at) VALUES ($1,$2,$3,'trial',NOW()+INTERVAL '14 days')`,
+        [orgId, plan||'pro', amount]
+      );
+      res.json({ success: true, org_id: orgId, pharmacy_id: pharmacyId, temp_password: tempPw });
+    } catch(e) {
+      if (e.code === '23505') return res.status(409).json({ error: 'Email already registered' });
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // POST /api/admin/orgs/:id/suspend — deactivate org + all users
+  app.post('/api/admin/orgs/:id/suspend', auth, adminOnly, async (req, res) => {
+    try {
+      await query(`UPDATE organisations SET is_active=false WHERE id=$1`, [req.params.id]);
+      await query(`UPDATE users SET is_active=false WHERE organisation_id=$1`, [req.params.id]);
+      await query(`UPDATE subscriptions SET status='suspended' WHERE organisation_id=$1`, [req.params.id]);
+      res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // POST /api/admin/orgs/:id/activate — reactivate org + all users
+  app.post('/api/admin/orgs/:id/activate', auth, adminOnly, async (req, res) => {
+    try {
+      await query(`UPDATE organisations SET is_active=true WHERE id=$1`, [req.params.id]);
+      await query(`UPDATE users SET is_active=true WHERE organisation_id=$1`, [req.params.id]);
+      await query(`UPDATE subscriptions SET status='active' WHERE organisation_id=$1`, [req.params.id]);
+      res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // POST /api/admin/orgs/:id/mark-overdue
+  app.post('/api/admin/orgs/:id/mark-overdue', auth, adminOnly, async (req, res) => {
+    try {
+      await query(`UPDATE subscriptions SET status='overdue' WHERE organisation_id=$1`, [req.params.id]);
+      res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // POST /api/admin/orgs/:id/convert-trial — convert trial to paid
+  app.post('/api/admin/orgs/:id/convert-trial', auth, adminOnly, async (req, res) => {
+    const { plan } = req.body;
+    const planAmounts = { drug_shop:20000, basic:20000, single:50000, pro:50000, multi:80000, enterprise:150000 };
+    const amount = planAmounts[plan] || 50000;
+    try {
+      await query(`UPDATE subscriptions SET status='active', plan=$1, amount_ugx=$2, next_billing=NOW()+INTERVAL '30 days' WHERE organisation_id=$3`, [plan||'pro', amount, req.params.id]);
+      await query(`UPDATE organisations SET is_active=true, plan=$1 WHERE id=$2`, [plan||'pro', req.params.id]);
+      await query(`UPDATE users SET is_active=true WHERE organisation_id=$1`, [req.params.id]);
+      res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // POST /api/admin/orgs/:id/extend-trial
+  app.post('/api/admin/orgs/:id/extend-trial', auth, adminOnly, async (req, res) => {
+    const days = parseInt(req.body.days) || 7;
+    try {
+      await query(`UPDATE subscriptions SET trial_ends_at = GREATEST(trial_ends_at, NOW()) + INTERVAL '${days} days' WHERE organisation_id=$1`, [req.params.id]);
+      res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // PATCH /api/admin/orgs/:id/plan — change plan
+  app.patch('/api/admin/orgs/:id/plan', auth, adminOnly, async (req, res) => {
+    const { plan } = req.body;
+    const planAmounts = { drug_shop:20000, basic:20000, single:50000, pro:50000, multi:80000, enterprise:150000 };
+    const amount = planAmounts[plan];
+    if (!amount) return res.status(400).json({ error: 'Invalid plan name' });
+    try {
+      await query(`UPDATE subscriptions SET plan=$1, amount_ugx=$2 WHERE organisation_id=$3`, [plan, amount, req.params.id]);
+      await query(`UPDATE organisations SET plan=$1 WHERE id=$2`, [plan, req.params.id]);
+      res.json({ success: true, amount });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // POST /api/admin/users/:id/suspend — suspend one user
+  app.post('/api/admin/users/:id/suspend', auth, adminOnly, async (req, res) => {
+    try {
+      await query(`UPDATE users SET is_active=false WHERE id=$1`, [req.params.id]);
+      res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // POST /api/admin/users/:id/activate — activate one user
+  app.post('/api/admin/users/:id/activate', auth, adminOnly, async (req, res) => {
+    try {
+      await query(`UPDATE users SET is_active=true WHERE id=$1`, [req.params.id]);
+      res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // POST /api/admin/users/:id/reset-password
+  app.post('/api/admin/users/:id/reset-password', auth, adminOnly, async (req, res) => {
+    try {
+      const u = await query(`SELECT email, phone FROM users u LEFT JOIN organisations o ON o.id=u.organisation_id WHERE u.id=$1`, [req.params.id]);
+      if (!u.rows.length) return res.status(404).json({ error: 'User not found' });
+      const newPw = 'MedVault' + Math.floor(1000 + Math.random()*9000) + '!';
+      const pwHash = await hash(newPw);
+      await query(`UPDATE users SET password_hash=$1 WHERE id=$2`, [pwHash, req.params.id]);
+      res.json({ success: true, new_password: newPw });
+    } catch(e) { res.status(500).json({ error: e.message }); }
   });
 
   // ── AI ──────────────────────────────────────────────────
@@ -1251,5 +1506,272 @@ app.post('/api/inventory', auth, async (req, res) => {
       res.status(500).json({ error: e.message });
     }
   });
+
+  // ══════════════════════════════════════════════════════════
+  // PHASE 1 — NEW ROUTES
+  // ══════════════════════════════════════════════════════════
+
+  // ── NOTIFICATIONS ─────────────────────────────────────────
+  app.get('/api/notifications', auth, async (req, res) => {
+    const { pharmacyId, userId } = req.user;
+    const limit = Math.min(50, parseInt(req.query.limit || '20'));
+    try {
+      const [notifs, unread] = await Promise.all([
+        query(
+          `SELECT * FROM notifications
+           WHERE pharmacy_id=$1 AND (user_id IS NULL OR user_id=$2)
+           ORDER BY created_at DESC LIMIT $3`,
+          [pharmacyId, userId, limit]
+        ),
+        query(
+          `SELECT COUNT(*) as cnt FROM notifications
+           WHERE pharmacy_id=$1 AND (user_id IS NULL OR user_id=$2) AND is_read=false`,
+          [pharmacyId, userId]
+        ),
+      ]);
+      res.json({ notifications: notifs.rows, unread_count: parseInt(unread.rows[0].cnt) });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.patch('/api/notifications/:id/read', auth, async (req, res) => {
+    const { pharmacyId } = req.user;
+    try {
+      await query(
+        `UPDATE notifications SET is_read=true WHERE id=$1 AND pharmacy_id=$2`,
+        [req.params.id, pharmacyId]
+      );
+      res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.patch('/api/notifications/read-all', auth, async (req, res) => {
+    const { pharmacyId, userId } = req.user;
+    try {
+      await query(
+        `UPDATE notifications SET is_read=true
+         WHERE pharmacy_id=$1 AND (user_id IS NULL OR user_id=$2) AND is_read=false`,
+        [pharmacyId, userId]
+      );
+      res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── SUPPLIERS ─────────────────────────────────────────────
+  app.get('/api/suppliers', auth, async (req, res) => {
+    const { orgId } = req.user;
+    try {
+      const result = await query(
+        `SELECT * FROM suppliers WHERE org_id=$1 AND is_active=true ORDER BY name`,
+        [orgId]
+      );
+      res.json({ suppliers: result.rows });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post('/api/suppliers', auth, async (req, res) => {
+    const { orgId, userId } = req.user;
+    if (!['owner','manager','super_admin'].includes(req.user.role))
+      return res.status(403).json({ error: 'Not allowed' });
+    const { name, contact_name, phone, email, address, payment_terms, notes } = req.body;
+    if (!name) return res.status(400).json({ error: "'name' is required" });
+    try {
+      const result = await query(
+        `INSERT INTO suppliers (org_id,name,contact_name,phone,email,address,payment_terms,notes)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+        [orgId, name, contact_name||null, phone||null, email||null, address||null, payment_terms||null, notes||null]
+      );
+      const { audit, getIp } = require('../utils/audit');
+      audit({ orgId, userId, action:'supplier.create', entity:'supplier', entityId:result.rows[0].id,
+              payload:{ name }, ip:getIp(req) });
+      res.json({ success: true, supplier: result.rows[0] });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.patch('/api/suppliers/:id', auth, async (req, res) => {
+    const { orgId, userId } = req.user;
+    if (!['owner','manager','super_admin'].includes(req.user.role))
+      return res.status(403).json({ error: 'Not allowed' });
+    const { name, contact_name, phone, email, address, payment_terms, notes, is_active } = req.body;
+    try {
+      const result = await query(
+        `UPDATE suppliers SET
+           name=COALESCE($1,name), contact_name=COALESCE($2,contact_name),
+           phone=COALESCE($3,phone), email=COALESCE($4,email),
+           address=COALESCE($5,address), payment_terms=COALESCE($6,payment_terms),
+           notes=COALESCE($7,notes),
+           is_active=COALESCE($8,is_active)
+         WHERE id=$9 AND org_id=$10 RETURNING *`,
+        [name||null, contact_name||null, phone||null, email||null,
+         address||null, payment_terms||null, notes||null,
+         is_active !== undefined ? is_active : null,
+         req.params.id, orgId]
+      );
+      if (!result.rows.length) return res.status(404).json({ error: 'Not found' });
+      const { audit, getIp } = require('../utils/audit');
+      audit({ orgId, userId, action:'supplier.update', entity:'supplier', entityId:req.params.id,
+              payload:req.body, ip:getIp(req) });
+      res.json({ success: true, supplier: result.rows[0] });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.delete('/api/suppliers/:id', auth, async (req, res) => {
+    const { orgId, userId } = req.user;
+    if (!['owner','super_admin'].includes(req.user.role))
+      return res.status(403).json({ error: 'Not allowed' });
+    try {
+      // Soft delete — preserve historical references
+      await query(`UPDATE suppliers SET is_active=false WHERE id=$1 AND org_id=$2`, [req.params.id, orgId]);
+      const { audit, getIp } = require('../utils/audit');
+      audit({ orgId, userId, action:'supplier.delete', entity:'supplier', entityId:req.params.id, ip:getIp(req) });
+      res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── STOCK ADJUSTMENTS ────────────────────────────────────
+  app.get('/api/inventory/adjustments', auth, async (req, res) => {
+    const { pharmacyId } = req.user;
+    if (!['owner','manager','super_admin'].includes(req.user.role))
+      return res.status(403).json({ error: 'Not allowed' });
+    const limit  = Math.min(100, parseInt(req.query.limit || '50'));
+    const offset = (Math.max(1, parseInt(req.query.page || '1')) - 1) * limit;
+    try {
+      const result = await query(
+        `SELECT sa.*, d.name as drug_name, u.name as user_name
+         FROM stock_adjustments sa
+         JOIN drugs d ON d.id=sa.drug_id
+         LEFT JOIN users u ON u.id=sa.user_id
+         WHERE sa.pharmacy_id=$1
+         ORDER BY sa.created_at DESC LIMIT $2 OFFSET $3`,
+        [pharmacyId, limit, offset]
+      );
+      res.json({ adjustments: result.rows });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  app.post('/api/inventory/adjustments', auth, async (req, res) => {
+    const { pharmacyId, orgId, userId } = req.user;
+    if (!['owner','manager','super_admin'].includes(req.user.role))
+      return res.status(403).json({ error: 'Not allowed' });
+    const { drug_id, quantity_after, type, reason } = req.body;
+    if (!drug_id || quantity_after === undefined || !type || !reason)
+      return res.status(400).json({ error: 'drug_id, quantity_after, type, and reason are required' });
+    const validTypes = ['count','damage','return','expired','correction'];
+    if (!validTypes.includes(type))
+      return res.status(400).json({ error: `type must be one of: ${validTypes.join(', ')}` });
+
+    const pool = getPool();
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Get current quantity (locked for update)
+      const drug = await client.query(
+        `SELECT quantity FROM drugs WHERE id=$1 AND pharmacy_id=$2 FOR UPDATE`,
+        [drug_id, pharmacyId]
+      );
+      if (!drug.rows.length) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Drug not found' }); }
+
+      const qtyBefore = drug.rows[0].quantity;
+      const qtyAfter  = parseInt(quantity_after);
+      const variance  = qtyAfter - qtyBefore;
+
+      // Update drug quantity
+      await client.query(
+        `UPDATE drugs SET quantity=$1, updated_at=NOW(), updated_by=$2 WHERE id=$3 AND pharmacy_id=$4`,
+        [qtyAfter, userId, drug_id, pharmacyId]
+      );
+
+      // Insert adjustment record
+      const adj = await client.query(
+        `INSERT INTO stock_adjustments
+           (pharmacy_id,drug_id,user_id,type,quantity_before,quantity_after,variance,reason)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+        [pharmacyId, drug_id, userId||null, type, qtyBefore, qtyAfter, variance, reason]
+      );
+
+      await client.query('COMMIT');
+
+      const { audit, getIp } = require('../utils/audit');
+      audit({ orgId, pharmacyId, userId, action:'stock.adjust', entity:'drug', entityId:drug_id,
+              payload:{ type, qtyBefore, qtyAfter, variance, reason }, ip:getIp(req) });
+
+      res.json({ success: true, adjustment: adj.rows[0] });
+    } catch(e) {
+      await client.query('ROLLBACK');
+      res.status(500).json({ error: e.message });
+    } finally {
+      client.release();
+    }
+  });
+
+  // ── AUDIT LOG (read-only for owners) ─────────────────────
+  app.get('/api/audit', auth, async (req, res) => {
+    const { pharmacyId, orgId, role } = req.user;
+    if (!['owner','super_admin'].includes(role))
+      return res.status(403).json({ error: 'Access denied: requires owner role' });
+    const limit  = Math.min(100, parseInt(req.query.limit || '50'));
+    const offset = (Math.max(1, parseInt(req.query.page || '1')) - 1) * limit;
+    const { entity, action: actionFilter } = req.query;
+    try {
+      let sql = `SELECT al.*, u.name as user_name
+                 FROM audit_logs al
+                 LEFT JOIN users u ON u.id=al.user_id
+                 WHERE al.pharmacy_id=$1`;
+      const params = [pharmacyId]; let i = 2;
+      if (entity)       { sql+=` AND al.entity=$${i++}`;        params.push(entity); }
+      if (actionFilter) { sql+=` AND al.action ILIKE $${i++}`;  params.push('%'+actionFilter+'%'); }
+      sql += ` ORDER BY al.created_at DESC LIMIT $${i} OFFSET $${i+1}`;
+      params.push(limit, offset);
+      const result = await query(sql, params);
+      res.json({ logs: result.rows });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── DAILY SUMMARY REPORT ──────────────────────────────────
+  app.get('/api/reports/daily-summary', auth, async (req, res) => {
+    const { pharmacyId, role } = req.user;
+    if (!['owner','manager','super_admin'].includes(role))
+      return res.status(403).json({ error: 'Not allowed' });
+    const date = req.query.date || new Date().toISOString().slice(0, 10);
+    try {
+      const [sales, topDrugs, paymentBreakdown, staffActivity] = await Promise.all([
+        query(
+          `SELECT COUNT(*) as transaction_count,
+                  COALESCE(SUM(total_amount),0) as gross_revenue,
+                  COALESCE(SUM(discount_amount),0) as total_discounts
+           FROM sales WHERE pharmacy_id=$1 AND DATE(created_at)=$2 AND voided=false`,
+          [pharmacyId, date]
+        ),
+        query(
+          `SELECT si.drug_name, SUM(si.quantity) as total_qty, SUM(si.total_price) as total_revenue
+           FROM sale_items si JOIN sales s ON s.id=si.sale_id
+           WHERE s.pharmacy_id=$1 AND DATE(s.created_at)=$2 AND s.voided=false
+           GROUP BY si.drug_name ORDER BY total_revenue DESC LIMIT 10`,
+          [pharmacyId, date]
+        ),
+        query(
+          `SELECT payment_method, COUNT(*) as count, COALESCE(SUM(total_amount),0) as total
+           FROM sales WHERE pharmacy_id=$1 AND DATE(created_at)=$2 AND voided=false
+           GROUP BY payment_method`,
+          [pharmacyId, date]
+        ),
+        query(
+          `SELECT u.name as staff_name, COUNT(s.id) as sale_count, COALESCE(SUM(s.total_amount),0) as revenue
+           FROM sales s JOIN users u ON u.id=s.user_id
+           WHERE s.pharmacy_id=$1 AND DATE(s.created_at)=$2 AND s.voided=false
+           GROUP BY u.name ORDER BY revenue DESC`,
+          [pharmacyId, date]
+        ),
+      ]);
+      res.json({
+        date,
+        summary: sales.rows[0],
+        top_drugs: topDrugs.rows,
+        payment_breakdown: paymentBreakdown.rows,
+        staff_activity: staffActivity.rows,
+      });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+
 
 };

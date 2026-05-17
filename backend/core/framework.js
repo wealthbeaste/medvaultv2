@@ -63,13 +63,21 @@ class App {
       const pathname = url.pathname;
 
       // ── Enrich res object ──
-      res.json = (data, status = 200) => {
-        res.writeHead(status, { 'Content-Type': 'application/json' });
+      res._statusCode = 200;
+      res.status = (code) => { res._statusCode = code; return res; };
+      res.json = (data, status) => {
+        // Use explicitly passed status, or the one set via res.status(), or 200
+        const code = (typeof status === 'number') ? status : res._statusCode;
+        res.writeHead(code, {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+        });
         res.end(JSON.stringify(data));
       };
-      res.status = (code) => { res._statusCode = code; return res; };
 
-      // ── CORS headers ──
+      // ── CORS headers (always set for all responses) ──
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
