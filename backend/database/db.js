@@ -304,106 +304,24 @@ async function runMigrations() {
     // Add idx for customers
     `CREATE INDEX IF NOT EXISTS idx_customers_pharmacy ON customers(pharmacy_id)`,
 
-    // =========================================================
-    // PHASE 1 — STABILISATION MIGRATIONS
-    // =========================================================
+    // ── STEP 2: Receipt counter — atomic, race-condition-free receipt numbers ─
+    `ALTER TABLE pharmacies ADD COLUMN IF NOT EXISTS receipt_counter INTEGER NOT NULL DEFAULT 0`,
 
-    // Receipt counter — atomic increment replaces COUNT(*) race condition
-    `ALTER TABLE pharmacies ADD COLUMN IF NOT EXISTS receipt_counter INTEGER DEFAULT 0`,
-
-    // Tracking columns on drugs and sales
-    `ALTER TABLE drugs ADD COLUMN IF NOT EXISTS updated_by INTEGER REFERENCES users(id)`,
-    `ALTER TABLE sales ADD COLUMN IF NOT EXISTS voided BOOLEAN NOT NULL DEFAULT false`,
-    `ALTER TABLE sales ADD COLUMN IF NOT EXISTS voided_by INTEGER REFERENCES users(id)`,
-    `ALTER TABLE sales ADD COLUMN IF NOT EXISTS voided_at TIMESTAMPTZ`,
-
-    // =========================================================
-    // AUDIT LOGS — healthcare compliance requirement
-    // =========================================================
-    `CREATE TABLE IF NOT EXISTS audit_logs (
-      id          BIGSERIAL PRIMARY KEY,
-      org_id      INTEGER NOT NULL,
-      pharmacy_id INTEGER,
-      user_id     INTEGER,
-      action      VARCHAR(100) NOT NULL,
-      entity      VARCHAR(100),
-      entity_id   VARCHAR(100),
-      payload     JSONB,
-      ip_address  VARCHAR(50),
-      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`,
-    `CREATE INDEX IF NOT EXISTS idx_audit_org      ON audit_logs(org_id, created_at DESC)`,
-    `CREATE INDEX IF NOT EXISTS idx_audit_pharmacy  ON audit_logs(pharmacy_id, created_at DESC)`,
-    `CREATE INDEX IF NOT EXISTS idx_audit_entity    ON audit_logs(entity, entity_id)`,
-
-    // =========================================================
-    // NOTIFICATIONS
-    // =========================================================
-    `CREATE TABLE IF NOT EXISTS notifications (
-      id          SERIAL PRIMARY KEY,
-      org_id      INTEGER NOT NULL,
-      pharmacy_id INTEGER,
-      user_id     INTEGER,
-      type        VARCHAR(100) NOT NULL,
-      title       VARCHAR(255) NOT NULL,
-      body        TEXT,
-      data        JSONB,
-      is_read     BOOLEAN NOT NULL DEFAULT false,
-      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`,
-    `CREATE INDEX IF NOT EXISTS idx_notif_user    ON notifications(user_id, is_read, created_at DESC)`,
-    `CREATE INDEX IF NOT EXISTS idx_notif_pharmacy ON notifications(pharmacy_id, created_at DESC)`,
-
-    // =========================================================
-    // SUPPLIERS
-    // =========================================================
-    `CREATE TABLE IF NOT EXISTS suppliers (
-      id            SERIAL PRIMARY KEY,
-      org_id        INTEGER NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
-      name          VARCHAR(255) NOT NULL,
-      contact_name  VARCHAR(255),
-      phone         VARCHAR(50),
-      email         VARCHAR(255),
-      address       TEXT,
-      payment_terms VARCHAR(100),
-      is_active     BOOLEAN NOT NULL DEFAULT true,
-      notes         TEXT,
-      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`,
-    `CREATE INDEX IF NOT EXISTS idx_suppliers_org ON suppliers(org_id)`,
-
-    // Link supplier_id to drugs table
-    `ALTER TABLE drugs ADD COLUMN IF NOT EXISTS supplier_id INTEGER REFERENCES suppliers(id)`,
-
-    // =========================================================
-    // STOCK ADJUSTMENTS
-    // =========================================================
-    `CREATE TABLE IF NOT EXISTS stock_adjustments (
-      id              SERIAL PRIMARY KEY,
-      pharmacy_id     INTEGER NOT NULL REFERENCES pharmacies(id) ON DELETE CASCADE,
-      drug_id         INTEGER NOT NULL REFERENCES drugs(id) ON DELETE CASCADE,
-      user_id         INTEGER REFERENCES users(id),
-      type            VARCHAR(50) NOT NULL,
-      quantity_before INTEGER NOT NULL,
-      quantity_after  INTEGER NOT NULL,
-      variance        INTEGER NOT NULL,
-      reason          TEXT,
-      created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`,
-    `CREATE INDEX IF NOT EXISTS idx_adjustments_pharmacy ON stock_adjustments(pharmacy_id, created_at DESC)`,
-    `CREATE INDEX IF NOT EXISTS idx_adjustments_drug     ON stock_adjustments(drug_id)`,
-
-    // =========================================================
-    // PERFORMANCE INDEXES — Phase 1
-    // =========================================================
-    `CREATE INDEX IF NOT EXISTS idx_sales_created   ON sales(pharmacy_id, created_at DESC)`,
-    `CREATE INDEX IF NOT EXISTS idx_drugs_name      ON drugs(pharmacy_id, name)`,
-    `CREATE INDEX IF NOT EXISTS idx_drugs_expiry    ON drugs(pharmacy_id, expiry_date)`,
-    `CREATE INDEX IF NOT EXISTS idx_drugs_category  ON drugs(pharmacy_id, category)`,
-    `CREATE INDEX IF NOT EXISTS idx_sale_items_drug ON sale_items(drug_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_users_org       ON users(organisation_id, role)`,
-    `CREATE INDEX IF NOT EXISTS idx_transfers_org   ON stock_transfers(organisation_id, status)`
+    // Back-fill: find the highest sequential number already embedded in any
+    // existing receipt_number for this pharmacy (pattern RCP-YYYY-NNNN).
+    // Using MAX of the numeric suffix means the next increment is always 1
+    // higher than any receipt that was ever issued — no collisions possible.
+    `UPDATE pharmacies p
+       SET receipt_counter = COALESCE((
+         SELECT MAX(
+           CAST(
+             NULLIF(REGEXP_REPLACE(s.receipt_number, '.*-', ''), '') AS INTEGER
+           )
+         )
+         FROM sales s
+         WHERE s.pharmacy_id = p.id
+       ), 0)
+       WHERE receipt_counter = 0`
 
   ];
 
@@ -502,25 +420,32 @@ async function seedSuperAdmin() {
   }
 }
 
-async function getNextReceiptNumber(pharmacyId, client) {
-  // ✅ FIXED: Atomic counter — no race condition under concurrent sales
-  // Uses UPDATE...RETURNING to atomically increment and read in one query.
-  // If client is provided (inside a transaction), use it; otherwise use pool.
-  const executor = client || { query: (sql, params) => query(sql, params) };
-  const r = await executor.query(
+async function getNextReceiptNumber(pharmacyId) {
+  // ── Atomic increment — single UPDATE avoids any race condition ──────────
+  // If receipt_counter was backfilled to MAX(existing suffix), this will
+  // always produce a number higher than any previously issued receipt.
+  const r = await query(
     `UPDATE pharmacies
-     SET receipt_counter = COALESCE(receipt_counter, 0) + 1
-     WHERE id = $1
-     RETURNING receipt_counter`,
+        SET receipt_counter = receipt_counter + 1
+      WHERE id = $1
+      RETURNING receipt_counter`,
     [pharmacyId]
   );
+
+  if (!r.rows.length) {
+    // Pharmacy not found — fall back to timestamp-based unique string
+    // so the sale is never blocked by a missing pharmacy row.
+    return `RCP-${new Date().getFullYear()}-${Date.now().toString(36).toUpperCase()}`;
+  }
+
   const n = r.rows[0].receipt_counter;
   return `RCP-${new Date().getFullYear()}-${String(n).padStart(4, '0')}`;
 }
 
+// ── getPool export — used by routes that need a client for transactions ──
 module.exports = {
   query,
-  getPool,
+  pool: { connect: () => getPool().connect() },   // safe lazy proxy
   runMigrations,
   seedSuperAdmin,
   getNextReceiptNumber,
