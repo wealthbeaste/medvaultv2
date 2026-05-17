@@ -3952,12 +3952,19 @@ function openInviteModal() {
   if (!canInviteStaff()) { showToast('⛔ Not allowed', 'warn'); return; }
   document.getElementById('inviteOverlay').classList.add('open');
 
-  // Load branches into dropdown
   fetch(MedVaultOffline.API_BASE + '/api/branches', { headers:{'Authorization':'Bearer '+token} })
     .then(r=>r.json()).then(data=>{
       const sel = document.getElementById('invBranch');
-      if (sel && data.branches) {
-        sel.innerHTML = '<option value="">All branches (not restricted)</option>' +
+      if (!sel || !data.branches) return;
+
+      if (data.branches.length === 1) {
+        // Single branch pharmacy — auto-select, hide the dropdown entirely
+        sel.innerHTML = `<option value="${data.branches[0].id}">${data.branches[0].name}</option>`;
+        sel.closest('div').style.display = 'none';
+      } else {
+        // Multi-branch — owner must pick
+        sel.closest('div').style.display = '';
+        sel.innerHTML = '<option value="">— Select a branch —</option>' +
           data.branches.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
       }
     }).catch(()=>{});
@@ -3978,6 +3985,12 @@ async function submitInvite() {
   if (!name)     { showToast('Name is required','warn'); return; }
   if (!email)    { showToast('Email is required','warn'); return; }
   if (!password || password.length < 6) { showToast('Password must be at least 6 characters','warn'); return; }
+
+  // If branch dropdown is visible (multi-branch), force selection
+  const branchEl = document.getElementById('invBranch');
+  if (branchEl && branchEl.closest('div').style.display !== 'none' && !pharmacyId) {
+    showToast('Please select a branch', 'warn'); return;
+  }
 
   // Owner-only (backend enforces this too)
   if (!canInviteStaff()) { showToast('⛔ Not allowed', 'warn'); return; }
