@@ -10,7 +10,9 @@ module.exports = function registerRoutes(app) {
   const auth              = require('../middleware/auth');
   const { can }           = require('../middleware/permissions');
   const { validate, schemas } = require('../middleware/validate');
-  const { audit } = require('../utils/audit');
+  const { audit }             = require('../middleware/audit');
+  const { rateLimit } = require('../utils/rateLimit');
+
   function callAnthropicAPI(payload) {
     return new Promise((resolve, reject) => {
       const body = JSON.stringify(payload);
@@ -81,7 +83,7 @@ module.exports = function registerRoutes(app) {
   });
 
   // ── AUTH ────────────────────────────────────────────────
-  app.post('/api/auth/register', async (req, res) => {
+  app.post('/api/auth/register', rateLimit({ max: 3, windowMs: 60 * 60 * 1000, message: 'Too many registrations from this device. Try again in 1 hour.' }), async (req, res) => {
     const { orgName, ownerName, email, phone, password, plan } = req.body;
     if (!orgName||!ownerName||!email||!phone||!password)
       return res.json({ error:'All fields required: orgName, ownerName, email, phone, password' }, 400);
@@ -117,7 +119,7 @@ module.exports = function registerRoutes(app) {
     } catch(e) { res.json({ error:'Registration failed: '+e.message }, 500); }
   });
 
-  app.post('/api/auth/login', async (req, res) => {
+  app.post('/api/auth/login', rateLimit({ max: 5, windowMs: 15 * 60 * 1000, message: 'Too many login attempts. Try again in 15 minutes.' }), async (req, res) => {
     const { email, password } = req.body;
     if (!email||!password) return res.json({ error:'Email and password required' }, 400);
     try {
