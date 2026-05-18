@@ -10,7 +10,7 @@ module.exports = function registerRoutes(app) {
   const auth              = require('../middleware/auth');
   const { can }           = require('../middleware/permissions');
   const { validate, schemas } = require('../middleware/validate');
-  const { audit }             = require('../middleware/audit');
+  const { audit } = require('../utils/audit');
   const { rateLimit } = require('../utils/rateLimit');
 
   function callAnthropicAPI(payload) {
