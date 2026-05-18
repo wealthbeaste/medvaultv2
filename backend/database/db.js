@@ -321,7 +321,49 @@ async function runMigrations() {
          FROM sales s
          WHERE s.pharmacy_id = p.id
        ), 0)
-       WHERE receipt_counter = 0`
+       WHERE receipt_counter = 0`,
+
+    // =========================================================
+    // NOTIFICATIONS
+    // =========================================================
+
+    `CREATE TABLE IF NOT EXISTS notifications (
+      id          BIGSERIAL PRIMARY KEY,
+      org_id      INTEGER REFERENCES organisations(id) ON DELETE CASCADE,
+      pharmacy_id INTEGER REFERENCES pharmacies(id) ON DELETE CASCADE,
+      type        VARCHAR(50) NOT NULL,
+      title       VARCHAR(255) NOT NULL,
+      body        TEXT,
+      data        JSONB,
+      is_read     BOOLEAN NOT NULL DEFAULT false,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
+
+    `CREATE INDEX IF NOT EXISTS idx_notifications_pharmacy
+       ON notifications(pharmacy_id, is_read, created_at DESC)`,
+
+    `CREATE INDEX IF NOT EXISTS idx_notifications_org
+       ON notifications(org_id, is_read, created_at DESC)`,
+
+    // =========================================================
+    // AUDIT LOGS
+    // =========================================================
+
+    `CREATE TABLE IF NOT EXISTS audit_logs (
+      id          BIGSERIAL PRIMARY KEY,
+      org_id      INTEGER,
+      pharmacy_id INTEGER,
+      user_id     INTEGER,
+      action      VARCHAR(100) NOT NULL,
+      entity      VARCHAR(100),
+      entity_id   VARCHAR(100),
+      payload     JSONB,
+      ip_address  VARCHAR(50),
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
+
+    `CREATE INDEX IF NOT EXISTS idx_audit_pharmacy
+       ON audit_logs(pharmacy_id, created_at DESC)`
 
   ];
 
