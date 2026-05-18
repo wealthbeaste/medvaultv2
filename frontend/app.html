@@ -899,6 +899,89 @@
   .toast.warn{border-left-color:var(--warn);}
   .toast.err{border-left-color:var(--danger);}
   .toast.wa{border-left-color:#25d366;}
+
+  /* ── NOTIFICATION BELL ── */
+  .notif-wrap{position:relative;}
+  .notif-btn{
+    position:relative;
+    width:38px;height:38px;
+    border-radius:10px;
+    background:var(--surface2);
+    border:1px solid var(--border);
+    color:var(--text);
+    font-size:17px;
+    cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    transition:all 0.2s;
+    flex-shrink:0;
+  }
+  .notif-btn:hover{background:var(--surface3);}
+  .notif-dot{
+    position:absolute;top:6px;right:6px;
+    width:8px;height:8px;
+    border-radius:50%;
+    background:var(--danger);
+    border:1.5px solid var(--bg);
+    animation:pulse 2s infinite;
+  }
+  .notif-panel{
+    position:absolute;top:calc(100% + 10px);right:0;
+    width:340px;
+    background:var(--surface);
+    border:1px solid var(--border2);
+    border-radius:16px;
+    box-shadow:0 20px 60px rgba(0,0,0,0.5);
+    z-index:100;
+    display:none;
+    overflow:hidden;
+  }
+  .notif-panel.open{display:block;}
+  .notif-header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 18px;
+    border-bottom:1px solid var(--border);
+  }
+  .notif-title{font-family:'Syne',sans-serif;font-weight:700;font-size:14px;}
+  .notif-clear{
+    font-size:11px;color:var(--muted);
+    background:none;border:none;cursor:pointer;
+    font-family:'DM Sans',sans-serif;
+    transition:color 0.15s;
+  }
+  .notif-clear:hover{color:var(--accent);}
+  .notif-list{max-height:380px;overflow-y:auto;}
+  .notif-empty{padding:28px;text-align:center;font-size:13px;color:var(--muted);}
+  .notif-item{
+    display:flex;gap:12px;align-items:flex-start;
+    padding:13px 18px;
+    border-bottom:1px solid var(--border);
+    cursor:pointer;
+    transition:background 0.15s;
+  }
+  .notif-item:last-child{border-bottom:none;}
+  .notif-item:hover{background:var(--surface2);}
+  .notif-item.unread{background:rgba(0,212,170,0.04);}
+  .notif-ico{
+    width:34px;height:34px;
+    border-radius:9px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:15px;flex-shrink:0;margin-top:1px;
+  }
+  .notif-ico.warn{background:rgba(245,158,11,0.12);}
+  .notif-ico.danger{background:rgba(239,68,68,0.12);}
+  .notif-ico.info{background:rgba(59,130,246,0.12);}
+  .notif-ico.success{background:rgba(16,185,129,0.12);}
+  .notif-body{flex:1;min-width:0;}
+  .notif-msg{font-size:13px;line-height:1.45;color:var(--text);}
+  .notif-time{font-size:11px;color:var(--muted);margin-top:3px;}
+  .notif-badge-count{
+    display:inline-flex;align-items:center;justify-content:center;
+    min-width:18px;height:18px;padding:0 5px;
+    border-radius:20px;
+    background:var(--danger);
+    color:#fff;font-size:10px;font-weight:700;
+    margin-left:auto;flex-shrink:0;margin-top:2px;
+  }
 </style>
 </head>
 <body>
@@ -1010,6 +1093,24 @@
     <div class="topbar-right">
       <button class="btn btn-wa" onclick="go('whatsapp',document.querySelectorAll('.nav-item')[6])">💬 WhatsApp</button>
       <button class="btn btn-ghost" onclick="manualSync()">🔄 Sync</button>
+
+      <!-- NOTIFICATION BELL -->
+      <div class="notif-wrap" id="notifWrap">
+        <button class="notif-btn" id="notifBtn" onclick="toggleNotifPanel()" title="Notifications">
+          🔔
+          <span class="notif-dot" id="notifDot" style="display:none"></span>
+        </button>
+        <div class="notif-panel" id="notifPanel">
+          <div class="notif-header">
+            <span class="notif-title">Notifications</span>
+            <button class="notif-clear" onclick="clearAllNotifs()">Clear all</button>
+          </div>
+          <div id="notifList" class="notif-list">
+            <div class="notif-empty">No notifications</div>
+          </div>
+        </div>
+      </div>
+
       <button class="btn btn-primary" onclick="handleTopBtn()">+ Add Drug</button>
     </div>
   </div>
@@ -2844,6 +2945,11 @@ async function boot(data) {
 
   // ── 5. Trial expiry check ───────────────────────────────
   checkTrialStatus(user);
+
+  // ── 6. Notification bell ────────────────────────────────
+  renderNotifPanel();
+  setTimeout(refreshNotifs, 1500);
+  setInterval(refreshNotifs, 5 * 60 * 1000); // refresh every 5 min
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2893,6 +2999,213 @@ function activateGracePeriod() {
   document.body.style.overflow = '';
   showToast('⏳ 3-day grace period activated. Please contact Sam to subscribe before it ends.', 'warn');
   setTimeout(() => showToast('🔔 Reminder: Contact Sam on +256 759 327 843 (Airtel) or +256 774 563 591 (MTN) to activate your subscription.', 'warn'), 60000);
+}
+
+// ═══════════════════════════════════════════════════════════
+// NOTIFICATION BELL
+// ═══════════════════════════════════════════════════════════
+let _notifs = JSON.parse(localStorage.getItem('mv_notifs') || '[]');
+
+function _saveNotifs() {
+  // Keep only the latest 40
+  _notifs = _notifs.slice(0, 40);
+  localStorage.setItem('mv_notifs', JSON.stringify(_notifs));
+}
+
+function addNotif({ icon, type = 'info', msg, action }) {
+  const id = Date.now() + Math.random().toString(36).slice(2);
+  _notifs.unshift({ id, icon, type, msg, action, time: Date.now(), read: false });
+  _saveNotifs();
+  renderNotifPanel();
+}
+
+function markAllRead() {
+  _notifs.forEach(n => n.read = true);
+  _saveNotifs();
+  renderNotifPanel();
+}
+
+function clearAllNotifs() {
+  _notifs = [];
+  _saveNotifs();
+  renderNotifPanel();
+}
+
+function toggleNotifPanel() {
+  const panel = document.getElementById('notifPanel');
+  if (!panel) return;
+  const open = panel.classList.toggle('open');
+  if (open) {
+    markAllRead();
+    // Close if clicking outside
+    setTimeout(() => {
+      document.addEventListener('click', _closeNotifOutside, { once: true });
+    }, 0);
+  }
+}
+
+function _closeNotifOutside(e) {
+  const wrap = document.getElementById('notifWrap');
+  if (wrap && !wrap.contains(e.target)) {
+    const panel = document.getElementById('notifPanel');
+    if (panel) panel.classList.remove('open');
+  } else if (wrap && wrap.contains(e.target)) {
+    // still inside — re-arm
+    setTimeout(() => {
+      document.addEventListener('click', _closeNotifOutside, { once: true });
+    }, 0);
+  }
+}
+
+function renderNotifPanel() {
+  const list  = document.getElementById('notifList');
+  const dot   = document.getElementById('notifDot');
+  if (!list) return;
+
+  const unread = _notifs.filter(n => !n.read).length;
+  if (dot) dot.style.display = unread > 0 ? 'block' : 'none';
+
+  if (_notifs.length === 0) {
+    list.innerHTML = '<div class="notif-empty">🎉 All clear — no notifications</div>';
+    return;
+  }
+
+  list.innerHTML = _notifs.map(n => {
+    const ago = _timeAgo(n.time);
+    return `
+      <div class="notif-item${n.read ? '' : ' unread'}"
+           onclick="_notifClick('${n.id}')">
+        <div class="notif-ico ${n.type}">${n.icon}</div>
+        <div class="notif-body">
+          <div class="notif-msg">${n.msg}</div>
+          <div class="notif-time">${ago}</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function _notifClick(id) {
+  const n = _notifs.find(x => x.id === id);
+  if (!n) return;
+  n.read = true;
+  _saveNotifs();
+  renderNotifPanel();
+  // Close panel
+  const panel = document.getElementById('notifPanel');
+  if (panel) panel.classList.remove('open');
+  // Navigate if action defined
+  if (n.action) {
+    const el = document.getElementById(n.action.navId);
+    go(n.action.page, el || null);
+  }
+}
+
+function _timeAgo(ts) {
+  const diff = Date.now() - ts;
+  if (diff < 60000)    return 'Just now';
+  if (diff < 3600000)  return Math.floor(diff / 60000) + 'm ago';
+  if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
+  return Math.floor(diff / 86400000) + 'd ago';
+}
+
+/** Called after login and on a timer — scans drugs for alerts */
+function refreshNotifs() {
+  const drugs = MedVaultOffline.getDrugs ? MedVaultOffline.getDrugs() : [];
+  const now   = new Date();
+  const today = now.toISOString().slice(0, 10);
+  const in30  = new Date(now.getTime() + 30 * 86400000).toISOString().slice(0, 10);
+
+  // De-duplicate: only add a notif once per day per drug+type
+  const dayKey = today;
+  const seen   = new Set(
+    _notifs
+      .filter(n => n.dayKey === dayKey)
+      .map(n => n.dedupeKey)
+  );
+
+  drugs.forEach(d => {
+    // Low / critical stock
+    const thresh = d.threshold || 20;
+    if (d.quantity !== undefined && d.quantity <= thresh) {
+      const level = d.quantity <= Math.floor(thresh * 0.25) ? 'critical' : 'low';
+      const key = `stock-${level}-${d.id}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        const isCrit = level === 'critical';
+        _notifs.push({
+          id: Date.now() + Math.random().toString(36).slice(2),
+          icon: isCrit ? '🚨' : '⚠️',
+          type: isCrit ? 'danger' : 'warn',
+          msg: `<strong>${d.name}</strong> is ${isCrit ? 'critically' : ''} low — only <strong>${d.quantity} units</strong> left`,
+          time: Date.now(),
+          read: false,
+          dayKey,
+          dedupeKey: key,
+          action: { page: 'inventory', navId: 'navInventory' },
+        });
+      }
+    }
+    // Expiring within 30 days
+    if (d.expiry_date && d.expiry_date.slice(0, 10) <= in30 && d.expiry_date.slice(0, 10) >= today) {
+      const key = `expiry-${d.id}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        const daysLeft = Math.ceil((new Date(d.expiry_date) - now) / 86400000);
+        _notifs.push({
+          id: Date.now() + Math.random().toString(36).slice(2),
+          icon: '📅',
+          type: daysLeft <= 7 ? 'danger' : 'warn',
+          msg: `<strong>${d.name}</strong> expires in <strong>${daysLeft} day${daysLeft !== 1 ? 's' : ''}</strong>`,
+          time: Date.now(),
+          read: false,
+          dayKey,
+          dedupeKey: key,
+          action: { page: 'inventory', navId: 'navInventory' },
+        });
+      }
+    }
+    // Already expired
+    if (d.expiry_date && d.expiry_date.slice(0, 10) < today) {
+      const key = `expired-${d.id}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        _notifs.push({
+          id: Date.now() + Math.random().toString(36).slice(2),
+          icon: '🔴',
+          type: 'danger',
+          msg: `<strong>${d.name}</strong> has <strong>expired</strong> — remove from shelf`,
+          time: Date.now(),
+          read: false,
+          dayKey,
+          dedupeKey: key,
+          action: { page: 'inventory', navId: 'navInventory' },
+        });
+      }
+    }
+  });
+
+  // Pending sync queue
+  const queue = MedVaultOffline.getQueue ? MedVaultOffline.getQueue() : [];
+  if (queue.length > 0) {
+    const key = `sync-queue-${dayKey}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      _notifs.push({
+        id: Date.now() + Math.random().toString(36).slice(2),
+        icon: '☁️',
+        type: 'info',
+        msg: `<strong>${queue.length} change${queue.length > 1 ? 's' : ''}</strong> waiting to sync to the server`,
+        time: Date.now(),
+        read: false,
+        dayKey,
+        dedupeKey: key,
+        action: { page: 'offline-settings', navId: 'navOfflineSettings' },
+      });
+    }
+  }
+
+  _saveNotifs();
+  renderNotifPanel();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -3805,6 +4118,8 @@ async function manualSync() {
       }
     }
   }
+  // Refresh bell after sync
+  setTimeout(refreshNotifs, 800);
 }
 
 async function forcePull() {
