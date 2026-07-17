@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MedVault API Documentation</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root{--bg:#0a0f1e;--surface:#111827;--surface2:#1a2235;--border:rgba(255,255,255,0.07);--accent:#00d4aa;--accent2:#3b82f6;--text:#f0f4ff;--muted:#6b7a99;--code-bg:#0d1117;}
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);line-height:1.7;}
+  .container{max-width:900px;margin:0 auto;padding:40px 24px 80px;}
+  h1{font-family:'Syne',sans-serif;font-weight:800;font-size:36px;margin-bottom:8px;}
+  h2{font-family:'Syne',sans-serif;font-weight:700;font-size:22px;margin:40px 0 16px;padding-top:20px;border-top:1px solid var(--border);}
+  h3{font-family:'Syne',sans-serif;font-weight:700;font-size:16px;margin:24px 0 8px;color:var(--accent);}
+  p{color:var(--muted);margin-bottom:12px;font-size:14px;}
+  code{font-family:'JetBrains Mono',monospace;background:var(--surface);padding:2px 6px;border-radius:4px;font-size:13px;}
+  pre{background:var(--code-bg);border:1px solid var(--border);border-radius:10px;padding:16px 20px;overflow-x:auto;margin:12px 0 20px;font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.6;}
+  .method{display:inline-block;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700;font-family:'JetBrains Mono',monospace;margin-right:8px;}
+  .get{background:rgba(16,185,129,0.15);color:#10b981;} .post{background:rgba(59,130,246,0.15);color:#3b82f6;}
+  .put{background:rgba(245,158,11,0.15);color:#f59e0b;} .patch{background:rgba(139,92,246,0.15);color:#8b5cf6;}
+  .delete{background:rgba(239,68,68,0.15);color:#ef4444;}
+  .endpoint{padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:8px;font-size:13px;display:flex;align-items:center;gap:8px;}
+  .endpoint .path{font-family:'JetBrains Mono',monospace;color:var(--text);}
+  .endpoint .desc{color:var(--muted);margin-left:auto;font-size:12px;}
+  .badge{display:inline-block;background:var(--accent);color:#000;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;margin-left:8px;}
+  .logo{display:flex;align-items:center;gap:12px;margin-bottom:28px;}
+  .logo-icon{width:44px;height:44px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;}
+  table{width:100%;border-collapse:collapse;margin:12px 0 20px;font-size:13px;}
+  th{text-align:left;padding:8px 12px;background:var(--surface);font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);border-bottom:1px solid var(--border);}
+  td{padding:8px 12px;border-bottom:1px solid var(--border);vertical-align:top;}
+
+  /* ========================================================= */
+  /* MOBILE RESPONSIVE ENHANCEMENTS (added)                      */
+  /* ========================================================= */
+  html{-webkit-text-size-adjust:100%;}
+  body{overflow-x:hidden;}
+  .table-scroll{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  @media(max-width:768px){
+    .container{padding:24px 16px 60px;}
+    h1{font-size:26px;}
+    h2{font-size:18px;margin:28px 0 12px;}
+    .endpoint{flex-wrap:wrap;}
+    .endpoint .desc{margin-left:0;}
+    table{font-size:12px;}
+    th,td{padding:7px 8px;}
+    pre{font-size:12px;padding:12px 14px;}
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="logo"><div class="logo-icon">💊</div><div><div style="font-family:'Syne',sans-serif;font-weight:800;font-size:24px">MedVault API</div><div style="font-size:12px;color:var(--muted)">Healthcare ERP Platform</div></div></div>
+
+  <h1>API Reference</h1>
+  <p>Base URL: <code>https://your-railway-url.up.railway.app</code></p>
+  <p>All requests require an <code>Authorization: Bearer &lt;token&gt;</code> header unless marked as public.</p>
+
+  <h2>Authentication</h2>
+  <div class="endpoint"><span class="method post">POST</span><span class="path">/api/auth/register</span><span class="desc">Create organisation + owner account</span></div>
+  <div class="endpoint"><span class="method post">POST</span><span class="path">/api/auth/login</span><span class="desc">Get JWT token</span></div>
+  <div class="endpoint"><span class="method get">GET</span><span class="path">/api/auth/me</span><span class="desc">Current user profile</span></div>
+
+  <h3>Login Request</h3>
+  <pre>{
+  "email": "user@pharmacy.com",
+  "password": "your_password"
+}</pre>
+
+  <h3>Login Response</h3>
+  <pre>{
+  "token": "eyJhbGciOi...",
+  "user": {
+    "id": 1, "name": "Owner", "email": "user@pharmacy.com",
+    "role": "owner", "orgId": 1, "pharmacyId": 1
+  }
+}</pre>
+
+  <h2>Inventory</h2>
+  <div class="endpoint"><span class="method get">GET</span><span class="path">/api/inventory?page=1&limit=50&search=para</span><span class="desc">List drugs with pagination</span></div>
+  <div class="endpoint"><span class="method post">POST</span><span class="path">/api/inventory</span><span class="desc">Add new drug</span></div>
+  <div class="endpoint"><span class="method put">PUT</span><span class="path">/api/inventory/:id</span><span class="desc">Update drug</span></div>
+  <div class="endpoint"><span class="method delete">DELETE</span><span class="path">/api/inventory/:id</span><span class="desc">Delete drug</span></div>
+  <div class="endpoint"><span class="method get">GET</span><span class="path">/api/inventory/alerts</span><span class="desc">Low stock + expiring drugs</span></div>
+  <div class="endpoint"><span class="method post">POST</span><span class="path">/api/inventory/adjust</span><span class="desc">Stock adjustment with audit</span></div>
+  <div class="endpoint"><span class="method get">GET</span><span class="path">/api/inventory/:id/purchase-history</span><span class="desc">GRN + PO history for a drug</span></div>
+
+  <h2>Sales</h2>
+  <div class="endpoint"><span class="method get">GET</span><span class="path">/api/sales?page=1&limit=50</span><span class="desc">List sales with pagination</span></div>
+  <div class="endpoint"><span class="method post">POST</span><span class="path">/api/sales</span><span class="desc">Record new sale (transactional)</span></div>
+  <div class="endpoint"><span class="method get">GET</span><span class="path">/api/activity</span><span class="desc">Staff activity log</span></div>
+
+  <h2>Patients<span class="badge">Phase 3</span></h2>
+  <div class="endpoint"><span class="method get">GET</span><span class="path">/api/clinic/patients?search=name</span><span class="desc">Search patients</span></div>
+  <div class="endpoint"><span class="method post">POST</span><span class="path">/api/clinic/patients</span><span class="desc">Register patient</span></div>
+  <div class="endpoint"><span class="method get">GET</span><span class="path">/api/clinic/patients/:id</span><span class="desc">Patient detail + history</span></div>
+  <div class="endpoint"><span class="method get">GET</span><span class="path">/api/clinic/patients/duplicates</span><span class="desc">Find duplicate patients</span></div>
+  <div class="endpoint"><span class="method post">POST</span><span class="path">/api/clinic/patients/merge</span><span class="desc">Merge duplicate patients</span></div>
+
+  <h2>Appointments<span class="badge">Phase 3</span></h2>
+  <div class="endpoint"><span class="method get">GET</span><span class="path">/api/clinic/appointments?date=2026-01-15</span><span class="desc">List appointments by date</span></div>
+  <div class="endpoint"><span class="method post">POST</span><span class="path">/api/clinic/appointments</span><span class="desc">Schedule appointment</span></div>
+  <div class="endpoint"><span class="method get">GET</span><span class="path">/api/clinic/queue</span><span class="desc">Live patient queue</span></div>
+
+  <h2>Consultations<span class="badge">Phase 3</span></h2>
+  <div class="endpoint"><span class="method post">POST</span><span class="path">/api/clinic/consultations</span><span class="desc">Record consultation with vitals</span></div>
+  <div class="endpoint"><span class="method post">POST</span><span class="path">/api/clinic/prescriptions</span><span class="desc">Create digital prescription</span></div>
+  <div class="endpoint"><span class="method patch">PATCH</span><span class="path">/api/clinic/prescriptions/:id/dispense</span><span class="desc">Dispense prescription</span></div>
+
+  <h2>Laboratory<span class="badge">Phase 4</span></h2>
+  <div class="endpoint"><span class="method get">GET</span><span class="path">/api/lab/tests</span><span class="desc">Test catalogue</span></div>
+  <div class="endpoint"><span class="method post">POST</span><span class="path">/api/lab/requests</span><span class="desc">Create lab request</span></div>
+  <div class="endpoint"><span class="method post">POST</span><span class="path">/api/lab/results</span><span class="desc">Enter results</span></div>
+  <div class="endpoint"><span class="method get">GET</span><span class="path">/api/lab/results/:requestId</span><span class="desc">Printable report data</span></div>
+
+  <h2>Hospital<span class="badge">Phase 5</span></h2>
+  <div class="endpoint"><span class="method get">GET</span><span class="path">/api/hospital/wards</span><span class="desc">Wards with bed counts</span></div>
+  <div class="endpoint"><span class="method post">POST</span><span class="path">/api/hospital/admissions</span><span class="desc">Admit patient</span></div>
+  <div class="endpoint"><span class="method patch">PATCH</span><span class="path">/api/hospital/admissions/:id/discharge</span><span class="desc">Discharge patient</span></div>
+  <div class="endpoint"><span class="method post">POST</span><span class="path">/api/hospital/charges</span><span class="desc">Post inpatient charge</span></div>
+  <div class="endpoint"><span class="method post">POST</span><span class="path">/api/hospital/claims</span><span class="desc">Create insurance claim</span></div>
+
+  <h2>Accounting<span class="badge">Phase 5</span></h2>
+  <div class="endpoint"><span class="method get">GET</span><span class="path">/api/accounting/accounts</span><span class="desc">Chart of accounts</span></div>
+  <div class="endpoint"><span class="method post">POST</span><span class="path">/api/accounting/journals</span><span class="desc">Create journal entry</span></div>
+  <div class="endpoint"><span class="method get">GET</span><span class="path">/api/accounting/trial-balance</span><span class="desc">Trial balance report</span></div>
+  <div class="endpoint"><span class="method get">GET</span><span class="path">/api/accounting/income-statement</span><span class="desc">Profit & Loss report</span></div>
+
+  <h2>Enterprise<span class="badge">Phase 6</span></h2>
+  <div class="endpoint"><span class="method get">GET</span><span class="path">/api/enterprise/regional</span><span class="desc">Cross-branch analytics</span></div>
+  <div class="endpoint"><span class="method post">POST</span><span class="path">/api/enterprise/forecast</span><span class="desc">AI demand forecast</span></div>
+  <div class="endpoint"><span class="method post">POST</span><span class="path">/api/enterprise/api-keys</span><span class="desc">Create API key</span></div>
+  <div class="endpoint"><span class="method post">POST</span><span class="path">/api/sms/send</span><span class="desc">Send SMS (Africa's Talking)</span></div>
+  <div class="endpoint"><span class="method post">POST</span><span class="path">/api/sms/credit-reminder</span><span class="desc">Send credit reminder SMS</span></div>
+
+  <h2>Response Format</h2>
+  <p>All endpoints return JSON. Successful responses include the data directly. Errors follow this format:</p>
+  <pre>{
+  "success": false,
+  "error": "Human-readable error message",
+  "code": "VALIDATION_ERROR",
+  "field": "email"
+}</pre>
+
+  <h2>Roles & Permissions</h2>
+  <table>
+    <thead><tr><th>Role</th><th>Access Level</th></tr></thead>
+    <tbody>
+      <tr><td><code>owner</code></td><td>Full access to all modules</td></tr>
+      <tr><td><code>manager</code></td><td>All except billing/subscription changes</td></tr>
+      <tr><td><code>pharmacist</code></td><td>Inventory, sales, dispensing, clinical</td></tr>
+      <tr><td><code>doctor</code></td><td>Patients, consultations, prescriptions, lab requests</td></tr>
+      <tr><td><code>nurse</code></td><td>Patients, vitals, appointments, lab collection</td></tr>
+      <tr><td><code>lab_technician</code></td><td>Lab requests, results entry</td></tr>
+      <tr><td><code>cashier</code></td><td>Dispatch collection, payments</td></tr>
+      <tr><td><code>receptionist</code></td><td>Patients, appointments, admissions</td></tr>
+      <tr><td><code>dispensor</code></td><td>Dispensing, sales, prescriptions</td></tr>
+      <tr><td><code>staff</code></td><td>Basic read access</td></tr>
+    </tbody>
+  </table>
+
+  <div style="text-align:center;margin-top:40px;padding-top:20px;border-top:1px solid var(--border);color:var(--muted);font-size:12px">
+    <p>💊 MedVault Healthcare ERP — Built for African Healthcare</p>
+  </div>
+</div>
+</body>
+</html>

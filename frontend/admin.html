@@ -1,0 +1,2078 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MedVault — Super Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#07090f;--s1:#0d1117;--s2:#131920;--s3:#1a2230;--s4:#1f2a3a;
+  --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.1);
+  --accent:#00e5b0;--accent2:#3b82f6;--gold:#f59e0b;
+  --danger:#ef4444;--success:#10b981;--warn:#f59e0b;--purple:#a855f7;
+  --text:#eef2ff;--muted:#5a6a82;--muted2:#8899aa;
+  --font:'Outfit',sans-serif;--mono:'DM Mono',monospace;--display:'Syne',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:var(--font);background:var(--bg);color:var(--text);display:flex;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 60% 40% at 5% 20%,rgba(0,229,176,0.04) 0%,transparent 60%),radial-gradient(ellipse 50% 40% at 95% 80%,rgba(59,130,246,0.04) 0%,transparent 60%),radial-gradient(ellipse 30% 30% at 50% 50%,rgba(168,85,247,0.02) 0%,transparent 60%);pointer-events:none;z-index:0;}
+
+/* ── SIDEBAR ── */
+.sidebar{width:220px;background:var(--s1);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:20;}
+.logo-wrap{padding:24px 20px 20px;border-bottom:1px solid var(--border);}
+.logo-row{display:flex;align-items:center;gap:10px;margin-bottom:3px;}
+.logo-gem{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 0 16px rgba(0,229,176,0.25);}
+.logo-name{font-family:var(--display);font-weight:800;font-size:18px;letter-spacing:-0.5px;}
+.logo-tag{font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;padding-left:42px;}
+.admin-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(168,85,247,0.12);border:1px solid rgba(168,85,247,0.2);color:var(--purple);padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600;letter-spacing:0.3px;margin-top:8px;}
+.nav{flex:1;padding:16px 10px;display:flex;flex-direction:column;gap:1px;overflow-y:auto;}
+.nav-section{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);padding:10px 10px 5px;font-weight:600;}
+.ni{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:8px;cursor:pointer;transition:all 0.18s;color:var(--muted2);font-size:13px;position:relative;}
+.ni:hover{background:var(--s2);color:var(--text);}
+.ni.active{background:rgba(0,229,176,0.08);color:var(--accent);}
+.ni.active::before{content:'';position:absolute;left:0;top:25%;bottom:25%;width:2px;background:var(--accent);border-radius:0 2px 2px 0;}
+.ni-icon{font-size:15px;width:18px;text-align:center;flex-shrink:0;}
+.ni-badge{margin-left:auto;font-size:9px;font-weight:700;padding:2px 6px;border-radius:10px;}
+.ni-badge.r{background:var(--danger);color:#fff;}
+.ni-badge.w{background:var(--warn);color:#000;}
+.ni-badge.g{background:var(--success);color:#fff;}
+.sidebar-bottom{padding:12px 10px;border-top:1px solid var(--border);}
+.admin-card{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:8px;background:var(--s2);cursor:pointer;}
+.admin-card:hover{background:var(--s3);}
+.admin-av{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--purple),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;}
+.admin-name{font-size:12px;font-weight:500;}
+.admin-role{font-size:10px;color:var(--muted);}
+.logout-btn{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;margin-top:8px;padding:8px 10px;border-radius:8px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.15);color:var(--danger);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;transition:all 0.18s;}
+.logout-btn:hover{background:rgba(239,68,68,0.18);border-color:rgba(239,68,68,0.3);}
+
+/* ── MAIN ── */
+.main{margin-left:220px;flex:1;display:flex;flex-direction:column;position:relative;z-index:1;}
+.topbar{padding:16px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);background:rgba(7,9,15,0.7);backdrop-filter:blur(12px);position:sticky;top:0;z-index:10;}
+.tb-left{display:flex;align-items:center;gap:14px;}
+.tb-title{font-family:var(--display);font-weight:700;font-size:18px;}
+.tb-sub{font-size:12px;color:var(--muted);}
+.tb-right{display:flex;align-items:center;gap:10px;}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:all 0.18s;font-family:var(--font);}
+.btn-accent{background:var(--accent);color:#000;}
+.btn-accent:hover{filter:brightness(1.1);transform:translateY(-1px);}
+.btn-ghost{background:var(--s2);color:var(--text);border:1px solid var(--border);}
+.btn-ghost:hover{background:var(--s3);}
+.btn-danger{background:rgba(239,68,68,0.12);color:var(--danger);border:1px solid rgba(239,68,68,0.2);}
+.btn-danger:hover{background:rgba(239,68,68,0.2);}
+.btn-warn{background:rgba(245,158,11,0.12);color:var(--warn);border:1px solid rgba(245,158,11,0.2);}
+.live-pulse{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--success);background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.15);padding:5px 12px;border-radius:20px;}
+.lp-dot{width:6px;height:6px;border-radius:50%;background:var(--success);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.7)}}
+
+/* ── PAGES ── */
+.page{display:none;padding:24px 28px;animation:fadeUp 0.25s ease both;}
+.page.active{display:block;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── STAT CARDS ── */
+.stats-row{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:24px;}
+.stat{background:var(--s1);border:1px solid var(--border);border-radius:14px;padding:18px 20px;position:relative;overflow:hidden;cursor:default;}
+.stat::after{content:'';position:absolute;top:-15px;right:-15px;width:70px;height:70px;border-radius:50%;filter:blur(25px);opacity:0.1;}
+.stat.acc::after{background:var(--accent)}.stat.blu::after{background:var(--accent2)}.stat.gol::after{background:var(--gold)}.stat.red::after{background:var(--danger)}.stat.pur::after{background:var(--purple)}
+.stat-ico{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;margin-bottom:12px;}
+.stat-ico.acc{background:rgba(0,229,176,0.1)}.stat-ico.blu{background:rgba(59,130,246,0.1)}.stat-ico.gol{background:rgba(245,158,11,0.1)}.stat-ico.red{background:rgba(239,68,68,0.1)}.stat-ico.pur{background:rgba(168,85,247,0.1)}
+.stat-val{font-family:var(--display);font-weight:800;font-size:24px;letter-spacing:-0.5px;line-height:1;margin-bottom:4px;}
+.stat-lbl{font-size:11px;color:var(--muted);margin-bottom:3px;}
+.stat-chg{font-size:11px;}
+.chg-up{color:var(--success)}.chg-dn{color:var(--danger)}.chg-n{color:var(--muted)}
+
+/* ── CARDS ── */
+.card{background:var(--s1);border:1px solid var(--border);border-radius:14px;overflow:hidden;}
+.ch{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.ct{font-family:var(--display);font-weight:700;font-size:14px;}
+.cs{font-size:11px;color:var(--muted);margin-top:2px;}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:20px;}
+.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;margin-bottom:20px;}
+
+/* ── TABLE ── */
+.tbl{width:100%;border-collapse:collapse;font-size:12px;}
+.tbl th{padding:11px 16px;text-align:left;font-size:10px;letter-spacing:0.7px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);font-weight:500;}
+.tbl td{padding:12px 16px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.tbl tr:last-child td{border-bottom:none;}
+.tbl tbody tr{cursor:pointer;transition:background 0.15s;}
+.tbl tbody tr:hover td{background:rgba(255,255,255,0.02);}
+
+/* ── PILLS ── */
+.pill{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:600;white-space:nowrap;}
+.pill.active{background:rgba(16,185,129,0.12);color:var(--success);}
+.pill.trial{background:rgba(59,130,246,0.12);color:#93c5fd;}
+.pill.overdue{background:rgba(239,68,68,0.12);color:var(--danger);}
+.pill.suspended{background:rgba(90,106,130,0.15);color:var(--muted2);}
+.pill.basic{background:rgba(90,106,130,0.12);color:var(--muted2);}
+.pill.pro{background:rgba(0,229,176,0.12);color:var(--accent);}
+.pill.enterprise{background:rgba(168,85,247,0.12);color:var(--purple);}
+.pill.paid{background:rgba(16,185,129,0.1);color:var(--success);}
+.pill.pending{background:rgba(245,158,11,0.1);color:var(--warn);}
+.pill.failed{background:rgba(239,68,68,0.1);color:var(--danger);}
+
+/* ── REVENUE CHART ── */
+.rev-chart{padding:18px 20px;height:160px;display:flex;align-items:flex-end;gap:6px;}
+.rbar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;height:100%;justify-content:flex-end;}
+.rbar{width:100%;border-radius:5px 5px 0 0;transition:height 0.8s cubic-bezier(0.34,1.56,0.64,1);cursor:pointer;position:relative;}
+.rbar:hover::after{content:attr(data-tip);position:absolute;top:-28px;left:50%;transform:translateX(-50%);background:var(--s4);border:1px solid var(--border2);padding:3px 8px;border-radius:5px;font-size:10px;white-space:nowrap;color:var(--text);}
+.rbar-lbl{font-size:9px;color:var(--muted);font-family:var(--mono);}
+
+/* ── PHARMACY ROW ── */
+.pharma-row{display:flex;align-items:center;gap:12px;padding:13px 18px;border-bottom:1px solid var(--border);transition:background 0.15s;cursor:pointer;}
+.pharma-row:hover{background:rgba(255,255,255,0.02);}
+.pharma-row:last-child{border-bottom:none;}
+.pharma-av{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;}
+.pharma-info{flex:1;}
+.pharma-name{font-size:13px;font-weight:600;}
+.pharma-meta{font-size:11px;color:var(--muted);margin-top:2px;}
+.pharma-right{text-align:right;}
+.pharma-rev{font-family:var(--display);font-weight:700;font-size:13px;}
+.pharma-date{font-size:10px;color:var(--muted);margin-top:2px;}
+
+/* ── ACTIVITY FEED ── */
+.activity-item{display:flex;align-items:flex-start;gap:12px;padding:12px 18px;border-bottom:1px solid var(--border);}
+.activity-item:last-child{border-bottom:none;}
+.act-dot{width:8px;height:8px;border-radius:50%;margin-top:5px;flex-shrink:0;}
+.act-text{font-size:12px;color:var(--muted2);flex:1;line-height:1.5;}
+.act-text strong{color:var(--text);}
+.act-time{font-size:10px;color:var(--muted);font-family:var(--mono);white-space:nowrap;}
+
+/* ── MODAL ── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);z-index:100;display:none;align-items:center;justify-content:center;}
+.overlay.open{display:flex;}
+.modal{background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:28px;width:480px;max-width:92vw;box-shadow:0 30px 80px rgba(0,0,0,0.6);animation:modalIn 0.2s ease;}
+@keyframes modalIn{from{opacity:0;transform:scale(0.96) translateY(16px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.modal-title{font-family:var(--display);font-weight:700;font-size:18px;margin-bottom:4px;}
+.modal-sub{font-size:12px;color:var(--muted);margin-bottom:22px;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;}
+.fg{display:flex;flex-direction:column;gap:5px;}
+.fg.full{grid-column:1/-1;}
+.fl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;}
+.fi{background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-family:var(--font);font-size:13px;outline:none;transition:border-color 0.2s;width:100%;}
+.fi:focus{border-color:rgba(0,229,176,0.4);}
+.fi::placeholder{color:var(--muted);}
+.fsel{background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-family:var(--font);font-size:13px;outline:none;width:100%;}
+.fsel option{background:var(--s2);}
+.modal-footer{display:flex;gap:10px;justify-content:flex-end;margin-top:22px;padding-top:18px;border-top:1px solid var(--border);}
+
+/* ── PLAN CARDS ── */
+.plan-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;}
+.plan-card{background:var(--s2);border:1px solid var(--border);border-radius:12px;padding:20px;position:relative;cursor:pointer;transition:all 0.2s;}
+.plan-card:hover{border-color:rgba(0,229,176,0.3);transform:translateY(-2px);}
+.plan-card.current{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 8px 30px rgba(0,229,176,0.1);}
+.plan-popular{position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:var(--accent);color:#000;font-size:9px;font-weight:700;padding:3px 12px;border-radius:20px;white-space:nowrap;}
+.plan-name{font-family:var(--display);font-weight:800;font-size:16px;margin-bottom:4px;}
+.plan-price{font-family:var(--display);font-weight:800;font-size:26px;letter-spacing:-0.5px;color:var(--accent);}
+.plan-period{font-size:11px;color:var(--muted);}
+.plan-div{height:1px;background:var(--border);margin:14px 0;}
+.plan-feat{font-size:12px;color:var(--muted2);margin-bottom:7px;display:flex;align-items:center;gap:7px;}
+.plan-feat .ck{color:var(--success);}
+.plan-btn{width:100%;padding:9px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;font-family:var(--font);margin-top:14px;transition:all 0.2s;}
+.plan-btn.pr{background:var(--accent);color:#000;}
+.plan-btn.gh{background:var(--s3);color:var(--text);border:1px solid var(--border);}
+
+/* ── SEARCH ── */
+.search-wrap{display:flex;align-items:center;gap:8px;background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;width:240px;}
+.search-wrap input{background:none;border:none;outline:none;color:var(--text);font-family:var(--font);font-size:12px;width:100%;}
+.search-wrap input::placeholder{color:var(--muted);}
+
+/* ── METRIC RING ── */
+.metric-rings{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:18px 20px;}
+.ring-card{text-align:center;}
+.ring-label{font-size:11px;color:var(--muted);margin-top:8px;}
+.ring-val{font-family:var(--display);font-weight:800;font-size:20px;margin-top:2px;}
+svg.ring-svg{transform:rotate(-90deg);}
+.ring-track{fill:none;stroke:rgba(255,255,255,0.06);}
+.ring-fill{fill:none;stroke-linecap:round;transition:stroke-dashoffset 1s ease;}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--s2);border:1px solid var(--border2);border-left:3px solid var(--accent);border-radius:10px;padding:12px 16px;font-size:12px;font-weight:500;transform:translateY(70px);opacity:0;transition:all 0.28s ease;z-index:300;max-width:320px;}
+.toast.show{transform:translateY(0);opacity:1;}
+.toast.err{border-left-color:var(--danger);}
+.toast.warn{border-left-color:var(--warn);}
+
+/* ── MISC ── */
+.section-title{font-family:var(--display);font-weight:700;font-size:16px;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+.mono{font-family:var(--mono);font-size:11px;}
+.tag{display:inline-block;padding:2px 8px;border-radius:5px;font-size:10px;font-weight:600;background:var(--s3);color:var(--muted2);}
+.divider{height:1px;background:var(--border);margin:20px 0;}
+.empty-state{text-align:center;padding:40px 20px;color:var(--muted);}
+.empty-icon{font-size:36px;margin-bottom:10px;}
+
+/* ── OVERVIEW GRID ── */
+.overview-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:18px;margin-bottom:20px;}
+.revenue-vs{padding:14px 20px;display:flex;gap:20px;}
+.rvs-item{text-align:center;flex:1;}
+.rvs-val{font-family:var(--display);font-weight:800;font-size:20px;letter-spacing:-0.5px;}
+.rvs-lbl{font-size:10px;color:var(--muted);margin-top:3px;}
+
+/* ── BILLING TIMELINE ── */
+.billing-row{display:flex;align-items:center;gap:12px;padding:11px 18px;border-bottom:1px solid var(--border);}
+.billing-row:last-child{border-bottom:none;}
+.br-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.br-info{flex:1;}
+.br-name{font-size:12px;font-weight:500;}
+.br-meta{font-size:11px;color:var(--muted);margin-top:2px;}
+.br-amount{font-family:var(--display);font-weight:700;font-size:13px;}
+
+/* ========================================================= */
+/* MOBILE / TABLET RESPONSIVE ENHANCEMENTS (added)            */
+/* ========================================================= */
+html{-webkit-text-size-adjust:100%;}
+img,svg,video{max-width:100%;}
+
+.hamburger-btn{display:none;align-items:center;justify-content:center;width:36px;height:36px;flex-shrink:0;background:rgba(255,255,255,0.08);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:18px;cursor:pointer;margin-right:4px;}
+.hamburger-btn:active{background:rgba(255,255,255,0.15);}
+#sidebarBackdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:150;}
+#sidebarBackdrop.show{display:block;}
+.table-scroll{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+
+@media(max-width:1024px){
+  .stats-row{grid-template-columns:repeat(3,1fr);}
+  .two-col,.three-col,.overview-grid,.plan-grid,.metric-rings{grid-template-columns:1fr 1fr;}
+}
+
+@media(max-width:768px){
+  .hamburger-btn{display:flex;}
+  body{overflow-x:hidden;}
+  .sidebar{
+    position:fixed !important;top:0;left:0;bottom:0;
+    width:80vw;max-width:280px;height:100vh;
+    transform:translateX(-100%);transition:transform 0.25s ease;
+    z-index:200;box-shadow:0 0 40px rgba(0,0,0,0.5);
+  }
+  .sidebar.mobile-open{transform:translateX(0);}
+  .main{margin-left:0 !important;}
+  .topbar{padding:12px 14px;flex-wrap:wrap;gap:8px;}
+  .tb-left{gap:8px;}
+  .tb-right{gap:6px;flex-wrap:wrap;}
+  .tb-title{font-size:16px;}
+  .page{padding:14px !important;}
+
+  .stats-row,.two-col,.three-col,.overview-grid,.plan-grid,.metric-rings,.form-row{grid-template-columns:1fr !important;}
+  [style*="grid-template-columns"]{grid-template-columns:1fr !important;}
+
+  .table-scroll table,.tbl{min-width:520px;}
+  .tbl th,.tbl td{padding:9px 10px;font-size:11px;}
+
+  .modal{width:100% !important;max-width:100% !important;max-height:86vh;overflow-y:auto;padding:20px;}
+  .overlay{padding:12px;align-items:flex-start !important;padding-top:6vh;}
+
+  .btn,button,.fi,.fsel,input,select,textarea{min-height:42px;}
+  input,select,textarea{font-size:16px !important;}
+  .search-wrap{width:100%;}
+
+  .pharma-row,.billing-row,.activity-item{flex-wrap:wrap;}
+}
+
+@media(max-width:480px){
+  .stat-val{font-size:20px;}
+  .logo-name{font-size:16px;}
+  .tb-title{font-size:15px;}
+  .modal{padding:16px;}
+  .sidebar{width:86vw;}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════ SIDEBAR ══════════ -->
+<aside class="sidebar">
+  <div class="logo-wrap">
+    <div class="logo-row"><div class="logo-gem">💊</div><div class="logo-name">MedVault</div></div>
+    <div class="logo-tag">Control Center</div>
+    <div class="admin-badge">⚡ Super Admin</div>
+  </div>
+  <nav class="nav">
+    <div class="nav-section">Overview</div>
+    <div class="ni active" onclick="go('overview',this)"><span class="ni-icon">📊</span>Overview</div>
+    <div class="ni" onclick="go('revenue',this)"><span class="ni-icon">💰</span>Revenue<span class="ni-badge g" id="revBadge">Live</span></div>
+
+    <div class="nav-section">Clients</div>
+    <div class="ni" onclick="go('pharmacies',this)"><span class="ni-icon">🏥</span>All Pharmacies<span class="ni-badge g" id="pharmCount">0</span></div>
+    <div class="ni" onclick="go('subscriptions',this)"><span class="ni-icon">💳</span>Subscriptions<span class="ni-badge r" id="overdueCount">0</span></div>
+    <div class="ni" onclick="go('billing',this)"><span class="ni-icon">🧾</span>Billing</div>
+    <div class="ni" onclick="go('trials',this)"><span class="ni-icon">⏳</span>Trials<span class="ni-badge w" id="trialCount">0</span></div>
+
+    <div class="nav-section">Operations</div>
+    <div class="ni" onclick="go('users',this)"><span class="ni-icon">👥</span>All Users</div>
+    <div class="ni" onclick="go('activity',this)"><span class="ni-icon">📡</span>Activity Log</div>
+    <div class="ni" onclick="go('marketplace',this)" id="niMarketplace"><span class="ni-icon">🏭</span>Marketplace Suppliers<span class="ni-badge w" id="pendingSupCount" style="display:none">0</span></div>
+
+    <div class="nav-section">System</div>
+    <div class="ni" onclick="go('pricing',this)"><span class="ni-icon">🏷️</span>Pricing Plans</div>
+    <div class="ni" onclick="go('settings',this)"><span class="ni-icon">⚙️</span>Settings</div>
+  </nav>
+  <div class="sidebar-bottom">
+    <div class="admin-card">
+      <div class="admin-av">SA</div>
+      <div><div class="admin-name">Super Admin</div><div class="admin-role">medvault.ug</div></div>
+    </div>
+    <button class="logout-btn" onclick="logout()">🚪 Log Out</button>
+  </div>
+</aside>
+<div id="sidebarBackdrop" onclick="closeMobileSidebar()"></div>
+
+<!-- ══════════ MAIN ══════════ -->
+<main class="main">
+  <div class="topbar">
+    <div class="tb-left">
+      <button class="hamburger-btn" id="hamburgerBtn" onclick="toggleMobileSidebar()" aria-label="Open menu">&#9776;</button>
+      <div><div class="tb-title" id="tb-title">Overview</div><div class="tb-sub" id="tb-sub">MedVault Control Center</div></div>
+    </div>
+    <div class="tb-right">
+      <div class="live-pulse"><div class="lp-dot"></div>Live</div>
+      <button class="btn btn-ghost" onclick="refreshPage()">🔄 Refresh</button>
+      <button class="btn btn-accent" onclick="openAddPharmacy()">+ Add Pharmacy</button>
+    </div>
+  </div>
+
+  <!-- ══ OVERVIEW ══ -->
+  <div class="page active" id="page-overview">
+    <div class="stats-row" id="overviewStats">
+      <div class="stat acc"><div class="stat-ico acc">🏥</div><div class="stat-val" id="sTotalPharma">47</div><div class="stat-lbl">Total Pharmacies</div><div class="stat-chg chg-up">↑ 3 this week</div></div>
+      <div class="stat blu"><div class="stat-ico blu">✅</div><div class="stat-val" id="sActive">39</div><div class="stat-lbl">Active Subscriptions</div><div class="stat-chg chg-up">↑ 2 this month</div></div>
+      <div class="stat gol"><div class="stat-ico gol">💰</div><div class="stat-val" id="sMRR">UGX 2.3M</div><div class="stat-lbl">Monthly Revenue (MRR)</div><div class="stat-chg chg-up">↑ 18% vs last month</div></div>
+      <div class="stat red"><div class="stat-ico red">⚠️</div><div class="stat-val" id="sOverdue">4</div><div class="stat-lbl">Overdue Payments</div><div class="stat-chg chg-dn">↑ 1 this week</div></div>
+      <div class="stat pur"><div class="stat-ico pur">⏳</div><div class="stat-val" id="sTrials">8</div><div class="stat-lbl">Active Trials</div><div class="stat-chg chg-n">14-day free trial</div></div>
+    </div>
+
+    <div class="overview-grid">
+      <!-- Revenue Chart -->
+      <div class="card">
+        <div class="ch"><div><div class="ct">Monthly Revenue</div><div class="cs">Last 7 months · UGX</div></div><span class="tag">MRR</span></div>
+        <div class="rev-chart" id="revChart"></div>
+        <div class="revenue-vs">
+          <div class="rvs-item"><div class="rvs-val" style="color:var(--accent)">UGX 2.3M</div><div class="rvs-lbl">This Month</div></div>
+          <div class="rvs-item"><div class="rvs-val" style="color:var(--muted2)">UGX 1.95M</div><div class="rvs-lbl">Last Month</div></div>
+          <div class="rvs-item"><div class="rvs-val" style="color:var(--success)">↑ 18%</div><div class="rvs-lbl">Growth</div></div>
+        </div>
+      </div>
+
+      <!-- Subscription breakdown rings -->
+      <div class="card">
+        <div class="ch"><div class="ct">Plan Breakdown</div></div>
+        <div class="metric-rings" id="planRings"></div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <!-- Recent signups -->
+      <div class="card">
+        <div class="ch"><div class="ct">Recent Signups</div><span class="see-all" onclick="go('pharmacies',document.querySelectorAll('.ni')[3])">View all →</span></div>
+        <div id="recentSignups"></div>
+      </div>
+      <!-- Activity feed -->
+      <div class="card">
+        <div class="ch"><div class="ct">Live Activity</div><span class="tag">Real-time</span></div>
+        <div id="activityFeed"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ REVENUE ══ -->
+  <div class="page" id="page-revenue">
+    <div class="stats-row">
+      <div class="stat acc"><div class="stat-ico acc">📅</div><div class="stat-val">UGX 2.3M</div><div class="stat-lbl">This Month</div><div class="stat-chg chg-up">↑ 18%</div></div>
+      <div class="stat blu"><div class="stat-ico blu">📆</div><div class="stat-val">UGX 1.95M</div><div class="stat-lbl">Last Month</div><div class="stat-chg chg-n">—</div></div>
+      <div class="stat gol"><div class="stat-ico gol">📈</div><div class="stat-val">UGX 12.4M</div><div class="stat-lbl">This Year</div><div class="stat-chg chg-up">↑ 34%</div></div>
+      <div class="stat pur"><div class="stat-ico pur">💳</div><div class="stat-val">UGX 147K</div><div class="stat-lbl">Avg Per Client</div><div class="stat-chg chg-up">↑ 5%</div></div>
+      <div class="stat red"><div class="stat-ico red">❌</div><div class="stat-val">UGX 200K</div><div class="stat-lbl">Churn (Lost)</div><div class="stat-chg chg-dn">2 cancellations</div></div>
+    </div>
+    <div class="two-col">
+      <div class="card">
+        <div class="ch"><div class="ct">Revenue by Plan</div></div>
+        <div style="padding:18px 20px">
+          <div style="margin-bottom:16px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:12px">Enterprise (UGX 150K)</span><span style="font-size:12px;font-family:var(--mono);color:var(--purple)">UGX 900K · 4 clients</span></div>
+            <div style="height:8px;background:var(--s3);border-radius:4px;overflow:hidden"><div style="height:100%;width:39%;background:var(--purple);border-radius:4px;transition:width 1s ease"></div></div>
+          </div>
+          <div style="margin-bottom:16px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:12px">Pro (UGX 50K)</span><span style="font-size:12px;font-family:var(--mono);color:var(--accent)">UGX 1.25M · 25 clients</span></div>
+            <div style="height:8px;background:var(--s3);border-radius:4px;overflow:hidden"><div style="height:100%;width:54%;background:var(--accent);border-radius:4px;transition:width 1s ease"></div></div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:12px">Basic (UGX 20K)</span><span style="font-size:12px;font-family:var(--mono);color:var(--muted2)">UGX 200K · 10 clients</span></div>
+            <div style="height:8px;background:var(--s3);border-radius:4px;overflow:hidden"><div style="height:100%;width:9%;background:var(--muted2);border-radius:4px;transition:width 1s ease"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ch"><div class="ct">Payment Methods</div></div>
+        <div style="padding:18px 20px">
+          <div style="margin-bottom:14px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:12px">📱 MTN MoMo</span><span style="font-size:12px;font-family:var(--mono);color:#f59e0b">62% · 24 clients</span></div>
+            <div style="height:8px;background:var(--s3);border-radius:4px;overflow:hidden"><div style="height:100%;width:62%;background:#f59e0b;border-radius:4px"></div></div>
+          </div>
+          <div style="margin-bottom:14px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:12px">📲 Airtel Money</span><span style="font-size:12px;font-family:var(--mono);color:#ef4444">28% · 11 clients</span></div>
+            <div style="height:8px;background:var(--s3);border-radius:4px;overflow:hidden"><div style="height:100%;width:28%;background:#ef4444;border-radius:4px"></div></div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:12px">💵 Cash/Bank</span><span style="font-size:12px;font-family:var(--mono);color:var(--muted2)">10% · 4 clients</span></div>
+            <div style="height:8px;background:var(--s3);border-radius:4px;overflow:hidden"><div style="height:100%;width:10%;background:var(--muted2);border-radius:4px"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><div class="ct">Revenue Timeline</div><div class="cs">All transactions this month</div></div>
+      <table class="tbl"><thead><tr><th>Date</th><th>Pharmacy</th><th>Plan</th><th>Amount</th><th>Method</th><th>Status</th></tr></thead>
+      <tbody id="revTimeline"></tbody></table>
+    </div>
+  </div>
+
+  <!-- ══ ALL PHARMACIES ══ -->
+  <div class="page" id="page-pharmacies">
+    <div class="toolbar" style="margin-bottom:18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <div class="search-wrap"><span>🔍</span><input type="text" id="pharmSearch" placeholder="Search pharmacy…" oninput="filterPharmas()"/></div>
+      <button class="btn btn-ghost" onclick="filterByStatus('')">All</button>
+      <button class="btn btn-ghost" onclick="filterByStatus('active')">✅ Active</button>
+      <button class="btn btn-ghost" onclick="filterByStatus('trial')">⏳ Trial</button>
+      <button class="btn btn-ghost" onclick="filterByStatus('overdue')">⚠️ Overdue</button>
+      <button class="btn btn-ghost" onclick="filterByStatus('suspended')">🚫 Suspended</button>
+      <button class="btn btn-accent" style="margin-left:auto" onclick="openAddPharmacy()">+ Add Pharmacy</button>
+    </div>
+    <div class="card">
+      <table class="tbl" id="pharmaTable">
+        <thead><tr><th>Pharmacy</th><th>Location</th><th>Plan</th><th>Status</th><th>Monthly Revenue</th><th>Billing Date</th><th>Last Active</th><th>Actions</th></tr></thead>
+        <tbody id="pharmaBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══ SUBSCRIPTIONS ══ -->
+  <div class="page" id="page-subscriptions">
+    <div class="stats-row" style="grid-template-columns:repeat(4,1fr)">
+      <div class="stat acc"><div class="stat-ico acc">✅</div><div class="stat-val" id="subActive">39</div><div class="stat-lbl">Active</div></div>
+      <div class="stat red"><div class="stat-ico red">⚠️</div><div class="stat-val" id="subOverdue">4</div><div class="stat-lbl">Overdue</div></div>
+      <div class="stat pur"><div class="stat-ico pur">⏳</div><div class="stat-val" id="subTrial">8</div><div class="stat-lbl">On Trial</div></div>
+      <div class="stat blu"><div class="stat-ico blu">🚫</div><div class="stat-val" id="subSuspended">2</div><div class="stat-lbl">Suspended</div></div>
+    </div>
+    <div class="two-col">
+      <div class="card">
+        <div class="ch"><div class="ct">Overdue — Action Required</div><span class="pill overdue">4 accounts</span></div>
+        <div id="overdueList"></div>
+      </div>
+      <div class="card">
+        <div class="ch"><div class="ct">Trials Ending Soon</div><span class="pill trial">This week</span></div>
+        <div id="trialEndList"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><div class="ct">All Subscriptions</div></div>
+      <table class="tbl"><thead><tr><th>Pharmacy</th><th>Plan</th><th>Amount</th><th>Billing Date</th><th>Days Left</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody id="allSubsBody"></tbody></table>
+    </div>
+  </div>
+
+  <!-- ══ BILLING ══ -->
+  <div class="page" id="page-billing">
+    <div class="stats-row" style="grid-template-columns:repeat(4,1fr)">
+      <div class="stat acc"><div class="stat-ico acc">✅</div><div class="stat-val">UGX 2.1M</div><div class="stat-lbl">Collected This Month</div></div>
+      <div class="stat red"><div class="stat-ico red">⌛</div><div class="stat-val">UGX 200K</div><div class="stat-lbl">Outstanding</div></div>
+      <div class="stat gol"><div class="stat-ico gol">📅</div><div class="stat-val">12</div><div class="stat-lbl">Due This Week</div></div>
+      <div class="stat blu"><div class="stat-ico blu">🔔</div><div class="stat-val">8</div><div class="stat-lbl">Reminders Sent</div></div>
+    </div>
+    <div class="two-col">
+      <div class="card">
+        <div class="ch"><div class="ct">Upcoming Billings</div><div class="cs">Next 7 days</div></div>
+        <div id="upcomingBilling"></div>
+      </div>
+      <div class="card">
+        <div class="ch"><div class="ct">Recent Collections</div></div>
+        <div id="recentCollections"></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:12px;margin-bottom:18px">
+      <button class="btn btn-accent" onclick="sendAllReminders()">📱 Send All Payment Reminders</button>
+      <button class="btn btn-ghost" onclick="openMessagingModal('trial')">⏳ Remind Trials</button>
+      <button class="btn btn-ghost" onclick="openMessagingModal('all')">📣 Message All</button>
+      <button class="btn btn-ghost" onclick="toast('Generating PDF invoice report…')">📄 Export Invoices</button>
+      <button class="btn btn-ghost" onclick="toast('Scheduling auto-charge via MTN MoMo…')">⚡ Auto-Charge All Overdue</button>
+    </div>
+  </div>
+
+  <!-- ══ TRIALS ══ -->
+  <div class="page" id="page-trials">
+    <div class="section-title">⏳ Active Free Trials</div>
+    <div class="card">
+      <table class="tbl"><thead><tr><th>Pharmacy</th><th>Started</th><th>Days Left</th><th>Usage</th><th>Contact</th><th>Actions</th></tr></thead>
+      <tbody id="trialsBody"></tbody></table>
+    </div>
+  </div>
+
+  <!-- ══ MOMO PAYMENTS ══ -->
+  <div class="page" id="page-payments">
+    <div class="stats-row" style="grid-template-columns:repeat(4,1fr)">
+      <div class="stat acc"><div class="stat-ico acc">✅</div><div class="stat-val">87</div><div class="stat-lbl">Successful Payments</div></div>
+      <div class="stat red"><div class="stat-ico red">❌</div><div class="stat-val">5</div><div class="stat-lbl">Failed Payments</div></div>
+      <div class="stat gol"><div class="stat-ico gol">⏳</div><div class="stat-val">3</div><div class="stat-lbl">Pending</div></div>
+      <div class="stat pur"><div class="stat-ico pur">💰</div><div class="stat-val">UGX 2.1M</div><div class="stat-lbl">Total Collected</div></div>
+    </div>
+    <div class="card">
+      <div class="ch"><div class="ct">MoMo Transaction Log</div><div class="cs">All MTN & Airtel payments</div></div>
+      <table class="tbl"><thead><tr><th>Reference ID</th><th>Pharmacy</th><th>Phone</th><th>Amount</th><th>Network</th><th>Time</th><th>Status</th></tr></thead>
+      <tbody id="momoLog"></tbody></table>
+    </div>
+  </div>
+
+  <!-- ══ SUPPORT ══ -->
+  <div class="page" id="page-support">
+    <div class="section-title">🎧 Support Tickets</div>
+    <div class="card">
+      <table class="tbl"><thead><tr><th>Ticket</th><th>Pharmacy</th><th>Issue</th><th>Priority</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody id="supportBody"></tbody></table>
+    </div>
+  </div>
+
+  <!-- ══ ACTIVITY ══ -->
+  <div class="page" id="page-activity">
+    <div class="section-title">📡 Full Activity Log</div>
+    <div class="card" id="fullActivityLog"></div>
+  </div>
+
+  <!-- ══ PRICING ══ -->
+  <div class="page" id="page-pricing">
+    <div class="section-title">🏷️ Subscription Plans</div>
+    <div class="plan-grid">
+      <div class="plan-card"><div class="plan-name">Basic</div><div class="plan-price">UGX 20K</div><div class="plan-period">per month</div><div class="plan-div"></div><div class="plan-feat"><span class="ck">✓</span>Inventory management</div><div class="plan-feat"><span class="ck">✓</span>Sales & receipts</div><div class="plan-feat"><span class="ck">✓</span>2 staff accounts</div><div class="plan-feat" style="opacity:0.4"><span>✗</span>Online ordering</div><button class="plan-btn gh" onclick="editPlan('basic')">Edit Plan</button></div>
+      <div class="plan-card current"><div class="plan-popular">Most Popular</div><div class="plan-name">Pro</div><div class="plan-price">UGX 50K</div><div class="plan-period">per month</div><div class="plan-div"></div><div class="plan-feat"><span class="ck">✓</span>Everything in Basic</div><div class="plan-feat"><span class="ck">✓</span>Online ordering</div><div class="plan-feat"><span class="ck">✓</span>5 staff accounts</div><div class="plan-feat"><span class="ck">✓</span>Analytics & reports</div><button class="plan-btn pr" onclick="editPlan('pro')">Edit Plan</button></div>
+      <div class="plan-card"><div class="plan-name">Enterprise</div><div class="plan-price">UGX 150K</div><div class="plan-period">per month</div><div class="plan-div"></div><div class="plan-feat"><span class="ck">✓</span>Everything in Pro</div><div class="plan-feat"><span class="ck">✓</span>Multi-branch</div><div class="plan-feat"><span class="ck">✓</span>AI stock predictions</div><div class="plan-feat"><span class="ck">✓</span>Priority support</div><button class="plan-btn gh" onclick="editPlan('enterprise')">Edit Plan</button></div>
+    </div>
+    <div class="divider"></div>
+    <div class="section-title">🎁 Discount Codes</div>
+    <div class="card">
+      <div class="ch"><div class="ct">Active Codes</div><button class="btn btn-accent" style="padding:6px 12px;font-size:11px" onclick="toast('Create discount code form coming!')">+ New Code</button></div>
+      <table class="tbl"><thead><tr><th>Code</th><th>Discount</th><th>Uses</th><th>Expires</th><th>Actions</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">LAUNCH50</td><td>50% off 1st month</td><td>12 uses</td><td>31 Dec 2026</td><td><button class="btn btn-ghost" style="padding:4px 10px;font-size:11px" onclick="toast('Code deactivated')">Deactivate</button></td></tr>
+        <tr><td class="mono">KATO2026</td><td>1 month free</td><td>3 uses</td><td>30 Jun 2026</td><td><button class="btn btn-ghost" style="padding:4px 10px;font-size:11px" onclick="toast('Code deactivated')">Deactivate</button></td></tr>
+      </tbody></table>
+    </div>
+  </div>
+
+  <!-- ══ SETTINGS ══ -->
+  <div class="page" id="page-settings">
+    <div class="two-col">
+      <div class="card">
+        <div class="ch"><div class="ct">System Settings</div></div>
+        <div style="padding:20px;display:flex;flex-direction:column;gap:16px">
+          <div class="fg"><label class="fl">Platform Name</label><input class="fi" value="MedVault"/></div>
+          <div class="fg"><label class="fl">Support Email</label><input class="fi" value="support@medvault.ug"/></div>
+          <div class="fg"><label class="fl">Support WhatsApp</label><input class="fi" value="+256 700 123 456"/></div>
+          <div class="fg"><label class="fl">Trial Period (days)</label><input class="fi" type="number" value="14"/></div>
+          <div class="fg"><label class="fl">Grace Period (days)</label><input class="fi" type="number" value="3"/></div>
+          <button class="btn btn-accent" onclick="toast('✅ Settings saved!')">Save Settings</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ch"><div class="ct">MTN MoMo Config</div></div>
+        <div style="padding:20px;display:flex;flex-direction:column;gap:16px">
+          <div class="fg"><label class="fl">Environment</label><select class="fsel"><option>sandbox</option><option>production</option></select></div>
+          <div class="fg"><label class="fl">Subscription Key</label><input class="fi" type="password" placeholder="••••••••••••••••"/></div>
+          <div class="fg"><label class="fl">API User ID</label><input class="fi" placeholder="UUID format"/></div>
+          <div class="fg"><label class="fl">API Key</label><input class="fi" type="password" placeholder="••••••••••••••••"/></div>
+          <button class="btn btn-accent" onclick="toast('✅ MoMo config saved!')">Save MoMo Config</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><div class="ct">Broadcast Message</div><div class="cs">Send announcement to all pharmacies</div></div>
+      <div style="padding:20px;display:flex;flex-direction:column;gap:12px">
+        <div class="fg"><label class="fl">Message</label><textarea class="fi" rows="3" placeholder="Type your announcement here…" style="resize:vertical"></textarea></div>
+        <div style="display:flex;gap:10px">
+          <button class="btn btn-accent" onclick="toast('📢 Broadcast sent to 47 pharmacies!')">📢 Send to All Pharmacies</button>
+          <button class="btn btn-ghost" onclick="toast('Preview mode — message looks good!')">👁 Preview</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ USERS ══ -->
+  <div class="page" id="page-users">
+    <div class="toolbar" style="margin-bottom:18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <div class="search-wrap"><span>🔍</span><input type="text" id="userSearch" placeholder="Search user…" oninput="renderUsers()"/></div>
+      <span style="font-size:12px;color:var(--muted)" id="userCount"></span>
+    </div>
+    <div class="card">
+      <table class="tbl">
+        <thead><tr><th>User</th><th>Role</th><th>Organisation</th><th>Pharmacy</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
+        <tbody id="usersBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══ REVENUE (dynamic) ══ -->
+  <div class="page" id="page-revenue">
+    <div class="stats-row" style="grid-template-columns:repeat(4,1fr)">
+      <div class="stat acc"><div class="stat-ico acc">💰</div><div class="stat-val" id="revMRR">—</div><div class="stat-lbl">Monthly Revenue (MRR)</div></div>
+      <div class="stat blu"><div class="stat-ico blu">📈</div><div class="stat-val" id="revTotal">—</div><div class="stat-lbl">Total Sales Revenue</div></div>
+      <div class="stat gol"><div class="stat-ico gol">💳</div><div class="stat-val" id="revAvg">—</div><div class="stat-lbl">Avg Per Client</div></div>
+      <div class="stat pur"><div class="stat-ico pur">✅</div><div class="stat-val" id="revClients">—</div><div class="stat-lbl">Paying Clients</div></div>
+    </div>
+    <div class="two-col">
+      <div class="card">
+        <div class="ch"><div class="ct">Revenue by Plan</div></div>
+        <div style="padding:18px 20px" id="revByPlan"></div>
+      </div>
+      <div class="card">
+        <div class="ch"><div class="ct">Plan Breakdown</div></div>
+        <div class="metric-rings" id="planRings2"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ch"><div class="ct">Organisation Revenue Table</div><div class="cs">Ranked by total sales</div></div>
+      <table class="tbl">
+        <thead><tr><th>Organisation</th><th>Plan</th><th>Status</th><th>MRR</th><th>Total Sales</th><th>Transactions</th><th>Last Sale</th></tr></thead>
+        <tbody id="revOrgTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══ MARKETPLACE SUPPLIERS ══ -->
+  <div class="page" id="page-marketplace">
+    <!-- Stats row -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:22px" id="mktStatsRow">
+      <div class="card" style="padding:16px 18px;background:var(--s1)">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px">Pending Review</div>
+        <div id="mktPending" style="font-family:var(--display);font-weight:800;font-size:24px;color:var(--warn)">—</div>
+      </div>
+      <div class="card" style="padding:16px 18px;background:var(--s1)">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px">Approved</div>
+        <div id="mktApproved" style="font-family:var(--display);font-weight:800;font-size:24px;color:var(--accent)">—</div>
+      </div>
+      <div class="card" style="padding:16px 18px;background:var(--s1)">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px">Total Suppliers</div>
+        <div id="mktTotal" style="font-family:var(--display);font-weight:800;font-size:24px">—</div>
+      </div>
+      <div class="card" style="padding:16px 18px;background:var(--s1)">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px">Products Listed</div>
+        <div id="mktProducts" style="font-family:var(--display);font-weight:800;font-size:24px;color:var(--purple)">—</div>
+      </div>
+      <div class="card" style="padding:16px 18px;background:var(--s1)">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px">Total Orders</div>
+        <div id="mktOrders" style="font-family:var(--display);font-weight:800;font-size:24px">—</div>
+      </div>
+      <div class="card" style="padding:16px 18px;background:var(--s1);border:1px solid rgba(16,185,129,0.3)">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px">💰 Commission Earned</div>
+        <div id="mktCommissionEarned" style="font-family:var(--display);font-weight:800;font-size:22px;color:#10b981">—</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px">from delivered orders</div>
+      </div>
+      <div class="card" style="padding:16px 18px;background:var(--s1)">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px">📦 Total GMV</div>
+        <div id="mktGMV" style="font-family:var(--display);font-weight:800;font-size:22px">—</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px">gross merchandise value</div>
+      </div>
+    </div>
+
+    <!-- Filter row -->
+    <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+      <input id="mktSearch" type="text" placeholder="Search suppliers…" oninput="filterMarketplace()"
+        style="flex:1;min-width:200px;padding:9px 14px;border-radius:10px;border:1px solid var(--border2);background:var(--s1);color:var(--text);font-family:var(--font);font-size:13px;outline:none">
+      <select id="mktStatusFilter" onchange="filterMarketplace()"
+        style="padding:9px 14px;border-radius:10px;border:1px solid var(--border2);background:var(--s1);color:var(--text);font-family:var(--font);font-size:13px;outline:none">
+        <option value="">All Statuses</option>
+        <option value="pending">⏳ Pending</option>
+        <option value="approved">✅ Approved</option>
+        <option value="rejected">❌ Rejected</option>
+        <option value="suspended">⛔ Suspended</option>
+      </select>
+    </div>
+
+    <!-- Supplier table -->
+    <div class="card">
+      <div class="ch"><div class="ct">🏭 Supplier Applications</div><span id="mktCount" style="font-size:12px;color:var(--muted)"></span></div>
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th>Business</th>
+            <th>Type</th>
+            <th>Contact</th>
+            <th>Products</th>
+            <th>Status</th>
+            <th>Commission</th>
+            <th>Applied</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="mktBody">
+          <tr><td colspan="8" style="text-align:center;padding:30px;color:var(--muted)">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Orders table -->
+    <div class="card" style="margin-top:20px">
+      <div class="ch" style="display:flex;align-items:center;justify-content:space-between">
+        <div class="ct">📦 Marketplace Orders</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="mktOrderStatusFilter" onchange="loadAdminMktOrders()"
+            style="padding:7px 12px;border-radius:8px;border:1px solid var(--border2);background:var(--s1);color:var(--text);font-family:var(--font);font-size:12px;outline:none">
+            <option value="">All Statuses</option>
+            <option value="pending">⏳ Pending</option>
+            <option value="confirmed">✅ Confirmed</option>
+            <option value="processing">⚙️ Processing</option>
+            <option value="shipped">🚚 Shipped</option>
+            <option value="delivered">📬 Delivered</option>
+            <option value="cancelled">❌ Cancelled</option>
+          </select>
+          <button onclick="loadAdminMktOrders()" style="padding:7px 14px;border-radius:8px;background:var(--s2);border:1px solid var(--border2);color:var(--text);font-size:12px;cursor:pointer;font-family:var(--font)">🔄 Refresh</button>
+        </div>
+      </div>
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th>Order #</th>
+            <th>Pharmacy</th>
+            <th>Supplier</th>
+            <th>Amount</th>
+            <th>Payment</th>
+            <th>Status</th>
+            <th>Placed</th>
+          </tr>
+        </thead>
+        <tbody id="mktOrdersBody">
+          <tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted)">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══ LOADING OVERLAY ══ -->
+  <div id="globalLoader" style="display:none;position:fixed;inset:0;background:rgba(7,9,15,0.6);z-index:500;align-items:center;justify-content:center;flex-direction:column;gap:12px;">
+    <div style="width:36px;height:36px;border:3px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+    <div style="font-size:13px;color:var(--muted)">Loading live data…</div>
+  </div>
+  <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+</main>
+
+<!-- ADD PHARMACY MODAL -->
+<div class="overlay" id="addModal" onclick="if(event.target===this)closeModal('addModal')">
+  <div class="modal">
+    <div class="modal-title">Add New Pharmacy</div>
+    <div class="modal-sub">Create an account for a new client pharmacy</div>
+    <div class="form-row">
+      <div class="fg full"><label class="fl">Pharmacy Name</label><input class="fi" id="newPharmName" placeholder="e.g. Kato Pharma Ltd"/></div>
+      <div class="fg"><label class="fl">Owner Name</label><input class="fi" id="newOwner" placeholder="Full name"/></div>
+      <div class="fg"><label class="fl">Phone Number</label><input class="fi" id="newPhone" placeholder="07XX XXX XXX"/></div>
+      <div class="fg full"><label class="fl">Email Address</label><input class="fi" id="newEmail" placeholder="admin@pharmacyname.com" type="email"/></div>
+      <div class="fg"><label class="fl">Location</label><input class="fi" id="newLocation" placeholder="e.g. Kampala Road"/></div>
+      <div class="fg"><label class="fl">Plan</label><select class="fsel" id="newPlan"><option value="basic">Basic — UGX 20K/mo</option><option value="pro" selected>Pro — UGX 50K/mo</option><option value="enterprise">Enterprise — UGX 150K/mo</option></select></div>
+      <div class="fg full"><label class="fl">NDA Registration Number (optional)</label><input class="fi" id="newNDA" placeholder="NDA/PH/2024/XXX"/></div>
+    </div>
+    <div style="background:rgba(0,229,176,0.06);border:1px solid rgba(0,229,176,0.15);border-radius:8px;padding:12px;font-size:12px;color:var(--muted2);margin-bottom:4px">
+      💡 System will auto-generate login credentials and send them to the pharmacy's phone via SMS.
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('addModal')">Cancel</button>
+      <button class="btn btn-accent" onclick="createPharmacy()">Create Account & Send Login</button>
+    </div>
+  </div>
+</div>
+
+<!-- PHARMACY DETAIL MODAL -->
+<div class="overlay" id="detailModal" onclick="if(event.target===this)closeModal('detailModal')">
+  <div class="modal" style="width:540px">
+    <div class="modal-title" id="detailTitle">Pharmacy Details</div>
+    <div class="modal-sub" id="detailSub">Full account information</div>
+    <div id="detailContent"></div>
+    <div class="modal-footer" id="detailActions"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span id="toastMsg"></span></div>
+
+<script>
+'use strict';
+// ═══════════════════════════════════════════
+// MOBILE OFF-CANVAS SIDEBAR + TABLE AUTO-WRAP
+// ═══════════════════════════════════════════
+function toggleMobileSidebar(){
+  const sb = document.querySelector('.sidebar');
+  const bd = document.getElementById('sidebarBackdrop');
+  if (!sb) return;
+  const open = sb.classList.toggle('mobile-open');
+  if (bd) bd.classList.toggle('show', open);
+  document.body.style.overflow = open ? 'hidden' : '';
+}
+function closeMobileSidebar(){
+  const sb = document.querySelector('.sidebar');
+  const bd = document.getElementById('sidebarBackdrop');
+  if (sb) sb.classList.remove('mobile-open');
+  if (bd) bd.classList.remove('show');
+  document.body.style.overflow = '';
+}
+document.addEventListener('click', function(e){
+  if (window.innerWidth <= 768 && e.target.closest('.ni')) closeMobileSidebar();
+});
+function wrapTablesForMobile(){
+  document.querySelectorAll('table').forEach(function(t){
+    if (t.closest('.table-scroll')) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'table-scroll';
+    t.parentNode.insertBefore(wrap, t);
+    wrap.appendChild(t);
+  });
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', wrapTablesForMobile);
+} else { wrapTablesForMobile(); }
+setInterval(wrapTablesForMobile, 2000);
+
+// ═══════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════
+const BASE = 'https://medvaultv2-production.up.railway.app';
+const AV   = ['linear-gradient(135deg,#00e5b0,#3b82f6)','linear-gradient(135deg,#f59e0b,#ef4444)',
+               'linear-gradient(135deg,#a855f7,#3b82f6)','linear-gradient(135deg,#10b981,#a855f7)',
+               'linear-gradient(135deg,#3b82f6,#06b6d4)','linear-gradient(135deg,#f97316,#eab308)'];
+
+// ═══════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════
+let TOKEN  = localStorage.getItem('mv_admin_token') || '';
+let orgs   = [];   // raw from /api/admin/orgs
+let users  = [];   // raw from /api/admin/users
+let stats  = {};
+let currentPage = 'overview';
+
+// ═══════════════════════════════════════════
+// API HELPER
+// ═══════════════════════════════════════════
+async function api(path, opts = {}) {
+  try {
+    const res = await fetch(BASE + path, {
+      headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+TOKEN },
+      ...opts,
+    });
+    const data = await res.json();
+    if (res.status === 401 || res.status === 403) { showLogin(); return null; }
+    return { ok: res.ok, status: res.status, data };
+  } catch(e) {
+    toast('Network error: ' + e.message, 'err');
+    return null;
+  }
+}
+
+// ═══════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════
+function ugx(n) {
+  const v = parseFloat(n)||0;
+  if (v >= 1000000) return 'UGX ' + (v/1000000).toFixed(1) + 'M';
+  if (v >= 1000)    return 'UGX ' + Math.round(v/1000) + 'K';
+  return 'UGX ' + v.toLocaleString();
+}
+function ago(d) {
+  if (!d) return '—';
+  const s = Math.floor((Date.now() - new Date(d))/1000);
+  if (s < 60)     return 'just now';
+  if (s < 3600)   return Math.floor(s/60) + ' min ago';
+  if (s < 86400)  return Math.floor(s/3600) + ' hr ago';
+  if (s < 604800) return Math.floor(s/86400) + ' days ago';
+  return new Date(d).toLocaleDateString();
+}
+function esc(s) { return String(s||'').replace(/'/g,'\''); }
+function initials(name) { return (name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(); }
+function statusPill(st) {
+  const map = { active:'active', trial:'trial', overdue:'overdue', suspended:'suspended',
+                true:'active', false:'suspended' };
+  return `<span class="pill ${map[st]||'basic'}">${st}</span>`;
+}
+function planPill(p) { return `<span class="pill ${p||'basic'}">${p||'—'}</span>`; }
+function daysBetween(d) {
+  if (!d) return null;
+  return Math.ceil((new Date(d) - Date.now()) / 86400000);
+}
+
+// ═══════════════════════════════════════════
+// LOGIN GATE
+// ═══════════════════════════════════════════
+function showLogin() {
+  TOKEN = '';
+  localStorage.removeItem('mv_admin_token');
+  if (document.getElementById('loginGate')) return;
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="loginGate" style="position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;">
+      <div style="width:340px;background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:32px;">
+        <div style="text-align:center;margin-bottom:24px;">
+          <div style="font-family:var(--display);font-size:22px;font-weight:800;">MedVault Admin</div>
+          <div style="color:var(--muted);font-size:12px;margin-top:4px;">Super Admin Login</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <input id="lgEmail" class="fi" type="email" placeholder="admin@medvault.ug" value="admin@medvault.ug"/>
+          <input id="lgPass"  class="fi" type="password" placeholder="Password"/>
+          <button class="btn btn-accent" style="width:100%;justify-content:center;padding:11px;" onclick="doLogin()">Login to Control Center</button>
+          <div id="lgErr" style="color:var(--danger);font-size:12px;text-align:center;display:none;"></div>
+        </div>
+      </div>
+    </div>`);
+  document.getElementById('lgPass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+}
+
+async function doLogin() {
+  const email = document.getElementById('lgEmail').value.trim();
+  const pass  = document.getElementById('lgPass').value;
+  if (!email||!pass) return;
+  const btn = document.querySelector('#loginGate .btn-accent');
+  btn.textContent = 'Logging in…'; btn.disabled = true;
+  try {
+    const r = await fetch(BASE + '/api/auth/login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email, password: pass })
+    });
+    const d = await r.json();
+    if (d.token && d.user?.role === 'super_admin') {
+      TOKEN = d.token;
+      localStorage.setItem('mv_admin_token', TOKEN);
+      document.getElementById('loginGate').remove();
+      // Show admin name
+      document.querySelector('.admin-name').textContent = d.user.name || 'Super Admin';
+      boot();
+    } else {
+      const err = document.getElementById('lgErr');
+      err.style.display = 'block';
+      err.textContent = d.error || 'Invalid credentials or not a super admin';
+      btn.textContent = 'Login to Control Center'; btn.disabled = false;
+    }
+  } catch(e) {
+    document.getElementById('lgErr').style.display = 'block';
+    document.getElementById('lgErr').textContent = 'Connection error: ' + e.message;
+    btn.textContent = 'Login to Control Center'; btn.disabled = false;
+  }
+}
+
+// ═══════════════════════════════════════════
+// BOOT — load all data
+// ═══════════════════════════════════════════
+async function boot() {
+  setLoading(true);
+  const [sRes, oRes] = await Promise.all([
+    api('/api/admin/stats'),
+    api('/api/admin/orgs'),
+  ]);
+  if (!sRes || !oRes) { setLoading(false); return; }
+  if (sRes.ok)  stats = sRes.data;
+  if (oRes.ok)  orgs  = oRes.data.orgs || [];
+  setLoading(false);
+  updateSidebarBadges();
+  loadPage(currentPage);
+}
+
+async function loadUsersData() {
+  const r = await api('/api/admin/users');
+  if (r && r.ok) users = r.data.users || [];
+}
+
+function setLoading(on) {
+  const el = document.getElementById('globalLoader');
+  if (el) el.style.display = on ? 'flex' : 'none';
+}
+
+function updateSidebarBadges() {
+  const over = orgs.filter(o => o.sub_status === 'overdue').length;
+  const trial = orgs.filter(o => o.sub_status === 'trial').length;
+  document.getElementById('pharmCount').textContent   = orgs.length;
+  document.getElementById('overdueCount').textContent = over;
+  document.getElementById('trialCount').textContent   = trial;
+}
+
+// ═══════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════
+const pageMeta = {
+  overview:     {t:'Overview',                s:'Platform health at a glance'},
+  pharmacies:   {t:'All Pharmacies',          s:'Every client account — activate, suspend, manage'},
+  users:        {t:'All Users',               s:'Every user account across all pharmacies'},
+  subscriptions:{t:'Subscriptions',           s:'Plans, billing & overdue accounts'},
+  trials:       {t:'Free Trials',             s:'Monitor & convert trial users'},
+  revenue:      {t:'Revenue',                 s:'Subscription MRR & financial overview'},
+  activity:     {t:'Activity Log',            s:'Signups, suspensions & key events'},
+  pricing:      {t:'Pricing Plans',           s:'Subscription tiers'},
+  settings:     {t:'Settings',               s:'Platform configuration'},
+  marketplace:  {t:'Marketplace Suppliers',   s:'Review, approve, and manage supplier applications'},
+};
+
+function go(page, el) {
+  currentPage = page;
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const pg = document.getElementById('page-' + page);
+  if (pg) pg.classList.add('active');
+  document.querySelectorAll('.ni').forEach(n => n.classList.remove('active'));
+  if (el) el.classList.add('active');
+  const m = pageMeta[page] || {t:page, s:''};
+  document.getElementById('tb-title').textContent = m.t;
+  document.getElementById('tb-sub').textContent   = m.s;
+  loadPage(page);
+}
+
+function loadPage(page) {
+  if (page === 'overview')       renderOverview();
+  else if (page === 'pharmacies')     renderPharmacies();
+  else if (page === 'users')          renderUsers();
+  else if (page === 'subscriptions')  renderSubscriptions();
+  else if (page === 'trials')         renderTrials();
+  else if (page === 'revenue')        renderRevenue();
+  else if (page === 'activity')       renderActivity();
+  else if (page === 'marketplace')    renderMarketplace();
+}
+
+async function refreshPage() {
+  await boot();
+  toast('✅ Data refreshed from server');
+}
+
+// ═══════════════════════════════════════════
+// OVERVIEW
+// ═══════════════════════════════════════════
+function renderOverview() {
+  const mrr  = stats.mrr || 0;
+  const tot  = stats.totalOrgs || orgs.length;
+  const act  = stats.activeCount || orgs.filter(o=>o.sub_status==='active').length;
+  const tr   = stats.trialCount  || orgs.filter(o=>o.sub_status==='trial').length;
+  const ov   = stats.overdueCount|| orgs.filter(o=>o.sub_status==='overdue').length;
+  const sus  = stats.suspendedCount||orgs.filter(o=>o.sub_status==='suspended').length;
+
+  document.getElementById('sTotalPharma').textContent = tot;
+  document.getElementById('sActive').textContent      = act;
+  document.getElementById('sMRR').textContent         = ugx(mrr);
+  document.getElementById('sOverdue').textContent     = ov;
+  document.getElementById('sTrials').textContent      = tr;
+  updateSidebarBadges();
+
+  // Revenue chart — monthly MRR bars built from org join dates as proxy
+  const monthBuckets = {};
+  const now = new Date();
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = d.toLocaleString('default',{month:'short'});
+    monthBuckets[key] = 0;
+  }
+  orgs.filter(o=>o.sub_status==='active').forEach(o => {
+    const d = new Date(o.created_at);
+    const key = d.toLocaleString('default',{month:'short'});
+    if (key in monthBuckets) monthBuckets[key] += parseFloat(o.amount_ugx)||0;
+  });
+  // Also add all active subs to current month
+  const curKey = now.toLocaleString('default',{month:'short'});
+  monthBuckets[curKey] = orgs.filter(o=>o.sub_status==='active').reduce((s,o)=>s+(parseFloat(o.amount_ugx)||0),0);
+
+  const vals = Object.values(monthBuckets);
+  const maxV = Math.max(...vals, 1);
+  const chart = document.getElementById('revChart');
+  chart.innerHTML = '';
+  Object.entries(monthBuckets).forEach(([m, v], i, arr) => {
+    const pct = (v / maxV) * 85;
+    const color = i === arr.length-1 ? 'var(--accent)' : `rgba(0,229,176,${0.15+(i/arr.length)*0.5})`;
+    const w = document.createElement('div'); w.className = 'rbar-wrap';
+    w.innerHTML = `<div class="rbar" style="height:0%;background:${color};transition-delay:${i*0.07}s" data-h="${pct.toFixed(1)}" data-tip="${ugx(v)}"></div><div class="rbar-lbl">${m}</div>`;
+    chart.appendChild(w);
+  });
+  requestAnimationFrame(()=>requestAnimationFrame(()=>
+    document.querySelectorAll('.rbar').forEach(b=>b.style.height=b.dataset.h+'%')
+  ));
+
+  // Revenue vs panel
+  const months = Object.values(monthBuckets);
+  const thisM  = months[months.length-1]||0;
+  const lastM  = months[months.length-2]||0;
+  const growth = lastM > 0 ? Math.round(((thisM-lastM)/lastM)*100) : 0;
+  document.querySelector('.revenue-vs').innerHTML = `
+    <div class="rvs-item"><div class="rvs-val" style="color:var(--accent)">${ugx(thisM)}</div><div class="rvs-lbl">This Month</div></div>
+    <div class="rvs-item"><div class="rvs-val" style="color:var(--muted2)">${ugx(lastM)}</div><div class="rvs-lbl">Last Month</div></div>
+    <div class="rvs-item"><div class="rvs-val" style="color:${growth>=0?'var(--success)':'var(--danger)'}">${growth>=0?'↑':'↓'} ${Math.abs(growth)}%</div><div class="rvs-lbl">Growth</div></div>`;
+
+  // Plan rings
+  const planCnt = { basic:0, pro:0, enterprise:0 };
+  orgs.forEach(o=>{
+    const p = o.plan||'pro';
+    if (p==='enterprise') planCnt.enterprise++;
+    else if (p==='pro'||p==='single'||p==='multi'||p==='branch'||p==='chain') planCnt.pro++;
+    else planCnt.basic++;
+  });
+  const total = Math.max(orgs.length,1);
+  document.getElementById('planRings').innerHTML = [
+    {label:'Basic', cnt:planCnt.basic, color:'var(--muted2)'},
+    {label:'Pro',   cnt:planCnt.pro,   color:'var(--accent)'},
+    {label:'Enterprise', cnt:planCnt.enterprise, color:'var(--purple)'},
+  ].map(r=>{
+    const pct  = r.cnt/total;
+    const circ = 2*Math.PI*28;
+    const off  = circ-(pct*circ);
+    return `<div class="ring-card">
+      <svg class="ring-svg" width="70" height="70" viewBox="0 0 70 70">
+        <circle class="ring-track" cx="35" cy="35" r="28" stroke-width="7"/>
+        <circle class="ring-fill" cx="35" cy="35" r="28" stroke-width="7" stroke="${r.color}"
+          stroke-dasharray="${circ.toFixed(2)}" stroke-dashoffset="${off.toFixed(2)}" style="transition:stroke-dashoffset 1s ease;"/>
+      </svg>
+      <div class="ring-label">${r.label}</div>
+      <div class="ring-val" style="color:${r.color}">${r.cnt}</div>
+    </div>`;
+  }).join('');
+
+  // Recent signups
+  const recent = [...orgs].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).slice(0,5);
+  document.getElementById('recentSignups').innerHTML = recent.length ? recent.map((o,i)=>`
+    <div class="pharma-row" onclick="openOrgDetail(${o.id})">
+      <div class="pharma-av" style="background:${AV[i%AV.length]}">${initials(o.name)}</div>
+      <div class="pharma-info"><div class="pharma-name">${o.name}</div><div class="pharma-meta">${o.location||'Uganda'} · ${o.owner_name}</div></div>
+      <div class="pharma-right">${planPill(o.plan)}<div class="pharma-date">${new Date(o.created_at).toLocaleDateString()}</div></div>
+    </div>`).join('')
+    : '<div class="empty-state"><div class="empty-icon">🏥</div>No pharmacies yet. Add your first one above.</div>';
+
+  // Activity feed from real events
+  const events = [];
+  const sorted = [...orgs].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  sorted.slice(0,10).forEach(o=>{
+    if (o.sub_status==='trial')     events.push({color:'var(--accent)',text:`<strong>${o.name}</strong> signed up — 14-day trial started`,time:ago(o.created_at)});
+    if (o.sub_status==='suspended') events.push({color:'var(--danger)',text:`<strong>${o.name}</strong> account is suspended`,time:ago(o.created_at)});
+    if (o.sub_status==='overdue')   events.push({color:'var(--warn)',  text:`<strong>${o.name}</strong> payment is overdue`,time:ago(o.created_at)});
+    if (o.sub_status==='active' && parseFloat(o.total_sales)>0) events.push({color:'var(--success)',text:`<strong>${o.name}</strong> is active — ${ugx(o.total_sales)} total sales`,time:ago(o.last_sale_at)});
+  });
+  if (!events.length) events.push({color:'var(--muted)',text:'No activity yet — data will appear as pharmacies use the system',time:'now'});
+  document.getElementById('activityFeed').innerHTML = events.slice(0,6).map(a=>`
+    <div class="activity-item">
+      <div class="act-dot" style="background:${a.color}"></div>
+      <div class="act-text">${a.text}</div>
+      <div class="act-time">${a.time}</div>
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════
+// ALL PHARMACIES / ORGS
+// ═══════════════════════════════════════════
+function renderPharmacies(data) {
+  const list = data || orgs;
+  document.getElementById('pharmaBody').innerHTML = list.length ? list.map((o,i)=>{
+    const days = daysBetween(o.next_billing || o.trial_ends_at);
+    const daysStr = days===null ? '—' : days < 0 ? `${Math.abs(days)}d overdue` : `${days}d`;
+    const dColor  = days===null ? 'var(--muted)' : days < 0 ? 'var(--danger)' : days <= 7 ? 'var(--warn)' : 'var(--muted2)';
+    return `<tr onclick="openOrgDetail(${o.id})">
+      <td>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="pharma-av" style="background:${AV[i%AV.length]};width:30px;height:30px;font-size:11px">${initials(o.name)}</div>
+          <div><div style="font-weight:600;font-size:13px">${o.name}</div><div style="font-size:10px;color:var(--muted)">${o.owner_name||'—'}</div></div>
+        </div>
+      </td>
+      <td style="color:var(--muted2);font-size:12px">${o.location||'Uganda'}</td>
+      <td>${planPill(o.plan)}</td>
+      <td>${statusPill(o.sub_status||'trial')}</td>
+      <td style="font-family:var(--mono);color:var(--accent)">${ugx(o.amount_ugx)}/mo</td>
+      <td style="color:${dColor};font-size:12px;font-weight:600">${daysStr}</td>
+      <td style="color:var(--muted2);font-size:11px">${ago(o.last_sale_at)}</td>
+      <td>
+        <div style="display:flex;gap:4px" onclick="event.stopPropagation()">
+          <button class="btn btn-ghost" style="padding:3px 8px;font-size:10px" onclick="openOrgDetail(${o.id})">View</button>
+          ${o.sub_status==='suspended'||!o.is_active
+            ? `<button class="btn btn-accent" style="padding:3px 8px;font-size:10px" onclick="activateOrg(${o.id},'${esc(o.name)}')">✅ Activate</button>`
+            : `<button class="btn btn-danger" style="padding:3px 8px;font-size:10px" onclick="suspendOrg(${o.id},'${esc(o.name)}')">🚫 Suspend</button>`}
+          ${o.sub_status==='trial'
+            ? `<button class="btn btn-warn" style="padding:3px 8px;font-size:10px" onclick="convertTrial(${o.id},'${esc(o.name)}')">Convert</button>` : ''}
+        </div>
+      </td>
+    </tr>`;
+  }).join('')
+    : '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">🏥</div>No pharmacies found</div></td></tr>';
+}
+
+function filterPharmas() {
+  const q = document.getElementById('pharmSearch').value.toLowerCase();
+  renderPharmacies(orgs.filter(o=>
+    (o.name||'').toLowerCase().includes(q) ||
+    (o.owner_name||'').toLowerCase().includes(q) ||
+    (o.email||'').toLowerCase().includes(q) ||
+    (o.location||'').toLowerCase().includes(q)
+  ));
+}
+
+function filterByStatus(status) {
+  renderPharmacies(status ? orgs.filter(o=>o.sub_status===status) : orgs);
+}
+
+// ═══════════════════════════════════════════
+// ALL USERS
+// ═══════════════════════════════════════════
+async function renderUsers() {
+  if (!users.length) await loadUsersData();
+  const search = document.getElementById('userSearch');
+  const q = search ? search.value.toLowerCase() : '';
+  const list = q ? users.filter(u=>
+    (u.name||'').toLowerCase().includes(q) ||
+    (u.email||'').toLowerCase().includes(q) ||
+    (u.org_name||'').toLowerCase().includes(q)
+  ) : users;
+
+  document.getElementById('usersBody').innerHTML = list.length ? list.map(u=>`
+    <tr>
+      <td><div style="font-weight:600">${u.name}</div><div style="font-size:10px;color:var(--muted)">${u.email}</div></td>
+      <td><span class="tag">${u.role}</span></td>
+      <td style="font-size:12px;color:var(--muted2)">${u.org_name||'—'}</td>
+      <td style="font-size:12px;color:var(--muted2)">${u.pharmacy_name||'—'}</td>
+      <td>${statusPill(u.is_active ? 'active' : 'suspended')}</td>
+      <td style="font-size:11px;color:var(--muted2)">${new Date(u.created_at).toLocaleDateString()}</td>
+      <td>
+        <div style="display:flex;gap:4px">
+          ${u.is_active
+            ? `<button class="btn btn-danger" style="padding:3px 8px;font-size:10px" onclick="suspendUser(${u.id},'${esc(u.name)}')">Suspend</button>`
+            : `<button class="btn btn-accent" style="padding:3px 8px;font-size:10px" onclick="activateUser(${u.id},'${esc(u.name)}')">Activate</button>`}
+          <button class="btn btn-ghost" style="padding:3px 8px;font-size:10px" onclick="resetPassword(${u.id},'${esc(u.name)}')">Reset PW</button>
+        </div>
+      </td>
+    </tr>`).join('')
+    : '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">👤</div>No users found</div></td></tr>';
+}
+
+// ═══════════════════════════════════════════
+// SUBSCRIPTIONS
+// ═══════════════════════════════════════════
+function renderSubscriptions() {
+  const active    = orgs.filter(o=>o.sub_status==='active');
+  const overdue   = orgs.filter(o=>o.sub_status==='overdue');
+  const trial     = orgs.filter(o=>o.sub_status==='trial');
+  const suspended = orgs.filter(o=>o.sub_status==='suspended');
+
+  document.getElementById('subActive').textContent    = active.length;
+  document.getElementById('subOverdue').textContent   = overdue.length;
+  document.getElementById('subTrial').textContent     = trial.length;
+  document.getElementById('subSuspended').textContent = suspended.length;
+
+  document.getElementById('overdueList').innerHTML = overdue.length ? overdue.map(o=>`
+    <div class="billing-row">
+      <div class="br-icon" style="background:rgba(239,68,68,0.1)">⚠️</div>
+      <div class="br-info">
+        <div class="br-name">${o.name}</div>
+        <div class="br-meta">${o.owner_name} · ${o.phone} · ${o.plan} plan</div>
+      </div>
+      <div style="text-align:right">
+        <div class="br-amount" style="color:var(--danger)">${ugx(o.amount_ugx)}</div>
+        <div style="display:flex;gap:4px;margin-top:5px;justify-content:flex-end">
+          <button class="btn btn-warn" style="padding:3px 8px;font-size:10px" onclick="markPaid(${o.id},'${esc(o.name)}')">✅ Mark Paid</button>
+          <button class="btn btn-danger" style="padding:3px 8px;font-size:10px" onclick="suspendOrg(${o.id},'${esc(o.name)}')">🚫 Suspend</button>
+        </div>
+      </div>
+    </div>`).join('')
+    : '<div class="empty-state"><div class="empty-icon">✅</div>No overdue accounts!</div>';
+
+  document.getElementById('trialEndList').innerHTML = trial.length ? trial.map(o=>{
+    const days = daysBetween(o.trial_ends_at);
+    const dStr = days===null?'—':days<=0?'Expired':days+' days left';
+    const dCol = days<=3?'var(--danger)':days<=7?'var(--warn)':'var(--success)';
+    return `<div class="billing-row">
+      <div class="br-icon" style="background:rgba(59,130,246,0.1)">⏳</div>
+      <div class="br-info">
+        <div class="br-name">${o.name}</div>
+        <div class="br-meta" style="color:${dCol};font-weight:600">${dStr}</div>
+      </div>
+      <div style="display:flex;gap:4px">
+        <button class="btn btn-accent" style="padding:3px 8px;font-size:10px" onclick="convertTrial(${o.id},'${esc(o.name)}')">Convert</button>
+        <button class="btn btn-ghost"  style="padding:3px 8px;font-size:10px" onclick="extendTrial(${o.id},'${esc(o.name)}')">+7 Days</button>
+      </div>
+    </div>`;
+  }).join('')
+    : '<div class="empty-state"><div class="empty-icon">✅</div>No active trials</div>';
+
+  document.getElementById('allSubsBody').innerHTML = orgs.map(o=>{
+    const days   = daysBetween(o.next_billing||o.trial_ends_at);
+    const dColor = days===null?'var(--muted)':days<0?'var(--danger)':days<=7?'var(--warn)':'var(--muted2)';
+    const dStr   = days===null?'—':days<0?Math.abs(days)+' days overdue':days+' days';
+    return `<tr onclick="openOrgDetail(${o.id})">
+      <td><strong>${o.name}</strong><div style="font-size:10px;color:var(--muted)">${o.email}</div></td>
+      <td>${planPill(o.plan)}</td>
+      <td class="mono" style="color:var(--accent)">${ugx(o.amount_ugx)}</td>
+      <td style="font-size:11px;color:var(--muted2)">${o.next_billing?new Date(o.next_billing).toLocaleDateString():o.trial_ends_at?'Trial: '+new Date(o.trial_ends_at).toLocaleDateString():'—'}</td>
+      <td style="color:${dColor};font-weight:600;font-size:12px">${dStr}</td>
+      <td>${statusPill(o.sub_status||'trial')}</td>
+      <td>
+        <div style="display:flex;gap:4px" onclick="event.stopPropagation()">
+          ${o.sub_status==='trial'?`<button class="btn btn-accent" style="padding:3px 7px;font-size:10px" onclick="convertTrial(${o.id},'${esc(o.name)}')">Convert</button>`:''}
+          ${o.sub_status==='overdue'?`<button class="btn btn-warn" style="padding:3px 7px;font-size:10px" onclick="markPaid(${o.id},'${esc(o.name)}')">Mark Paid</button>`:''}
+          <button class="btn btn-ghost" style="padding:3px 7px;font-size:10px" onclick="changePlan(${o.id},'${esc(o.name)}')">Plan</button>
+          <button class="btn btn-ghost" style="padding:3px 7px;font-size:10px;color:#00c896;border-color:rgba(0,200,150,0.3)" onclick="sendReminder(${o.id},'${esc(o.name)}')">📱 Remind</button>
+          ${o.is_active
+            ?`<button class="btn btn-danger" style="padding:3px 7px;font-size:10px" onclick="suspendOrg(${o.id},'${esc(o.name)}')">Suspend</button>`
+            :`<button class="btn btn-accent" style="padding:3px 7px;font-size:10px" onclick="activateOrg(${o.id},'${esc(o.name)}')">Activate</button>`}
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════
+// TRIALS
+// ═══════════════════════════════════════════
+function renderTrials() {
+  const trials = orgs.filter(o=>o.sub_status==='trial');
+  document.getElementById('trialsBody').innerHTML = trials.length ? trials.map(o=>{
+    const days  = Math.max(0, daysBetween(o.trial_ends_at)||0);
+    const dColor= days<=3?'var(--danger)':days<=7?'var(--warn)':'var(--success)';
+    const usage = Math.min(100, Math.round((parseInt(o.drug_count)||0)/3));
+    return `<tr onclick="openOrgDetail(${o.id})">
+      <td><strong>${o.name}</strong><div style="font-size:10px;color:var(--muted)">${o.owner_name}</div></td>
+      <td style="font-size:12px;color:var(--muted2)">${new Date(o.created_at).toLocaleDateString()}</td>
+      <td style="color:${dColor};font-weight:700">${days} days</td>
+      <td>
+        <div style="height:5px;width:80px;background:var(--s3);border-radius:3px;overflow:hidden">
+          <div style="height:100%;width:${usage}%;background:var(--accent);border-radius:3px"></div>
+        </div>
+        <div style="font-size:10px;color:var(--muted);margin-top:3px">${o.drug_count||0} drugs · ${o.sale_count||0} sales</div>
+      </td>
+      <td style="font-family:var(--mono);font-size:12px">${o.phone}</td>
+      <td>
+        <div style="display:flex;gap:4px" onclick="event.stopPropagation()">
+          <button class="btn btn-accent" style="padding:4px 10px;font-size:11px" onclick="convertTrial(${o.id},'${esc(o.name)}')">Convert → Paid</button>
+          <button class="btn btn-ghost"  style="padding:4px 10px;font-size:11px" onclick="extendTrial(${o.id},'${esc(o.name)}')">+7 Days</button>
+          <button class="btn btn-danger" style="padding:4px 10px;font-size:11px" onclick="suspendOrg(${o.id},'${esc(o.name)}')">Suspend</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('')
+    : '<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">⏳</div>No active trials</div></td></tr>';
+}
+
+// ═══════════════════════════════════════════
+// REVENUE
+// ═══════════════════════════════════════════
+function renderRevenue() {
+  const mrr  = orgs.filter(o=>o.sub_status==='active').reduce((s,o)=>s+(parseFloat(o.amount_ugx)||0),0);
+  const tot  = orgs.reduce((s,o)=>s+(parseFloat(o.total_sales)||0),0);
+  const avg  = orgs.filter(o=>o.sub_status==='active').length > 0
+    ? mrr / orgs.filter(o=>o.sub_status==='active').length : 0;
+
+  document.getElementById('revMRR').textContent   = ugx(mrr);
+  document.getElementById('revTotal').textContent = ugx(tot);
+  document.getElementById('revAvg').textContent   = ugx(avg);
+  document.getElementById('revClients').textContent = orgs.filter(o=>o.sub_status==='active').length;
+
+  // Revenue by plan
+  const byPlan = {};
+  orgs.filter(o=>o.sub_status==='active').forEach(o=>{
+    const p = o.plan||'pro';
+    byPlan[p] = (byPlan[p]||0) + (parseFloat(o.amount_ugx)||0);
+  });
+  const maxPlanRev = Math.max(...Object.values(byPlan), 1);
+  document.getElementById('revByPlan').innerHTML = Object.entries(byPlan)
+    .sort((a,b)=>b[1]-a[1])
+    .map(([plan,rev])=>{
+      const cnt  = orgs.filter(o=>o.plan===plan&&o.sub_status==='active').length;
+      const pct  = Math.round((rev/maxPlanRev)*100);
+      const col  = plan==='enterprise'?'var(--purple)':plan==='pro'||plan==='single'?'var(--accent)':'var(--muted2)';
+      return `<div style="margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+          <span style="font-size:12px">${plan.charAt(0).toUpperCase()+plan.slice(1)}</span>
+          <span style="font-size:12px;font-family:var(--mono);color:${col}">${ugx(rev)} · ${cnt} client${cnt!==1?'s':''}</span>
+        </div>
+        <div style="height:8px;background:var(--s3);border-radius:4px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:${col};border-radius:4px;transition:width 0.8s ease"></div>
+        </div>
+      </div>`;
+    }).join('') || '<div style="color:var(--muted);font-size:12px;padding:12px">No active subscriptions yet</div>';
+
+  // Org revenue table
+  document.getElementById('revOrgTable').innerHTML = [...orgs]
+    .sort((a,b)=>(parseFloat(b.total_sales)||0)-(parseFloat(a.total_sales)||0))
+    .slice(0,20)
+    .map(o=>`<tr onclick="openOrgDetail(${o.id})">
+      <td><strong>${o.name}</strong></td>
+      <td>${planPill(o.plan)}</td>
+      <td>${statusPill(o.sub_status||'trial')}</td>
+      <td class="mono" style="color:var(--accent)">${ugx(o.amount_ugx)}/mo</td>
+      <td class="mono" style="color:var(--success)">${ugx(o.total_sales)}</td>
+      <td style="color:var(--muted2);font-size:11px">${o.sale_count||0} sales</td>
+      <td style="color:var(--muted2);font-size:11px">${ago(o.last_sale_at)}</td>
+    </tr>`).join('') || '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">💰</div>No revenue data yet</div></td></tr>';
+}
+
+// ═══════════════════════════════════════════
+// ACTIVITY
+// ═══════════════════════════════════════════
+function renderActivity() {
+  const events = [];
+  [...orgs].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).forEach(o=>{
+    events.push({
+      color: o.sub_status==='active'?'var(--success)':o.sub_status==='overdue'?'var(--warn)':o.sub_status==='suspended'?'var(--danger)':'var(--accent2)',
+      text: `<strong>${o.name}</strong> · ${o.owner_name} · ${o.plan} plan · Status: <strong>${o.sub_status}</strong>`,
+      time: ago(o.created_at),
+    });
+  });
+  if (!events.length) events.push({color:'var(--muted)',text:'No activity yet',time:'now'});
+  document.getElementById('fullActivityLog').innerHTML = events.map(a=>`
+    <div class="activity-item">
+      <div class="act-dot" style="background:${a.color}"></div>
+      <div class="act-text">${a.text}</div>
+      <div class="act-time">${a.time}</div>
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════
+// ORG DETAIL MODAL
+// ═══════════════════════════════════════════
+function openOrgDetail(id) {
+  const o = orgs.find(x=>x.id===id);
+  if (!o) return;
+  const days = daysBetween(o.next_billing||o.trial_ends_at);
+  document.getElementById('detailTitle').textContent = o.name;
+  document.getElementById('detailSub').textContent   = (o.location||'Uganda') + ' · ' + (o.owner_name||'—');
+  document.getElementById('detailContent').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">PLAN</div>${planPill(o.plan)}</div>
+      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">STATUS</div>${statusPill(o.sub_status||'trial')}</div>
+      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">SUBSCRIPTION FEE</div><div style="font-family:var(--mono);color:var(--accent);font-weight:700">${ugx(o.amount_ugx)}/mo</div></div>
+      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">TOTAL SALES REVENUE</div><div style="font-family:var(--mono);color:var(--success);font-weight:700">${ugx(o.total_sales)}</div></div>
+      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">PHONE</div><div style="font-size:13px">${o.phone||'—'}</div></div>
+      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">EMAIL</div><div style="font-size:12px;color:var(--muted2)">${o.email}</div></div>
+      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">BRANCHES</div><div style="font-size:13px">${o.branch_count||1}</div></div>
+      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">DRUGS IN STOCK</div><div style="font-size:13px">${o.drug_count||0} types</div></div>
+      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">USERS</div><div style="font-size:13px">${o.user_count||0} staff</div></div>
+      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">TOTAL SALES</div><div style="font-size:13px">${o.sale_count||0} transactions</div></div>
+    </div>
+    <div style="background:var(--s2);border-radius:8px;padding:12px;margin-bottom:8px">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:4px">NDA REGISTRATION</div>
+      <div style="font-family:var(--mono);font-size:12px">${o.nda||'⚠️ Not provided'}</div>
+    </div>
+    <div style="background:var(--s2);border-radius:8px;padding:12px;margin-bottom:8px">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:4px">BILLING / TRIAL ENDS</div>
+      <div style="font-size:13px;color:${days!==null&&days<0?'var(--danger)':'var(--text)'}">${
+        o.next_billing ? new Date(o.next_billing).toLocaleDateString() :
+        o.trial_ends_at ? 'Trial ends ' + new Date(o.trial_ends_at).toLocaleDateString() : '—'
+      }${days!==null&&days<0?' ('+Math.abs(days)+' days overdue)':days!==null?' ('+days+' days left)':''}</div>
+    </div>
+    <div style="background:var(--s2);border-radius:8px;padding:12px">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:4px">JOINED</div>
+      <div style="font-size:13px">${new Date(o.created_at).toLocaleDateString()}</div>
+    </div>`;
+
+  // Build action buttons based on current status
+  const actions = [`<button class="btn btn-ghost" onclick="closeModal('detailModal')">Close</button>`];
+  if (o.sub_status==='trial') {
+    actions.push(`<button class="btn btn-ghost" onclick="extendTrial(${o.id},'${esc(o.name)}')">+7 Days Trial</button>`);
+    actions.push(`<button class="btn btn-accent" onclick="convertTrial(${o.id},'${esc(o.name)}');closeModal('detailModal')">✅ Convert to Paid</button>`);
+  }
+  if (o.sub_status==='overdue') {
+    actions.push(`<button class="btn btn-warn" onclick="markPaid(${o.id},'${esc(o.name)}');closeModal('detailModal')">✅ Mark as Paid</button>`);
+    actions.push(`<button class="btn btn-danger" onclick="suspendOrg(${o.id},'${esc(o.name)}');closeModal('detailModal')">🚫 Suspend</button>`);
+  }
+  if (o.sub_status==='active') {
+    actions.push(`<button class="btn btn-ghost" onclick="changePlan(${o.id},'${esc(o.name)}')">Change Plan</button>`);
+    actions.push(`<button class="btn btn-danger" onclick="suspendOrg(${o.id},'${esc(o.name)}');closeModal('detailModal')">🚫 Suspend</button>`);
+  }
+  if (o.sub_status==='suspended' || !o.is_active) {
+    actions.push(`<button class="btn btn-accent" onclick="activateOrg(${o.id},'${esc(o.name)}');closeModal('detailModal')">✅ Reactivate</button>`);
+  }
+  document.getElementById('detailActions').innerHTML = actions.join('');
+  document.getElementById('detailModal').classList.add('open');
+}
+
+// ═══════════════════════════════════════════
+// ADD PHARMACY MODAL
+// ═══════════════════════════════════════════
+function openAddPharmacy() { document.getElementById('addModal').classList.add('open'); }
+
+async function createPharmacy() {
+  const name  = document.getElementById('newPharmName').value.trim();
+  const phone = document.getElementById('newPhone').value.trim();
+  const email = document.getElementById('newEmail').value.trim();
+  if (!name||!phone||!email) { toast('⚠️ Name, phone and email are required','warn'); return; }
+  const btn = document.querySelector('#addModal .btn-accent');
+  btn.textContent='Creating…'; btn.disabled=true;
+  const r = await api('/api/admin/orgs', {
+    method:'POST',
+    body: JSON.stringify({
+      name, owner_name: document.getElementById('newOwner').value.trim()||name,
+      email, phone,
+      location: document.getElementById('newLocation').value.trim(),
+      plan: document.getElementById('newPlan').value,
+      nda: document.getElementById('newNDA').value.trim(),
+    })
+  });
+  btn.textContent='Create Account & Send Login'; btn.disabled=false;
+  if (r && r.ok && r.data.success) {
+    closeModal('addModal');
+    ['newPharmName','newOwner','newPhone','newEmail','newLocation','newNDA']
+      .forEach(id=>document.getElementById(id).value='');
+    toast(`✅ ${name} created! Temp password: ${r.data.temp_password}`);
+    await boot();
+    go('pharmacies', document.querySelectorAll('.ni')[2]);
+  } else {
+    toast('❌ ' + (r?.data?.error||'Failed to create pharmacy'), 'err');
+  }
+}
+
+// ═══════════════════════════════════════════
+// CONTROL ACTIONS — all hit real API
+// ═══════════════════════════════════════════
+async function suspendOrg(id, name) {
+  if (!confirm(`Suspend "${name}"? All their users will lose access immediately.`)) return;
+  const r = await api(`/api/admin/orgs/${id}/suspend`, {method:'POST'});
+  if (r&&r.ok) {
+    const o = orgs.find(x=>x.id===id);
+    if (o) { o.sub_status='suspended'; o.is_active=false; }
+    toast(`🚫 ${name} suspended`, 'err');
+    updateSidebarBadges(); loadPage(currentPage);
+  } else { toast('❌ '+(r?.data?.error||'Failed'),'err'); }
+}
+
+async function activateOrg(id, name) {
+  const r = await api(`/api/admin/orgs/${id}/activate`, {method:'POST'});
+  if (r&&r.ok) {
+    const o = orgs.find(x=>x.id===id);
+    if (o) { o.sub_status='active'; o.is_active=true; }
+    toast(`✅ ${name} reactivated!`);
+    updateSidebarBadges(); loadPage(currentPage);
+  } else { toast('❌ '+(r?.data?.error||'Failed'),'err'); }
+}
+
+async function markPaid(id, name) {
+  const r = await api(`/api/admin/orgs/${id}/activate`, {method:'POST'});
+  if (r&&r.ok) {
+    const o = orgs.find(x=>x.id===id);
+    if (o) { o.sub_status='active'; o.is_active=true; }
+    toast(`✅ ${name} marked as paid & reactivated!`);
+    updateSidebarBadges(); loadPage(currentPage);
+  } else { toast('❌ '+(r?.data?.error||'Failed'),'err'); }
+}
+
+async function convertTrial(id, name) {
+  const plan = prompt(`Convert "${name}" to paid.
+Enter plan: basic, pro, enterprise`, 'pro');
+  if (!plan) return;
+  const r = await api(`/api/admin/orgs/${id}/convert-trial`, {method:'POST', body:JSON.stringify({plan})});
+  if (r&&r.ok) {
+    const o = orgs.find(x=>x.id===id);
+    if (o) { o.sub_status='active'; o.is_active=true; o.plan=plan; }
+    toast(`✅ ${name} converted to ${plan}!`);
+    updateSidebarBadges(); loadPage(currentPage);
+  } else { toast('❌ '+(r?.data?.error||'Failed'),'err'); }
+}
+
+async function extendTrial(id, name) {
+  const r = await api(`/api/admin/orgs/${id}/extend-trial`, {method:'POST', body:JSON.stringify({days:7})});
+  if (r&&r.ok) {
+    toast(`⏳ ${name} trial extended 7 days`);
+    await boot();
+    loadPage(currentPage);
+  } else { toast('❌ '+(r?.data?.error||'Failed'),'err'); }
+}
+
+async function changePlan(id, name) {
+  const plan = prompt(`Change plan for "${name}".
+Options: basic, pro, enterprise`, 'pro');
+  if (!plan) return;
+  const r = await api(`/api/admin/orgs/${id}/plan`, {method:'PATCH', body:JSON.stringify({plan})});
+  if (r&&r.ok) {
+    const o = orgs.find(x=>x.id===id);
+    if (o) { o.plan=plan; o.amount_ugx=r.data.amount; }
+    toast(`✅ ${name} moved to ${plan} plan`);
+    loadPage(currentPage);
+  } else { toast('❌ '+(r?.data?.error||'Failed'),'err'); }
+}
+
+async function suspendUser(id, name) {
+  if (!confirm(`Suspend user "${name}"?`)) return;
+  const r = await api(`/api/admin/users/${id}/suspend`, {method:'POST'});
+  if (r&&r.ok) {
+    const u = users.find(x=>x.id===id); if(u) u.is_active=false;
+    toast(`🚫 ${name} suspended`,'err');
+    renderUsers();
+  } else { toast('❌ '+(r?.data?.error||'Failed'),'err'); }
+}
+
+async function activateUser(id, name) {
+  const r = await api(`/api/admin/users/${id}/activate`, {method:'POST'});
+  if (r&&r.ok) {
+    const u = users.find(x=>x.id===id); if(u) u.is_active=true;
+    toast(`✅ ${name} activated`);
+    renderUsers();
+  } else { toast('❌ '+(r?.data?.error||'Failed'),'err'); }
+}
+
+async function resetPassword(id, name) {
+  if (!confirm(`Reset password for "${name}"? A new password will be generated.`)) return;
+  const r = await api(`/api/admin/users/${id}/reset-password`, {method:'POST'});
+  if (r&&r.ok) {
+    toast(`🔑 New password for ${name}: ${r.data.new_password}`);
+    alert(`New password for ${name}:
+
+${r.data.new_password}
+
+Share this with the user securely.`);
+  } else { toast('❌ '+(r?.data?.error||'Failed'),'err'); }
+}
+
+function sendReminder(id, name) {
+  // Pre-select this org and open the messaging modal
+  openMessagingModal('selected', [id], name);
+}
+function sendAllReminders() {
+  openMessagingModal('overdue');
+}
+
+// ── BULK MESSAGING MODAL ─────────────────────────────────────
+let _msgSelectedOrgs = [];
+
+function openMessagingModal(target = 'all', orgIds = [], orgName = '') {
+  _msgSelectedOrgs = orgIds;
+  const modal = document.getElementById('messagingModal');
+  if (!modal) return;
+
+  // Set target dropdown
+  const tsel = document.getElementById('msgTarget');
+  if (tsel) tsel.value = target;
+
+  // Set message type to payment_reminder by default
+  const msel = document.getElementById('msgType');
+  if (msel) msel.value = 'payment_reminder';
+
+  // Show/hide custom message area
+  onMsgTypeChange();
+  onMsgTargetChange();
+
+  // If single recipient, show their name
+  const recipLabel = document.getElementById('msgRecipientLabel');
+  if (recipLabel) recipLabel.textContent = orgName ? `Sending to: ${orgName}` : '';
+
+  // Load recipient preview
+  previewMsgRecipients();
+
+  modal.style.display = 'flex';
+}
+
+function closeMessagingModal() {
+  const modal = document.getElementById('messagingModal');
+  if (modal) modal.style.display = 'none';
+  _msgSelectedOrgs = [];
+}
+
+function onMsgTargetChange() {
+  const target = document.getElementById('msgTarget')?.value;
+  const selectedNote = document.getElementById('msgSelectedNote');
+  if (selectedNote) selectedNote.style.display = target === 'selected' ? 'block' : 'none';
+  previewMsgRecipients();
+}
+
+function onMsgTypeChange() {
+  const type = document.getElementById('msgType')?.value;
+  const customArea = document.getElementById('msgCustomArea');
+  if (customArea) customArea.style.display = type === 'custom' ? 'block' : 'none';
+  updateMsgPreview();
+}
+
+async function previewMsgRecipients() {
+  const target = document.getElementById('msgTarget')?.value || 'all';
+  const countEl = document.getElementById('msgRecipientCount');
+  const listEl  = document.getElementById('msgRecipientList');
+  if (!countEl || !listEl) return;
+
+  if (target === 'selected') {
+    countEl.textContent = _msgSelectedOrgs.length + ' selected';
+    listEl.innerHTML = '';
+    return;
+  }
+
+  try {
+    const r = await api(`/api/admin/messaging/recipients?target=${target}`);
+    const recipients = (r?.data?.recipients) || [];
+    countEl.textContent = recipients.length + ' recipients';
+    listEl.innerHTML = recipients.slice(0, 5).map(r =>
+      `<div style="font-size:11px;padding:3px 0;color:var(--muted)">${r.name} · ${r.phone} · <span style="color:${r.sub_status==='overdue'?'var(--red)':r.sub_status==='trial'?'var(--gol)':'var(--acc)'}">${(r.sub_status||'').toUpperCase()}</span></div>`
+    ).join('') + (recipients.length > 5 ? `<div style="font-size:11px;color:var(--muted)">...and ${recipients.length - 5} more</div>` : '');
+    updateMsgPreview();
+  } catch(e) {
+    countEl.textContent = '—';
+  }
+}
+
+function updateMsgPreview() {
+  const type = document.getElementById('msgType')?.value;
+  const previewEl = document.getElementById('msgPreviewText');
+  if (!previewEl) return;
+
+  const previews = {
+    payment_reminder: `Dear {Name},
+
+This is a reminder that your MedVault subscription payment is due soon.
+
+Please pay via MTN MoMo or Airtel Money to keep your pharmacy running.
+
+Thank you,
+MedVault Team`,
+    trial_expiry:     `Dear {Name},
+
+Your MedVault free trial is expiring soon.
+
+Upgrade now to continue without interruption. Plans from UGX 20,000/month.
+
+Contact: +256 700 000 000
+MedVault Team`,
+    custom:           document.getElementById('msgCustomText')?.value || 'Enter your custom message above...',
+  };
+  previewEl.textContent = previews[type] || '';
+}
+
+async function sendBulkMessages() {
+  const target        = document.getElementById('msgTarget')?.value;
+  const message_type  = document.getElementById('msgType')?.value;
+  const custom_message = document.getElementById('msgCustomText')?.value?.trim();
+  const btn           = document.getElementById('msgSendBtn');
+
+  if (message_type === 'custom' && !custom_message) {
+    toast('Please enter a custom message', 'warn'); return;
+  }
+
+  if (!confirm(`Send ${message_type.replace('_',' ')} messages to ${target === 'selected' ? _msgSelectedOrgs.length + ' selected' : target} pharmacies?`)) return;
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Sending...';
+
+  try {
+    const payload = { target, message_type };
+    if (target === 'selected') payload.org_ids = _msgSelectedOrgs;
+    if (message_type === 'custom') payload.custom_message = custom_message;
+
+    const res = await api('/api/admin/messaging/send', { method: 'POST', body: JSON.stringify(payload) });
+    const r = res?.data;
+    if (!r) { toast('No response from server', 'err'); return; }
+
+    // Show results
+    const resultsEl = document.getElementById('msgResults');
+    if (resultsEl) {
+      resultsEl.style.display = 'block';
+      resultsEl.innerHTML = `
+        <div style="display:flex;gap:16px;margin-bottom:12px">
+          <div style="background:rgba(0,200,150,0.1);border:1px solid rgba(0,200,150,0.3);border-radius:8px;padding:10px 16px;text-align:center">
+            <div style="font-size:22px;font-weight:700;color:#00c896">${r.sent}</div>
+            <div style="font-size:11px;color:var(--muted)">Sent</div>
+          </div>
+          <div style="background:rgba(255,80,80,0.1);border:1px solid rgba(255,80,80,0.3);border-radius:8px;padding:10px 16px;text-align:center">
+            <div style="font-size:22px;font-weight:700;color:#ff5050">${r.failed}</div>
+            <div style="font-size:11px;color:var(--muted)">Failed</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:10px 16px;text-align:center">
+            <div style="font-size:22px;font-weight:700">${r.total}</div>
+            <div style="font-size:11px;color:var(--muted)">Total</div>
+          </div>
+        </div>
+        ${(r.results||[]).map(x => `<div style="font-size:11px;padding:3px 0;color:${x.success?'#00c896':'#ff5050'}">${x.success?'✅':'❌'} ${x.name} · ${x.phone}${x.error?' — '+x.error:x.sandbox?' (sandbox)':''}</div>`).join('')}
+      `;
+    }
+    toast(`✅ Sent: ${r.sent} · Failed: ${r.failed}`, r.failed > 0 ? 'warn' : 'success');
+  } catch(e) {
+    toast('Failed to send messages: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '📱 Send Messages';
+  }
+}
+function editPlan(plan)           { toast(`✏️ ${plan} plan editor coming soon`); }
+function closeModal(id)           { document.getElementById(id).classList.remove('open'); }
+
+// ═══════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════
+let _tt;
+function toast(msg, type='') {
+  const t = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  t.className = 'toast ' + type;
+  t.classList.add('show');
+  clearTimeout(_tt);
+  _tt = setTimeout(()=>t.classList.remove('show'), 4500);
+}
+
+// ═══════════════════════════════════════════
+// LOGOUT
+// ═══════════════════════════════════════════
+function logout() {
+  if (!confirm('Log out of the MedVault Control Center?')) return;
+  TOKEN = '';
+  localStorage.removeItem('mv_admin_token');
+  // Remove any existing login gate so showLogin() can rebuild it fresh
+  const existing = document.getElementById('loginGate');
+  if (existing) existing.remove();
+  showLogin();
+  toast('👋 Logged out successfully');
+}
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+
+// ════════════════════════════════════════════════════════════
+// MARKETPLACE SUPPLIERS
+// ════════════════════════════════════════════════════════════
+let allMktSuppliers = [];
+
+async function renderMarketplace() {
+  // Load stats
+  const statsR = await api('/api/admin/marketplace/stats');
+  if (statsR && statsR.ok) {
+    const s = statsR.data;
+    document.getElementById('mktPending').textContent  = s.pendingCount  || 0;
+    document.getElementById('mktApproved').textContent = s.approvedCount || 0;
+    document.getElementById('mktTotal').textContent    = s.totalCount    || 0;
+    document.getElementById('mktProducts').textContent = s.productCount  || 0;
+    document.getElementById('mktOrders').textContent   = s.orderCount    || 0;
+    const earned = parseFloat(s.totalCommissionEarned || 0);
+    const gmv    = parseFloat(s.totalGMV || 0);
+    document.getElementById('mktCommissionEarned').textContent = 'UGX ' + ugx(earned).replace('UGX ','');
+    document.getElementById('mktGMV').textContent              = 'UGX ' + ugx(gmv).replace('UGX ','');
+    // sidebar badge
+    const badge = document.getElementById('pendingSupCount');
+    if (badge) {
+      badge.textContent     = s.pendingCount || 0;
+      badge.style.display   = s.pendingCount > 0 ? '' : 'none';
+    }
+  }
+  // Load suppliers
+  const r = await api('/api/admin/marketplace/suppliers');
+  if (!r || !r.ok) { toast('Failed to load marketplace suppliers', 'err'); return; }
+  allMktSuppliers = r.data.suppliers || [];
+  filterMarketplace();
+  // Load orders
+  loadAdminMktOrders();
+}
+
+async function loadAdminMktOrders() {
+  const body = document.getElementById('mktOrdersBody');
+  if (!body) return;
+  body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">Loading…</td></tr>';
+  const status = document.getElementById('mktOrderStatusFilter')?.value || '';
+  const url = '/api/admin/marketplace/orders' + (status ? '?status=' + status : '');
+  const r = await api(url);
+  if (!r || !r.ok) {
+    body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--danger)">Failed to load orders</td></tr>';
+    return;
+  }
+  const orders = r.data.orders || [];
+  if (!orders.length) {
+    body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted)">No marketplace orders yet.</td></tr>';
+    return;
+  }
+  const statusStyle = {
+    pending:    'background:rgba(245,158,11,0.12);color:var(--warn)',
+    confirmed:  'background:rgba(59,130,246,0.12);color:var(--accent2)',
+    processing: 'background:rgba(168,85,247,0.12);color:#a855f7',
+    shipped:    'background:rgba(245,158,11,0.12);color:var(--warn)',
+    delivered:  'background:rgba(0,229,176,0.12);color:var(--accent)',
+    cancelled:  'background:rgba(239,68,68,0.12);color:#ef4444',
+  };
+  body.innerHTML = orders.map(o => {
+    const ss = statusStyle[o.status] || '';
+    return `<tr>
+      <td style="font-family:monospace;font-size:11px;color:var(--accent)">${o.order_number}</td>
+      <td><strong>${o.pharmacy_name || '—'}</strong></td>
+      <td>${o.supplier_name || '—'}</td>
+      <td style="font-weight:700">UGX ${Number(o.total_amount || 0).toLocaleString()}</td>
+      <td style="font-size:12px">${o.payment_method || '—'}</td>
+      <td><span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;${ss}">${(o.status || '').toUpperCase()}</span></td>
+      <td style="font-size:12px;color:var(--muted)">${new Date(o.placed_at).toLocaleString()}</td>
+    </tr>`;
+  }).join('');
+}
+
+function filterMarketplace() {
+  const q      = (document.getElementById('mktSearch')?.value || '').toLowerCase();
+  const status = document.getElementById('mktStatusFilter')?.value || '';
+  const list   = allMktSuppliers.filter(s => {
+    const matchQ = !q || s.business_name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q) || (s.contact_name||'').toLowerCase().includes(q);
+    const matchS = !status || s.status === status;
+    return matchQ && matchS;
+  });
+  const cnt = document.getElementById('mktCount');
+  if (cnt) cnt.textContent = `${list.length} supplier${list.length !== 1 ? 's' : ''}`;
+  renderMktTable(list);
+}
+
+function renderMktTable(list) {
+  const body = document.getElementById('mktBody');
+  if (!list.length) {
+    body.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted)">No suppliers match your filter.</td></tr>';
+    return;
+  }
+  const statusStyle = {
+    pending:   'background:rgba(245,158,11,0.12);color:var(--warn)',
+    approved:  'background:rgba(0,229,176,0.12);color:var(--accent)',
+    rejected:  'background:rgba(239,68,68,0.12);color:#ef4444',
+    suspended: 'background:rgba(255,255,255,0.06);color:var(--muted)',
+  };
+  body.innerHTML = list.map(s => `
+    <tr>
+      <td>
+        <strong>${s.business_name}</strong>
+        <div style="font-size:11px;color:var(--muted)">${s.email}</div>
+        ${s.registration_number ? `<div style="font-size:10px;color:var(--muted2)">Reg: ${s.registration_number}</div>` : ''}
+        ${s.nda_permit ? `<div style="font-size:10px;color:var(--muted2)">NDA: ${s.nda_permit}</div>` : ''}
+      </td>
+      <td style="font-size:12px;text-transform:capitalize">${s.supplier_type}</td>
+      <td>
+        <div style="font-size:13px">${s.contact_name}</div>
+        <div style="font-size:11px;color:var(--muted)">${s.phone}</div>
+      </td>
+      <td style="font-size:13px;font-weight:700;color:var(--accent)">${s.product_count || 0}</td>
+      <td>
+        <span style="font-size:11px;padding:3px 10px;border-radius:20px;font-weight:700;${statusStyle[s.status]||''}">
+          ${s.status?.toUpperCase()}
+        </span>
+        ${s.rejection_reason ? `<div style="font-size:10px;color:var(--muted);margin-top:3px;max-width:140px;white-space:normal">${s.rejection_reason}</div>` : ''}
+      </td>
+      <td style="font-size:13px">${s.commission_rate}%</td>
+      <td style="font-size:11px;color:var(--muted)">${ago(s.created_at)}</td>
+      <td>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          ${s.status === 'pending' ? `
+            <button onclick="mktApprove(${s.id},'${esc(s.business_name)}')"
+              style="font-size:11px;padding:5px 10px;border-radius:7px;border:none;background:rgba(0,229,176,0.15);color:var(--accent);cursor:pointer;font-weight:700">✅ Approve</button>
+            <button onclick="mktReject(${s.id},'${esc(s.business_name)}')"
+              style="font-size:11px;padding:5px 10px;border-radius:7px;border:none;background:rgba(239,68,68,0.12);color:#ef4444;cursor:pointer;font-weight:700">❌ Reject</button>
+          ` : ''}
+          ${s.status === 'approved' ? `
+            <button onclick="mktEditCommission(${s.id},${s.commission_rate},'${esc(s.business_name)}')"
+              style="font-size:11px;padding:5px 10px;border-radius:7px;border:1px solid var(--border2);background:var(--s1);color:var(--text);cursor:pointer">💰 Commission</button>
+            <button onclick="mktSuspend(${s.id},'${esc(s.business_name)}')"
+              style="font-size:11px;padding:5px 10px;border-radius:7px;border:none;background:rgba(239,68,68,0.1);color:#ef4444;cursor:pointer">⛔ Suspend</button>
+          ` : ''}
+          ${s.status === 'suspended' ? `
+            <button onclick="mktUnsuspend(${s.id},'${esc(s.business_name)}')"
+              style="font-size:11px;padding:5px 10px;border-radius:7px;border:none;background:rgba(0,229,176,0.12);color:var(--accent);cursor:pointer;font-weight:700">↩️ Unsuspend</button>
+          ` : ''}
+          ${s.status === 'rejected' ? `
+            <button onclick="mktApprove(${s.id},'${esc(s.business_name)}')"
+              style="font-size:11px;padding:5px 10px;border-radius:7px;border:none;background:rgba(0,229,176,0.15);color:var(--accent);cursor:pointer;font-weight:700">↩️ Approve</button>
+          ` : ''}
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+async function mktApprove(id, name) {
+  const rate = prompt(`Approve "${name}"?\n\nSet commission rate (%, default 5):`);
+  if (rate === null) return;  // cancelled
+  const commission_rate = parseFloat(rate) || 5;
+  const r = await api(`/api/admin/marketplace/suppliers/${id}/approve`, {
+    method: 'POST', body: JSON.stringify({ commission_rate }),
+  });
+  if (!r || !r.ok) { toast(r?.data?.error || 'Failed to approve', 'err'); return; }
+  toast(`✅ ${name} approved! Commission: ${commission_rate}%`);
+  renderMarketplace();
+}
+
+async function mktReject(id, name) {
+  const reason = prompt(`Reject "${name}"?\n\nPlease provide a reason (required):`);
+  if (!reason || !reason.trim()) { toast('Rejection reason is required', 'err'); return; }
+  const r = await api(`/api/admin/marketplace/suppliers/${id}/reject`, {
+    method: 'POST', body: JSON.stringify({ reason: reason.trim() }),
+  });
+  if (!r || !r.ok) { toast(r?.data?.error || 'Failed to reject', 'err'); return; }
+  toast(`❌ ${name} rejected.`);
+  renderMarketplace();
+}
+
+async function mktSuspend(id, name) {
+  if (!confirm(`Suspend "${name}"? They will not be able to log in.`)) return;
+  const r = await api(`/api/admin/marketplace/suppliers/${id}/suspend`, { method: 'POST' });
+  if (!r || !r.ok) { toast(r?.data?.error || 'Failed', 'err'); return; }
+  toast(`⛔ ${name} suspended.`);
+  renderMarketplace();
+}
+
+async function mktUnsuspend(id, name) {
+  if (!confirm(`Unsuspend "${name}"? They will be able to log in again.`)) return;
+  const r = await api(`/api/admin/marketplace/suppliers/${id}/unsuspend`, { method: 'POST' });
+  if (!r || !r.ok) { toast(r?.data?.error || 'Failed', 'err'); return; }
+  toast(`✅ ${name} unsuspended.`);
+  renderMarketplace();
+}
+
+async function mktEditCommission(id, current, name) {
+  const input = prompt(`Change commission rate for "${name}"\nCurrent: ${current}%\n\nNew rate (0–50%):`, current);
+  if (input === null) return;
+  const rate = parseFloat(input);
+  if (isNaN(rate) || rate < 0 || rate > 50) { toast('Rate must be 0–50%', 'err'); return; }
+  const r = await api(`/api/admin/marketplace/suppliers/${id}/commission`, {
+    method: 'PATCH', body: JSON.stringify({ commission_rate: rate }),
+  });
+  if (!r || !r.ok) { toast(r?.data?.error || 'Failed', 'err'); return; }
+  toast(`✅ Commission updated to ${rate}%`);
+  renderMarketplace();
+}
+
+(function init() {
+  if (!TOKEN) { showLogin(); return; }
+  boot();
+  setInterval(boot, 60000); // refresh every 60s
+})();
+</script>
+
+<!-- ══ BULK MESSAGING MODAL ══ -->
+<div id="messagingModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;align-items:center;justify-content:center;padding:20px" onclick="if(event.target===this)closeMessagingModal()">
+  <div style="background:#111827;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:28px;width:560px;max-width:95vw;max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <div>
+        <div style="font-size:18px;font-weight:700">📱 Bulk Messaging</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px">Send WhatsApp messages to pharmacy owners</div>
+      </div>
+      <button onclick="closeMessagingModal()" style="background:rgba(255,255,255,0.08);border:none;color:var(--text);width:32px;height:32px;border-radius:8px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:14px">
+
+      <!-- Target -->
+      <div>
+        <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;display:block;margin-bottom:5px">Send To</label>
+        <select id="msgTarget" onchange="onMsgTargetChange()" style="width:100%;background:#1a2235;border:1px solid rgba(255,255,255,0.1);border-radius:9px;padding:10px 14px;color:var(--text);font-size:13px;outline:none">
+          <option value="all">All Pharmacies</option>
+          <option value="overdue">Overdue Only</option>
+          <option value="trial">On Trial Only</option>
+          <option value="selected">Selected (see below)</option>
+        </select>
+        <div id="msgSelectedNote" style="display:none;font-size:11px;color:var(--muted);margin-top:5px;padding:6px 10px;background:rgba(255,255,255,0.04);border-radius:6px">
+          Sending to pre-selected pharmacies. <span id="msgRecipientLabel" style="color:var(--acc)"></span>
+        </div>
+      </div>
+
+      <!-- Message Type -->
+      <div>
+        <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;display:block;margin-bottom:5px">Message Type</label>
+        <select id="msgType" onchange="onMsgTypeChange()" style="width:100%;background:#1a2235;border:1px solid rgba(255,255,255,0.1);border-radius:9px;padding:10px 14px;color:var(--text);font-size:13px;outline:none">
+          <option value="payment_reminder">💳 Payment Reminder</option>
+          <option value="trial_expiry">⏳ Trial Expiry Warning</option>
+          <option value="custom">✏️ Custom Message</option>
+        </select>
+      </div>
+
+      <!-- Custom message -->
+      <div id="msgCustomArea" style="display:none">
+        <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;display:block;margin-bottom:5px">Custom Message <span style="text-transform:none;font-style:italic">(use {name}, {pharmacy}, {plan})</span></label>
+        <textarea id="msgCustomText" oninput="updateMsgPreview()" rows="4" placeholder="Dear {name}, ..." style="width:100%;background:#1a2235;border:1px solid rgba(255,255,255,0.1);border-radius:9px;padding:10px 14px;color:var(--text);font-size:13px;outline:none;resize:vertical;font-family:inherit;box-sizing:border-box"></textarea>
+      </div>
+
+      <!-- Recipients preview -->
+      <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:9px;padding:12px 14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div style="font-size:12px;font-weight:600">Recipients</div>
+          <div id="msgRecipientCount" style="font-size:11px;color:var(--acc);font-weight:700">—</div>
+        </div>
+        <div id="msgRecipientList"></div>
+      </div>
+
+      <!-- Message preview -->
+      <div>
+        <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;display:block;margin-bottom:5px">Message Preview</label>
+        <pre id="msgPreviewText" style="background:#1a2235;border:1px solid rgba(255,255,255,0.07);border-radius:9px;padding:12px 14px;font-size:12px;color:var(--muted);white-space:pre-wrap;font-family:inherit;margin:0;line-height:1.6"></pre>
+      </div>
+
+      <!-- Results -->
+      <div id="msgResults" style="display:none;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:9px;padding:14px;max-height:160px;overflow-y:auto"></div>
+
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:20px">
+      <button onclick="closeMessagingModal()" style="flex:1;padding:11px;border-radius:10px;background:rgba(255,255,255,0.06);color:var(--text);border:1px solid rgba(255,255,255,0.1);font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
+      <button id="msgSendBtn" onclick="sendBulkMessages()" style="flex:2;padding:11px;border-radius:10px;background:var(--acc);color:#000;border:none;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit">📱 Send Messages</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MedVault — Supplier Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Epilogue:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#0c1220;--surface:#141c2e;--surface2:#1a2540;--surface3:#1e2d4a;
+  --border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.13);
+  --accent:#00c896;--accent2:#0052ff;--gold:#f5a623;
+  --danger:#ef4444;--success:#00b96b;--warn:#f59e0b;
+  --text:#f0f4ff;--muted:rgba(255,255,255,0.45);--muted2:rgba(255,255,255,0.25);
+  --font:'Epilogue',sans-serif;--display:'Syne',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;}
+
+/* ── SHELL ── */
+.shell{display:flex;min-height:100vh;}
+.sidebar{width:240px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;inset:0 auto 0 0;z-index:10;}
+.sb-logo{padding:22px 20px 18px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);}
+.sb-logo-icon{width:34px;height:34px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;}
+.sb-logo-text{font-family:var(--display);font-weight:800;font-size:15px;letter-spacing:-0.3px;}
+.sb-logo-sub{font-size:10px;color:var(--muted);margin-top:1px;}
+.sb-nav{flex:1;padding:16px 10px;display:flex;flex-direction:column;gap:2px;overflow-y:auto;}
+.ni{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;color:var(--muted);font-size:13px;font-weight:500;transition:all 0.18s;position:relative;}
+.ni:hover{background:var(--surface2);color:var(--text);}
+.ni.active{background:rgba(0,200,150,0.12);color:var(--accent);font-weight:600;}
+.ni.active::before{content:'';position:absolute;left:0;top:20%;bottom:20%;width:3px;background:var(--accent);border-radius:0 2px 2px 0;}
+.ni-icon{font-size:15px;width:20px;text-align:center;}
+.sb-footer{padding:14px 12px;border-top:1px solid var(--border);}
+.sb-user{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:10px;background:var(--surface2);}
+.sb-av{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#000;flex-shrink:0;}
+.sb-name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sb-role{font-size:10px;color:var(--muted);}
+.logout-btn{width:100%;margin-top:8px;padding:8px;border-radius:8px;background:rgba(239,68,68,0.1);color:var(--danger);border:1px solid rgba(239,68,68,0.2);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;transition:all 0.18s;}
+.logout-btn:hover{background:rgba(239,68,68,0.18);}
+
+/* ── MAIN ── */
+.main{margin-left:240px;flex:1;display:flex;flex-direction:column;min-height:100vh;}
+.topbar{padding:18px 32px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:5;}
+.tb-title{font-family:var(--display);font-weight:700;font-size:18px;}
+.tb-sub{font-size:12px;color:var(--muted);margin-top:2px;}
+.content{padding:28px 32px;flex:1;}
+
+/* ── STATUS BADGE ── */
+.status-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:0.3px;}
+.status-badge.pending{background:rgba(245,158,11,0.15);color:var(--warn);}
+.status-badge.approved{background:rgba(0,200,150,0.15);color:var(--accent);}
+.status-badge.rejected{background:rgba(239,68,68,0.15);color:var(--danger);}
+.status-badge.suspended{background:rgba(255,255,255,0.08);color:var(--muted);}
+
+/* ── CARDS ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;}
+.card-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.card-title{font-family:var(--display);font-weight:700;font-size:14px;}
+.card-body{padding:20px;}
+
+/* ── STATS GRID ── */
+.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;}
+.stat-ico{font-size:22px;margin-bottom:10px;}
+.stat-val{font-family:var(--display);font-weight:800;font-size:26px;color:var(--accent);}
+.stat-lbl{font-size:11px;color:var(--muted);margin-top:4px;}
+
+/* ── TABLE ── */
+.tbl{width:100%;border-collapse:collapse;font-size:13px;}
+.tbl th{padding:11px 16px;text-align:left;font-size:10px;letter-spacing:0.7px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);font-weight:600;}
+.tbl td{padding:12px 16px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.tbl tr:last-child td{border-bottom:none;}
+.tbl tbody tr:hover td{background:var(--surface2);}
+
+/* ── FORMS ── */
+.fg{display:flex;flex-direction:column;gap:5px;margin-bottom:14px;}
+.fl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;}
+.fi{background:var(--surface2);border:1.5px solid var(--border2);border-radius:9px;padding:10px 14px;color:var(--text);font-family:var(--font);font-size:14px;outline:none;transition:border-color 0.2s;width:100%;}
+.fi:focus{border-color:var(--accent);}
+.fi::placeholder{color:var(--muted2);}
+.fsel{background:var(--surface2);border:1.5px solid var(--border2);border-radius:9px;padding:10px 14px;color:var(--text);font-family:var(--font);font-size:14px;outline:none;width:100%;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 20px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;border:none;font-family:var(--font);transition:all 0.18s;}
+.btn-primary{background:var(--accent);color:#000;}
+.btn-primary:hover{filter:brightness(1.08);}
+.btn-ghost{background:var(--surface2);color:var(--text);border:1px solid var(--border2);}
+.btn-ghost:hover{background:var(--surface3);}
+.btn-danger{background:rgba(239,68,68,0.1);color:var(--danger);border:1px solid rgba(239,68,68,0.2);}
+.btn-sm{padding:5px 12px;font-size:11px;border-radius:7px;}
+
+/* ── PENDING NOTICE ── */
+.pending-notice{background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:12px;padding:20px 24px;margin-bottom:24px;}
+.rejected-notice{background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:12px;padding:20px 24px;margin-bottom:24px;}
+
+/* ── PAGES ── */
+.page{display:none;}
+.page.active{display:block;}
+
+/* ── AUTH GATE ── */
+.auth-shell{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);}
+.auth-card{width:440px;background:var(--surface);border:1px solid var(--border2);border-radius:18px;padding:36px;}
+.auth-tabs{display:flex;gap:0;margin-bottom:28px;background:var(--surface2);border-radius:10px;padding:3px;}
+.auth-tab{flex:1;text-align:center;padding:8px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:var(--muted);transition:all 0.18s;}
+.auth-tab.active{background:var(--surface);color:var(--text);}
+.auth-logo{text-align:center;margin-bottom:24px;}
+.auth-logo-icon{width:52px;height:52px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 10px;}
+.auth-logo-title{font-family:var(--display);font-weight:800;font-size:20px;}
+.auth-logo-sub{font-size:12px;color:var(--muted);margin-top:3px;}
+
+/* ── OVERLAY / MODAL ── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);z-index:100;display:none;align-items:center;justify-content:center;}
+.overlay.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:28px;width:540px;max-width:94vw;max-height:90vh;overflow-y:auto;}
+.modal-title{font-family:var(--display);font-weight:700;font-size:18px;margin-bottom:4px;}
+.modal-sub{font-size:12px;color:var(--muted);margin-bottom:22px;}
+.modal-footer{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid var(--border);}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--surface3);color:var(--text);border:1px solid var(--border2);border-radius:10px;padding:12px 20px;font-size:13px;font-weight:500;transform:translateY(80px);opacity:0;transition:all 0.3s;z-index:9999;}
+.toast.show{transform:translateY(0);opacity:1;}
+.toast.ok{border-color:rgba(0,200,150,0.4);background:rgba(0,200,150,0.1);}
+.toast.err{border-color:rgba(239,68,68,0.4);background:rgba(239,68,68,0.1);}
+
+/* ========================================================= */
+/* MOBILE / TABLET RESPONSIVE ENHANCEMENTS (added)            */
+/* ========================================================= */
+html{-webkit-text-size-adjust:100%;}
+body{overflow-x:hidden;}
+img,svg,video{max-width:100%;}
+
+.hamburger-btn{display:none;align-items:center;justify-content:center;width:36px;height:36px;flex-shrink:0;background:rgba(255,255,255,0.08);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:18px;cursor:pointer;margin-right:4px;}
+.hamburger-btn:active{background:rgba(255,255,255,0.15);}
+#sidebarBackdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:150;}
+#sidebarBackdrop.show{display:block;}
+.table-scroll{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+
+@media(max-width:1024px){
+  .stats-grid{grid-template-columns:repeat(2,1fr);}
+}
+
+@media(max-width:768px){
+  .hamburger-btn{display:flex;}
+  .sidebar{
+    position:fixed !important;top:0;left:0;bottom:0;
+    width:80vw;max-width:280px;height:100vh;
+    transform:translateX(-100%);transition:transform 0.25s ease;
+    z-index:200;box-shadow:0 0 40px rgba(0,0,0,0.5);
+  }
+  .sidebar.mobile-open{transform:translateX(0);}
+  .main{margin-left:0 !important;}
+  .topbar{padding:12px 14px;flex-wrap:wrap;gap:8px;}
+  .tb-title{font-size:16px;}
+  .content{padding:16px !important;}
+
+  .stats-grid,.form-row{grid-template-columns:1fr !important;}
+  [style*="grid-template-columns"]{grid-template-columns:1fr !important;}
+
+  .table-scroll table,.tbl{min-width:520px;}
+  .tbl th,.tbl td{padding:9px 10px;font-size:11px;}
+
+  .modal{width:100% !important;max-width:100% !important;padding:20px;}
+  .overlay{padding:12px;align-items:flex-start !important;padding-top:6vh;}
+  .auth-card{width:100%;max-width:none;margin:0 16px;padding:24px;}
+
+  .btn,button,.fi,.fsel,input,select,textarea{min-height:42px;}
+  input,select,textarea{font-size:16px !important;}
+}
+
+@media(max-width:480px){
+  .stat-val{font-size:20px;}
+  .sb-logo-text{font-size:14px;}
+  .tb-title{font-size:15px;}
+  .sidebar{width:86vw;}
+}
+</style>
+</head>
+<body>
+
+<!-- ── AUTH GATE (shown until logged in) ── -->
+<div id="authGate" class="auth-shell">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="auth-logo-icon">🏭</div>
+      <div class="auth-logo-title">MedVault Supplier Portal</div>
+      <div class="auth-logo-sub">List your products. Reach 47+ pharmacies across Uganda.</div>
+    </div>
+    <div class="auth-tabs">
+      <div class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">Login</div>
+      <div class="auth-tab" id="tabRegister" onclick="switchAuthTab('register')">Apply</div>
+    </div>
+
+    <!-- Login form -->
+    <div id="loginForm">
+      <div class="fg"><label class="fl">Email Address</label><input class="fi" id="lgEmail" type="email" placeholder="supplier@company.com"/></div>
+      <div class="fg"><label class="fl">Password</label><input class="fi" id="lgPass" type="password" placeholder="Your password"/></div>
+      <div id="lgErr" style="color:var(--danger);font-size:12px;margin-bottom:10px;display:none"></div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="doLogin()">Login →</button>
+    </div>
+
+    <!-- Registration form -->
+    <div id="registerForm" style="display:none">
+      <div class="fg"><label class="fl">Business Name *</label><input class="fi" id="rgBiz" placeholder="e.g. Cipla Quality Chemical Ltd"/></div>
+      <div class="form-row">
+        <div class="fg"><label class="fl">Supplier Type *</label>
+          <select class="fsel" id="rgType">
+            <option value="">Select type</option>
+            <option value="manufacturer">Manufacturer</option>
+            <option value="importer">Importer</option>
+            <option value="distributor">Distributor</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fl">Contact Name *</label><input class="fi" id="rgContact" placeholder="Full name"/></div>
+      </div>
+      <div class="form-row">
+        <div class="fg"><label class="fl">Phone *</label><input class="fi" id="rgPhone" placeholder="07XX XXX XXX"/></div>
+        <div class="fg"><label class="fl">Email *</label><input class="fi" id="rgEmail" type="email" placeholder="you@company.com"/></div>
+      </div>
+      <div class="form-row">
+        <div class="fg"><label class="fl">Registration No.</label><input class="fi" id="rgReg" placeholder="Business reg. number"/></div>
+        <div class="fg"><label class="fl">NDA Permit No.</label><input class="fi" id="rgNDA" placeholder="NDA/XXX/XXXX"/></div>
+      </div>
+      <div class="fg"><label class="fl">Address</label><input class="fi" id="rgAddr" placeholder="Company address, city"/></div>
+      <div class="form-row">
+        <div class="fg"><label class="fl">Password *</label><input class="fi" id="rgPass" type="password" placeholder="Min 6 characters"/></div>
+        <div class="fg"><label class="fl">Confirm Password *</label><input class="fi" id="rgPass2" type="password" placeholder="Repeat password"/></div>
+      </div>
+      <div style="background:rgba(0,200,150,0.06);border:1px solid rgba(0,200,150,0.15);border-radius:8px;padding:12px;font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:14px;">
+        💡 After applying, a MedVault admin will review your details and approve your account within <strong style="color:var(--text)">2 business days</strong>. You'll be able to login and list products once approved.
+      </div>
+      <div id="rgErr" style="color:var(--danger);font-size:12px;margin-bottom:10px;display:none"></div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="doRegister()">Submit Application →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── APP SHELL (shown after login) ── -->
+<div id="appShell" class="shell" style="display:none">
+  <aside class="sidebar">
+    <div class="sb-logo">
+      <div class="sb-logo-icon">🏭</div>
+      <div>
+        <div class="sb-logo-text">MedVault</div>
+        <div class="sb-logo-sub">Supplier Portal</div>
+      </div>
+    </div>
+    <nav class="sb-nav">
+      <div class="ni active" id="navDash" onclick="go('dashboard',this)"><span class="ni-icon">📊</span>Dashboard</div>
+      <div class="ni" id="navProducts" onclick="go('products',this)"><span class="ni-icon">💊</span>My Products</div>
+      <div class="ni" id="navOrders" onclick="go('orders',this)"><span class="ni-icon">📦</span>Orders</div>
+      <div class="ni" id="navProfile" onclick="go('profile',this)"><span class="ni-icon">⚙️</span>Profile & Settings</div>
+    </nav>
+    <div class="sb-footer">
+      <div class="sb-user">
+        <div class="sb-av" id="sbAv">S</div>
+        <div style="min-width:0">
+          <div class="sb-name" id="sbName">Supplier</div>
+          <div class="sb-role" id="sbStatus">pending</div>
+        </div>
+      </div>
+      <button class="logout-btn" onclick="logout()">🚪 Log Out</button>
+    </div>
+  </aside>
+  <div id="sidebarBackdrop" onclick="closeMobileSidebar()"></div>
+
+  <main class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button class="hamburger-btn" id="hamburgerBtn" onclick="toggleMobileSidebar()" aria-label="Open menu">&#9776;</button>
+        <div>
+          <div class="tb-title" id="tbTitle">Dashboard</div>
+          <div class="tb-sub" id="tbSub">Welcome back</div>
+        </div>
+      </div>
+      <div id="topbarStatus"></div>
+    </div>
+    <div class="content">
+
+      <!-- ── DASHBOARD ── -->
+      <div class="page active" id="page-dashboard">
+        <div id="pendingNotice" style="display:none" class="pending-notice">
+          <strong style="font-size:14px">⏳ Application Under Review</strong>
+          <p style="font-size:13px;color:var(--muted);margin-top:6px;line-height:1.6">Your supplier application is being reviewed by a MedVault admin. This usually takes 1–2 business days. You can log in and manage your profile, but you won't be able to list products until you're approved.</p>
+        </div>
+        <div id="rejectedNotice" style="display:none" class="rejected-notice">
+          <strong style="font-size:14px">❌ Application Rejected</strong>
+          <p id="rejectedReason" style="font-size:13px;color:var(--muted);margin-top:6px;line-height:1.6"></p>
+          <p style="font-size:12px;color:var(--muted);margin-top:8px">Contact <a href="mailto:support@medvault.ug" style="color:var(--accent)">support@medvault.ug</a> to appeal or ask for clarification.</p>
+        </div>
+        <div class="stats-grid" id="dashStats">
+          <div class="stat-card"><div class="stat-ico">💊</div><div class="stat-val" id="dsProducts">—</div><div class="stat-lbl">Products Listed</div></div>
+          <div class="stat-card"><div class="stat-ico">📦</div><div class="stat-val" id="dsOrders">—</div><div class="stat-lbl">Total Orders</div></div>
+          <div class="stat-card"><div class="stat-ico">💰</div><div class="stat-val" id="dsRevenue">—</div><div class="stat-lbl">Revenue Earned (UGX)</div></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div class="card-title">📋 Account Details</div></div>
+          <div class="card-body" id="dashDetails" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;"></div>
+        </div>
+      </div>
+
+      <!-- ── PRODUCTS ── -->
+      <div class="page" id="page-products">
+        <div id="productsLocked" style="display:none;text-align:center;padding:60px 20px">
+          <div style="font-size:48px;margin-bottom:16px">🔒</div>
+          <div style="font-family:var(--display);font-weight:700;font-size:18px;margin-bottom:8px">Approval Required</div>
+          <div style="color:var(--muted);font-size:14px;max-width:380px;margin:0 auto;line-height:1.6">You can list products once a MedVault admin approves your application. Check back soon or contact support.</div>
+        </div>
+        <div id="productsPanel">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+            <div>
+              <div style="font-family:var(--display);font-weight:700;font-size:18px">💊 My Products</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:3px">Products listed on the MedVault marketplace</div>
+            </div>
+            <button class="btn btn-primary" onclick="openProductModal()">+ Add Product</button>
+          </div>
+          <div class="card">
+            <table class="tbl">
+              <thead><tr><th>Product</th><th>Category</th><th>Unit</th><th>Pack</th><th>Wholesale Price</th><th>Min Qty</th><th>Stock</th><th>Rx</th><th></th></tr></thead>
+              <tbody id="productBody"><tr><td colspan="9" style="text-align:center;padding:30px;color:var(--muted)">Loading products…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── ORDERS ── -->
+      <div class="page" id="page-orders">
+        <div style="font-family:var(--display);font-weight:700;font-size:18px;margin-bottom:6px">📦 Orders</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:20px">Wholesale orders placed by pharmacies</div>
+        <div class="card">
+          <table class="tbl">
+            <thead><tr><th>Order #</th><th>Pharmacy</th><th>Items</th><th>Total</th><th>Status</th><th>Date</th></tr></thead>
+            <tbody id="orderBody"><tr><td colspan="6" style="text-align:center;padding:30px;color:var(--muted)">No orders yet. Once pharmacies start ordering your products, they'll appear here.</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── PROFILE ── -->
+      <div class="page" id="page-profile">
+        <div style="font-family:var(--display);font-weight:700;font-size:18px;margin-bottom:20px">⚙️ Profile & Settings</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+          <div class="card">
+            <div class="card-head"><div class="card-title">Business Info</div></div>
+            <div class="card-body">
+              <div class="fg"><label class="fl">Business Name</label><input class="fi" id="prfBiz" placeholder="—" readonly style="color:var(--muted)"/></div>
+              <div class="fg"><label class="fl">Supplier Type</label><input class="fi" id="prfType" readonly style="color:var(--muted)"/></div>
+              <div class="fg"><label class="fl">Contact Name</label><input class="fi" id="prfContact" readonly style="color:var(--muted)"/></div>
+              <div class="fg"><label class="fl">Phone</label><input class="fi" id="prfPhone" readonly style="color:var(--muted)"/></div>
+              <div class="fg"><label class="fl">Email</label><input class="fi" id="prfEmail" readonly style="color:var(--muted)"/></div>
+              <div class="fg"><label class="fl">Registration Number</label><input class="fi" id="prfReg" readonly style="color:var(--muted)"/></div>
+              <div class="fg"><label class="fl">NDA Permit</label><input class="fi" id="prfNDA" readonly style="color:var(--muted)"/></div>
+              <p style="font-size:11px;color:var(--muted);margin-top:4px">To update business details, email <a href="mailto:support@medvault.ug" style="color:var(--accent)">support@medvault.ug</a></p>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head"><div class="card-title">🔒 Change Password</div></div>
+            <div class="card-body">
+              <div class="fg"><label class="fl">Current Password</label><input class="fi" id="pwCur" type="password" placeholder="Current password"/></div>
+              <div class="fg"><label class="fl">New Password</label><input class="fi" id="pwNew" type="password" placeholder="Min 6 characters"/></div>
+              <div class="fg"><label class="fl">Confirm New Password</label><input class="fi" id="pwNew2" type="password" placeholder="Repeat new password"/></div>
+              <button class="btn btn-primary" onclick="changePassword()">Update Password</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </main>
+</div><!-- /appShell -->
+
+<!-- ── PRODUCT MODAL ── -->
+<div class="overlay" id="productOverlay" onclick="if(event.target===this)closeProductModal()">
+  <div class="modal">
+    <div class="modal-title" id="prodModalTitle">Add Product</div>
+    <div class="modal-sub">List a new product on the MedVault marketplace</div>
+    <div class="fg"><label class="fl">Product Name *</label><input class="fi" id="pdName" placeholder="e.g. Paracetamol 500mg"/></div>
+    <div class="form-row">
+      <div class="fg"><label class="fl">Generic Name</label><input class="fi" id="pdGeneric" placeholder="Generic / INN name"/></div>
+      <div class="fg"><label class="fl">Category *</label>
+        <select class="fsel" id="pdCat">
+          <option>General</option><option>Antimalarials</option><option>Antibiotics</option>
+          <option>Analgesics</option><option>Vitamins & Supplements</option><option>Antihypertensives</option>
+          <option>Antidiabetics</option><option>Antiretrovirals</option><option>Surgical Supplies</option>
+          <option>Medical Devices</option><option>Other</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="fg"><label class="fl">Unit *</label>
+        <select class="fsel" id="pdUnit"><option value="Pack">Pack</option><option value="Box">Box</option><option value="Bottle">Bottle</option><option value="Vial">Vial</option><option value="Strip">Strip</option><option value="Tablet">Tablet</option></select>
+      </div>
+      <div class="fg"><label class="fl">Pack Size *</label><input class="fi" id="pdPackSize" type="number" min="1" placeholder="e.g. 100 (tablets per pack)"/></div>
+    </div>
+    <div class="form-row">
+      <div class="fg"><label class="fl">Wholesale Price (UGX) *</label><input class="fi" id="pdPrice" type="number" min="0" placeholder="e.g. 12000"/></div>
+      <div class="fg"><label class="fl">Min Order Qty *</label><input class="fi" id="pdMinQty" type="number" min="1" placeholder="e.g. 10"/></div>
+    </div>
+    <div class="fg"><label class="fl">Available Stock *</label><input class="fi" id="pdStock" type="number" min="0" placeholder="e.g. 5000"/></div>
+    <div class="fg"><label class="fl">Description</label><textarea class="fi" id="pdDesc" rows="2" placeholder="Optional product description…" style="resize:vertical"></textarea></div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+      <input type="checkbox" id="pdRx" style="width:16px;height:16px;accent-color:var(--accent)">
+      <label for="pdRx" style="font-size:13px;cursor:pointer">Requires prescription (Rx)</label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeProductModal()">Cancel</button>
+      <button class="btn btn-primary" id="prodSaveBtn" onclick="saveProduct()">✅ Save Product</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span id="toastMsg"></span></div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+// MOBILE OFF-CANVAS SIDEBAR + TABLE AUTO-WRAP
+// ════════════════════════════════════════════════════════════
+function toggleMobileSidebar(){
+  const sb = document.querySelector('.sidebar');
+  const bd = document.getElementById('sidebarBackdrop');
+  if (!sb) return;
+  const open = sb.classList.toggle('mobile-open');
+  if (bd) bd.classList.toggle('show', open);
+  document.body.style.overflow = open ? 'hidden' : '';
+}
+function closeMobileSidebar(){
+  const sb = document.querySelector('.sidebar');
+  const bd = document.getElementById('sidebarBackdrop');
+  if (sb) sb.classList.remove('mobile-open');
+  if (bd) bd.classList.remove('show');
+  document.body.style.overflow = '';
+}
+document.addEventListener('click', function(e){
+  if (window.innerWidth <= 768 && e.target.closest('.ni')) closeMobileSidebar();
+});
+function wrapTablesForMobile(){
+  document.querySelectorAll('table').forEach(function(t){
+    if (t.closest('.table-scroll')) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'table-scroll';
+    t.parentNode.insertBefore(wrap, t);
+    wrap.appendChild(t);
+  });
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', wrapTablesForMobile);
+} else { wrapTablesForMobile(); }
+setInterval(wrapTablesForMobile, 2000);
+
+// ════════════════════════════════════════════════════════════
+// CONFIG
+// ════════════════════════════════════════════════════════════
+const API_BASE = (() => {
+  if (window.MEDVAULT_API_BASE) return window.MEDVAULT_API_BASE.replace(/\/+$/, '');
+  if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') return 'http://localhost:8080';
+  return 'https://medvaultv2-production.up.railway.app';
+})();
+
+const TOKEN_KEY    = 'mv_supplier_token';
+const SUPPLIER_KEY = 'mv_supplier_data';
+
+let token    = localStorage.getItem(TOKEN_KEY) || '';
+let supplier = JSON.parse(localStorage.getItem(SUPPLIER_KEY) || 'null');
+let allProducts = [];
+let editingProductId = null;
+
+// ════════════════════════════════════════════════════════════
+// API
+// ════════════════════════════════════════════════════════════
+async function api(path, opts = {}) {
+  const res = await fetch(API_BASE + path, {
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    ...opts,
+  });
+  const data = await res.json();
+  return { ok: res.ok, status: res.status, data };
+}
+
+// ════════════════════════════════════════════════════════════
+// AUTH
+// ════════════════════════════════════════════════════════════
+function switchAuthTab(tab) {
+  document.getElementById('tabLogin').classList.toggle('active', tab === 'login');
+  document.getElementById('tabRegister').classList.toggle('active', tab === 'register');
+  document.getElementById('loginForm').style.display    = tab === 'login'    ? '' : 'none';
+  document.getElementById('registerForm').style.display = tab === 'register' ? '' : 'none';
+}
+
+async function doLogin() {
+  const email    = document.getElementById('lgEmail').value.trim();
+  const password = document.getElementById('lgPass').value;
+  const errEl    = document.getElementById('lgErr');
+  errEl.style.display = 'none';
+  if (!email || !password) { errEl.textContent = 'Email and password are required.'; errEl.style.display = ''; return; }
+  try {
+    const r = await fetch(API_BASE + '/api/marketplace/supplier/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await r.json();
+    if (!r.ok) { errEl.textContent = data.error || 'Login failed.'; errEl.style.display = ''; return; }
+    token    = data.token;
+    supplier = data.supplier;
+    localStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem(SUPPLIER_KEY, JSON.stringify(supplier));
+    launchApp();
+  } catch(e) {
+    errEl.textContent = 'Network error. Please try again.';
+    errEl.style.display = '';
+  }
+}
+
+async function doRegister() {
+  const errEl = document.getElementById('rgErr');
+  errEl.style.display = 'none';
+  const business_name       = document.getElementById('rgBiz').value.trim();
+  const supplier_type       = document.getElementById('rgType').value;
+  const contact_name        = document.getElementById('rgContact').value.trim();
+  const phone               = document.getElementById('rgPhone').value.trim();
+  const email               = document.getElementById('rgEmail').value.trim();
+  const password            = document.getElementById('rgPass').value;
+  const password2           = document.getElementById('rgPass2').value;
+  const registration_number = document.getElementById('rgReg').value.trim();
+  const nda_permit          = document.getElementById('rgNDA').value.trim();
+  const address             = document.getElementById('rgAddr').value.trim();
+
+  if (!business_name || !supplier_type || !contact_name || !phone || !email || !password) {
+    errEl.textContent = 'Please fill in all required fields.'; errEl.style.display = ''; return;
+  }
+  if (password !== password2) {
+    errEl.textContent = 'Passwords do not match.'; errEl.style.display = ''; return;
+  }
+  try {
+    const r = await fetch(API_BASE + '/api/marketplace/supplier/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ business_name, supplier_type, contact_name, phone, email, password,
+                             registration_number: registration_number || undefined,
+                             nda_permit: nda_permit || undefined,
+                             address: address || undefined }),
+    });
+    const data = await r.json();
+    if (!r.ok) { errEl.textContent = data.error || 'Registration failed.'; errEl.style.display = ''; return; }
+    toast('✅ Application submitted! You can now log in. A MedVault admin will review it within 2 days.', 'ok');
+    switchAuthTab('login');
+    document.getElementById('lgEmail').value = email;
+  } catch(e) {
+    errEl.textContent = 'Network error. Please try again.'; errEl.style.display = '';
+  }
+}
+
+function logout() {
+  token = '';
+  supplier = null;
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(SUPPLIER_KEY);
+  document.getElementById('authGate').style.display = 'flex';
+  document.getElementById('appShell').style.display = 'none';
+}
+
+// ════════════════════════════════════════════════════════════
+// APP
+// ════════════════════════════════════════════════════════════
+function launchApp() {
+  document.getElementById('authGate').style.display = 'none';
+  document.getElementById('appShell').style.display = 'flex';
+  initSidebar();
+  go('dashboard', document.getElementById('navDash'));
+  refreshProfile();
+}
+
+function initSidebar() {
+  if (!supplier) return;
+  document.getElementById('sbName').textContent = supplier.business_name || 'Supplier';
+  document.getElementById('sbStatus').textContent = supplier.status || 'pending';
+  document.getElementById('sbAv').textContent = (supplier.business_name || 'S')[0].toUpperCase();
+  // Status badge in topbar
+  const colors = { pending:'var(--warn)', approved:'var(--accent)', rejected:'var(--danger)', suspended:'var(--muted)' };
+  document.getElementById('topbarStatus').innerHTML = `
+    <span class="status-badge ${supplier.status}">${supplier.status?.toUpperCase()}</span>`;
+}
+
+const pageMeta = {
+  dashboard: { t: 'Dashboard', s: 'Your supplier overview' },
+  products:  { t: 'My Products', s: 'Manage your marketplace listings' },
+  orders:    { t: 'Orders', s: 'Wholesale orders from pharmacies' },
+  profile:   { t: 'Profile & Settings', s: 'Manage your account' },
+};
+
+function go(page, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const pg = document.getElementById('page-' + page);
+  if (pg) pg.classList.add('active');
+  document.querySelectorAll('.ni').forEach(n => n.classList.remove('active'));
+  if (el) el.classList.add('active');
+  const m = pageMeta[page] || { t: page, s: '' };
+  document.getElementById('tbTitle').textContent = m.t;
+  document.getElementById('tbSub').textContent   = m.s;
+  if (page === 'dashboard') loadDashboard();
+  if (page === 'products')  loadProducts();
+  if (page === 'orders')    loadOrders();
+  if (page === 'profile')   loadProfile();
+}
+
+// ════════════════════════════════════════════════════════════
+// DASHBOARD
+// ════════════════════════════════════════════════════════════
+async function loadDashboard() {
+  const r = await api('/api/marketplace/supplier/me');
+  if (!r.ok) return;
+  const s = r.data.supplier;
+  supplier = { ...supplier, ...s };
+  localStorage.setItem(SUPPLIER_KEY, JSON.stringify(supplier));
+  initSidebar();
+
+  // Status notices
+  document.getElementById('pendingNotice').style.display  = s.status === 'pending'  ? '' : 'none';
+  document.getElementById('rejectedNotice').style.display = s.status === 'rejected' ? '' : 'none';
+  if (s.status === 'rejected') {
+    document.getElementById('rejectedReason').textContent = 'Reason: ' + (s.rejection_reason || 'No reason provided.');
+  }
+
+  // Stats
+  document.getElementById('dsProducts').textContent = s.product_count || 0;
+  document.getElementById('dsOrders').textContent   = s.order_count   || 0;
+  const rev = parseFloat(s.total_revenue || 0);
+  document.getElementById('dsRevenue').textContent  = rev >= 1e6 ? (rev/1e6).toFixed(1)+'M' : rev.toLocaleString();
+
+  // Details
+  document.getElementById('dashDetails').innerHTML = `
+    <div>
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px">Business</div>
+      <div style="font-size:14px;font-weight:600">${s.business_name}</div>
+    </div>
+    <div>
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px">Type</div>
+      <div style="font-size:14px;font-weight:600;text-transform:capitalize">${s.supplier_type}</div>
+    </div>
+    <div>
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px">Commission Rate</div>
+      <div style="font-size:14px;font-weight:600;color:var(--accent)">${s.commission_rate}%</div>
+    </div>
+    <div>
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px">Plan</div>
+      <div style="font-size:14px;font-weight:600;text-transform:capitalize">${s.sub_plan || 'basic'}</div>
+    </div>
+    <div>
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px">Status</div>
+      <span class="status-badge ${s.status}">${s.status?.toUpperCase()}</span>
+    </div>
+    <div>
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px">Member Since</div>
+      <div style="font-size:14px">${new Date(s.created_at).toLocaleDateString()}</div>
+    </div>`;
+}
+
+// ════════════════════════════════════════════════════════════
+// PRODUCTS
+// ════════════════════════════════════════════════════════════
+async function loadProducts() {
+  const isApproved = supplier?.status === 'approved';
+  document.getElementById('productsLocked').style.display = isApproved ? 'none' : '';
+  document.getElementById('productsPanel').style.display  = isApproved ? ''     : 'none';
+  if (!isApproved) return;
+
+  const r = await api('/api/marketplace/supplier/products');
+  if (!r.ok) { toast('Failed to load products', 'err'); return; }
+  allProducts = r.data.products || [];
+  renderProducts();
+}
+
+function renderProducts() {
+  const body = document.getElementById('productBody');
+  if (!allProducts.length) {
+    body.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--muted)">No products yet. Click + Add Product to list your first item.</td></tr>';
+    return;
+  }
+  body.innerHTML = allProducts.map(p => `
+    <tr>
+      <td><strong>${p.name}</strong>${p.generic_name ? `<div style="font-size:11px;color:var(--muted)">${p.generic_name}</div>` : ''}</td>
+      <td style="font-size:12px">${p.category}</td>
+      <td style="font-size:12px">${p.unit}</td>
+      <td style="font-size:12px">${p.pack_size}</td>
+      <td style="font-weight:700;color:var(--accent)">UGX ${Number(p.wholesale_price).toLocaleString()}</td>
+      <td style="font-size:12px">${p.min_order_qty}</td>
+      <td style="font-size:12px;color:${p.stock_qty > 0 ? 'var(--success)' : 'var(--danger)'};font-weight:600">${p.stock_qty}</td>
+      <td style="font-size:11px">${p.requires_rx ? '<span style="color:var(--warn)">Rx</span>' : '—'}</td>
+      <td>
+        <div style="display:flex;gap:5px">
+          <button class="btn btn-ghost btn-sm" onclick="editProduct(${p.id})">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteProduct(${p.id},'${p.name.replace(/'/g,"\\'")}')">🗑️</button>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+function openProductModal() {
+  editingProductId = null;
+  document.getElementById('prodModalTitle').textContent = '+ Add Product';
+  document.getElementById('prodSaveBtn').textContent    = '✅ Save Product';
+  ['pdName','pdGeneric','pdDesc'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('pdCat').value     = 'General';
+  document.getElementById('pdUnit').value    = 'Pack';
+  document.getElementById('pdPackSize').value= '';
+  document.getElementById('pdPrice').value   = '';
+  document.getElementById('pdMinQty').value  = '';
+  document.getElementById('pdStock').value   = '';
+  document.getElementById('pdRx').checked    = false;
+  document.getElementById('productOverlay').classList.add('open');
+}
+
+function editProduct(id) {
+  const p = allProducts.find(x => x.id === id);
+  if (!p) return;
+  editingProductId = id;
+  document.getElementById('prodModalTitle').textContent = '✏️ Edit Product';
+  document.getElementById('prodSaveBtn').textContent    = '✅ Save Changes';
+  document.getElementById('pdName').value     = p.name;
+  document.getElementById('pdGeneric').value  = p.generic_name || '';
+  document.getElementById('pdCat').value      = p.category;
+  document.getElementById('pdUnit').value     = p.unit;
+  document.getElementById('pdPackSize').value = p.pack_size;
+  document.getElementById('pdPrice').value    = p.wholesale_price;
+  document.getElementById('pdMinQty').value   = p.min_order_qty;
+  document.getElementById('pdStock').value    = p.stock_qty;
+  document.getElementById('pdDesc').value     = p.description || '';
+  document.getElementById('pdRx').checked     = p.requires_rx;
+  document.getElementById('productOverlay').classList.add('open');
+}
+
+function closeProductModal() {
+  document.getElementById('productOverlay').classList.remove('open');
+  editingProductId = null;
+}
+
+async function saveProduct() {
+  const btn  = document.getElementById('prodSaveBtn');
+  const name = document.getElementById('pdName').value.trim();
+  const wholesale_price = document.getElementById('pdPrice').value;
+  if (!name)            { toast('Product name is required', 'err'); return; }
+  if (!wholesale_price) { toast('Wholesale price is required', 'err'); return; }
+
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  const body = {
+    name,
+    generic_name:   document.getElementById('pdGeneric').value.trim() || null,
+    category:       document.getElementById('pdCat').value,
+    unit:           document.getElementById('pdUnit').value,
+    pack_size:      parseInt(document.getElementById('pdPackSize').value) || 1,
+    wholesale_price: parseFloat(wholesale_price),
+    min_order_qty:  parseInt(document.getElementById('pdMinQty').value) || 1,
+    stock_qty:      parseInt(document.getElementById('pdStock').value) || 0,
+    description:    document.getElementById('pdDesc').value.trim() || null,
+    requires_rx:    document.getElementById('pdRx').checked,
+  };
+
+  try {
+    const url    = editingProductId ? `/api/marketplace/supplier/products/${editingProductId}` : '/api/marketplace/supplier/products';
+    const method = editingProductId ? 'PUT' : 'POST';
+    const r      = await api(url, { method, body: JSON.stringify(body) });
+    if (!r.ok) { toast(r.data.error || 'Failed to save', 'err'); return; }
+    toast(editingProductId ? '✅ Product updated!' : '✅ Product listed!', 'ok');
+    closeProductModal();
+    loadProducts();
+  } catch(e) {
+    toast('Network error', 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = editingProductId ? '✅ Save Changes' : '✅ Save Product';
+  }
+}
+
+async function deleteProduct(id, name) {
+  if (!confirm(`Remove "${name}" from marketplace?`)) return;
+  const r = await api(`/api/marketplace/supplier/products/${id}`, { method: 'DELETE' });
+  if (!r.ok) { toast(r.data.error || 'Failed', 'err'); return; }
+  toast('✅ Product removed!', 'ok');
+  loadProducts();
+}
+
+// ════════════════════════════════════════════════════════════
+// ORDERS
+// ════════════════════════════════════════════════════════════
+async function loadOrders() {
+  const tbody = document.getElementById('orderBody');
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--muted)">Loading orders…</td></tr>';
+  const r = await api('/api/marketplace/supplier/orders');
+  if (!r.ok) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--danger)">' + (r.data?.error || 'Failed to load orders') + '</td></tr>';
+    return;
+  }
+  const orders = r.data.orders || [];
+  if (!orders.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--muted)">No orders yet. Orders from pharmacies will appear here.</td></tr>';
+    return;
+  }
+  const statusColors = {
+    pending:   'background:rgba(245,158,11,0.15);color:#f59e0b',
+    confirmed: 'background:rgba(59,130,246,0.15);color:#3b82f6',
+    processing:'background:rgba(124,58,237,0.15);color:#7c3aed',
+    shipped:   'background:rgba(0,200,150,0.15);color:#00c896',
+    delivered: 'background:rgba(0,185,107,0.15);color:#00b96b',
+    cancelled: 'background:rgba(239,68,68,0.15);color:#ef4444',
+  };
+  tbody.innerHTML = orders.map(o => {
+    const sc = statusColors[o.status] || '';
+    const canConfirm  = o.status === 'pending';
+    const canShip     = o.status === 'confirmed' || o.status === 'processing';
+    const canDeliver  = o.status === 'shipped';
+    const canCancel   = ['pending','confirmed'].includes(o.status);
+    return `<tr>
+      <td><strong style="font-size:12px">${o.order_number}</strong></td>
+      <td style="font-size:12px">${o.pharmacy_name || '—'}</td>
+      <td style="font-size:12px;font-weight:700;color:var(--accent)">UGX ${Number(o.total_amount).toLocaleString()}</td>
+      <td><span style="font-size:11px;padding:3px 9px;border-radius:20px;font-weight:700;${sc}">${o.status.toUpperCase()}</span></td>
+      <td style="font-size:11px;color:var(--muted)">${new Date(o.placed_at).toLocaleDateString()}</td>
+      <td>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          ${canConfirm  ? `<button onclick="updateOrderStatus(${o.id},'confirmed')"  style="font-size:11px;padding:4px 9px;border-radius:6px;border:none;background:rgba(0,200,150,0.15);color:var(--accent);cursor:pointer;font-weight:700">✅ Confirm</button>` : ''}
+          ${canShip     ? `<button onclick="updateOrderStatus(${o.id},'shipped')"    style="font-size:11px;padding:4px 9px;border-radius:6px;border:none;background:rgba(59,130,246,0.15);color:#3b82f6;cursor:pointer;font-weight:700">🚚 Ship</button>` : ''}
+          ${canDeliver  ? `<button onclick="updateOrderStatus(${o.id},'delivered')"  style="font-size:11px;padding:4px 9px;border-radius:6px;border:none;background:rgba(0,185,107,0.15);color:#00b96b;cursor:pointer;font-weight:700">📦 Delivered</button>` : ''}
+          ${canCancel   ? `<button onclick="updateOrderStatus(${o.id},'cancelled')"  style="font-size:11px;padding:4px 9px;border-radius:6px;border:none;background:rgba(239,68,68,0.12);color:#ef4444;cursor:pointer">✗ Cancel</button>` : ''}
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function updateOrderStatus(orderId, newStatus) {
+  const confirmMsg = {
+    confirmed: 'Confirm this order?',
+    shipped:   'Mark as shipped?',
+    delivered: 'Mark as delivered?',
+    cancelled: 'Cancel this order?',
+  };
+  if (!confirm(confirmMsg[newStatus] || 'Update status?')) return;
+  const r = await api(`/api/marketplace/supplier/orders/${orderId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status: newStatus }),
+  });
+  if (!r.ok) { toast(r.data?.error || 'Failed to update', 'err'); return; }
+  toast('✅ Order updated to ' + newStatus);
+  loadOrders();
+}
+
+// ════════════════════════════════════════════════════════════
+// PROFILE
+// ════════════════════════════════════════════════════════════
+async function loadProfile() {
+  const r = await api('/api/marketplace/supplier/me');
+  if (!r.ok) return;
+  const s = r.data.supplier;
+  document.getElementById('prfBiz').value     = s.business_name || '';
+  document.getElementById('prfType').value    = s.supplier_type || '';
+  document.getElementById('prfContact').value = s.contact_name  || '';
+  document.getElementById('prfPhone').value   = s.phone || '';
+  document.getElementById('prfEmail').value   = s.email || '';
+  document.getElementById('prfReg').value     = s.registration_number || '—';
+  document.getElementById('prfNDA').value     = s.nda_permit || '—';
+}
+
+async function changePassword() {
+  const current_password = document.getElementById('pwCur').value;
+  const new_password     = document.getElementById('pwNew').value;
+  const confirm          = document.getElementById('pwNew2').value;
+  if (!current_password || !new_password) { toast('Both current and new password are required', 'err'); return; }
+  if (new_password !== confirm) { toast('Passwords do not match', 'err'); return; }
+  const r = await api('/api/marketplace/supplier/change-password', {
+    method: 'POST', body: JSON.stringify({ current_password, new_password })
+  });
+  if (!r.ok) { toast(r.data.error || 'Failed', 'err'); return; }
+  toast('✅ Password updated!', 'ok');
+  ['pwCur','pwNew','pwNew2'].forEach(id => document.getElementById(id).value = '');
+}
+
+async function refreshProfile() {
+  const r = await api('/api/marketplace/supplier/me');
+  if (r.ok) {
+    supplier = { ...supplier, ...r.data.supplier };
+    localStorage.setItem(SUPPLIER_KEY, JSON.stringify(supplier));
+    initSidebar();
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// TOAST
+// ════════════════════════════════════════════════════════════
+let _tt;
+function toast(msg, type = '') {
+  const t  = document.getElementById('toast');
+  const tm = document.getElementById('toastMsg');
+  tm.textContent = msg;
+  t.className    = 'toast ' + (type === 'ok' ? 'ok' : type === 'err' ? 'err' : '');
+  t.classList.add('show');
+  clearTimeout(_tt);
+  _tt = setTimeout(() => t.classList.remove('show'), 4000);
+}
+
+// ════════════════════════════════════════════════════════════
+// BOOT
+// ════════════════════════════════════════════════════════════
+if (token && supplier) {
+  launchApp();
+} else {
+  document.getElementById('authGate').style.display = 'flex';
+  document.getElementById('appShell').style.display = 'none';
+}
+</script>
+</body>
+</html>

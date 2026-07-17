@@ -1,0 +1,77 @@
+[build]
+  publish = "frontend"
+  command = ""
+
+[build.environment]
+  NODE_VERSION = "20"
+  NPM_FLAGS = "--no-install"
+
+[[redirects]]
+  from = "/api/*"
+  to = "https://medvaultv2-production.up.railway.app/api/:splat"
+  status = 200
+  force = true
+  [redirects.headers]
+    Access-Control-Allow-Origin = "*"
+
+[[redirects]]
+  from = "/app"
+  to = "/app.html"
+  status = 200
+
+[[redirects]]
+  from = "/order"
+  to = "/order.html"
+  status = 200
+
+[[redirects]]
+  from = "/admin"
+  to = "/login.html"
+  status = 200
+
+[[redirects]]
+  from = "/ai"
+  to = "/ai.html"
+  status = 200
+
+[[redirects]]
+  from = "/suppliers"
+  to = "/suppliers.html"
+  status = 200
+
+[[redirects]]
+  from = "/supplier-portal"
+  to = "/supplier-portal.html"
+  status = 200
+
+[[redirects]]
+  from = "/supplier"
+  to = "/supplier-portal.html"
+  status = 200
+
+[[redirects]]
+  from = "/medvault-connected.html"
+  to = "/app.html"
+  status = 200
+
+[[redirects]]
+  from = "/medvault-offline.html"
+  to = "/app.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+[[headers]]
+  for = "/service-worker.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "no-cache"
