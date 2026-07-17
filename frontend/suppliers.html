@@ -235,6 +235,15 @@ html{-webkit-text-size-adjust:100%;}
 body{overflow-x:hidden;}
 img,svg,video{max-width:100%;}
 .table-scroll{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.card,.stats-row,.supplier-grid,.insurer-grid,.earn-grid,.three-col,
+.rev-flow,.table-scroll,.content{min-width:0;}
+.card *{overflow-wrap:break-word;}
+
+@media(max-width:768px){
+  [style*="width:"]:not([style*="position:absolute"]):not([style*="position:fixed"]){
+    max-width:100%;
+  }
+}
 
 @media(max-width:1024px){
   .stats-row,.supplier-grid,.insurer-grid,.earn-grid,.three-col{grid-template-columns:repeat(2,1fr);}

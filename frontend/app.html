@@ -1046,6 +1046,29 @@ img,svg,video{max-width:100%;}
 /* Table auto-wrap (added via JS) */
 .table-scroll{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;}
 
+/* ---- Card / layout overflow safety net ---- */
+/* Prevents any flex/grid item from being forced wider than its track
+   by content that refuses to shrink (the classic min-width:auto bug),
+   which is what was clipping cards off-screen on small phones. */
+.main,.card,.stat-card,.sc2,.two-col,.stats-grid,.inv-sum,.kanban,
+.table-scroll,.chart-area,.page{min-width:0;}
+
+/* Page title: split leading/trailing icon (emoji) from text so it
+   always stays aligned beside the text and never gets squeezed out. */
+.page-title{display:flex;align-items:center;flex-wrap:wrap;gap:7px;min-width:0;}
+.page-title .pt-icon{flex-shrink:0;line-height:1;}
+.page-title .pt-text{min-width:0;}
+.card *,.stat-card *{overflow-wrap:break-word;}
+
+@media(max-width:768px){
+  /* Any element carrying a large fixed inline pixel width (cards,
+     panels, popovers) is clamped to its container so it can never
+     push the layout wider than the screen or get clipped off-edge. */
+  [style*="width:"]:not([style*="position:absolute"]):not([style*="position:fixed"]):not(.hamburger-btn){
+    max-width:100%;
+  }
+}
+
 @media(max-width:1024px){
   .stats-grid{grid-template-columns:repeat(2,1fr);}
   .inv-sum{grid-template-columns:repeat(3,1fr);}
@@ -1054,6 +1077,16 @@ img,svg,video{max-width:100%;}
 }
 
 @media(max-width:768px){
+  /* Notification dropdown: switch to a centered fixed sheet so its
+     fixed 340px width can never overflow / get clipped on narrow
+     screens (previously anchored right:0 off a small icon). */
+  .notif-panel{
+    position:fixed !important;
+    top:64px !important;left:50% !important;right:auto !important;
+    transform:translateX(-50%);
+    width:92vw !important;max-width:400px;
+  }
+
   /* Off-canvas sidebar drawer */
   .hamburger-btn{display:flex;}
   .sidebar{
@@ -4595,7 +4628,17 @@ function go(page, el) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   if (el) el.classList.add('active');
   const m = pageMeta[page] || {t:page, s:''};
-  document.getElementById('tbTitle').innerHTML = `<div class="page-title">${m.t}</div><div class="page-sub">${m.s}</div>`;
+  // Split off emoji "icon" characters from the title so they get their
+  // own flex-aligned span — keeps the icon visible & properly positioned
+  // beside the text at every screen size instead of being part of one
+  // unbreakable text run.
+  const titleParts = String(m.t).split(/(\p{Extended_Pictographic}\uFE0F?)/gu).filter(Boolean);
+  const titleHTML = titleParts.map(part =>
+    /\p{Extended_Pictographic}/u.test(part)
+      ? `<span class="pt-icon">${part}</span>`
+      : `<span class="pt-text">${part.trim()}</span>`
+  ).join('');
+  document.getElementById('tbTitle').innerHTML = `<div class="page-title">${titleHTML}</div><div class="page-sub">${m.s}</div>`;
   loadPage(page);
 }
 

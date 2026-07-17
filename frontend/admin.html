@@ -228,6 +228,20 @@ img,svg,video{max-width:100%;}
 #sidebarBackdrop.show{display:block;}
 .table-scroll{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;}
 
+/* Card / layout overflow safety net — stops flex/grid tracks being
+   forced wider than the screen by content that won't shrink. */
+.main,.card,.plan-card,.ring-card,.stats-row,.two-col,.three-col,
+.overview-grid,.metric-rings,.table-scroll,.page{min-width:0;}
+.card *,.plan-card *{overflow-wrap:break-word;}
+
+@media(max-width:768px){
+  /* Any element with a large fixed inline pixel width is clamped to
+     its container so it can never overflow or get clipped edge-off. */
+  [style*="width:"]:not([style*="position:absolute"]):not([style*="position:fixed"]):not(.hamburger-btn){
+    max-width:100%;
+  }
+}
+
 @media(max-width:1024px){
   .stats-row{grid-template-columns:repeat(3,1fr);}
   .two-col,.three-col,.overview-grid,.plan-grid,.metric-rings{grid-template-columns:1fr 1fr;}
@@ -896,7 +910,7 @@ function showLogin() {
   if (document.getElementById('loginGate')) return;
   document.body.insertAdjacentHTML('beforeend', `
     <div id="loginGate" style="position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;">
-      <div style="width:340px;background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:32px;">
+      <div style="width:340px;max-width:90vw;background:var(--s1);border:1px solid var(--border2);border-radius:16px;padding:32px;">
         <div style="text-align:center;margin-bottom:24px;">
           <div style="font-family:var(--display);font-size:22px;font-weight:800;">MedVault Admin</div>
           <div style="color:var(--muted);font-size:12px;margin-top:4px;">Super Admin Login</div>

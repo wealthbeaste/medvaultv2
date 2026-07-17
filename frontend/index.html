@@ -149,6 +149,14 @@ footer{padding:40px;border-top:1px solid var(--border);display:flex;align-items:
 /* ========================================================= */
 html{-webkit-text-size-adjust:100%;}
 img,svg,video{max-width:100%;}
+.features-grid,.pricing-grid,.testi-grid,.steps-grid,.price-card,.testi-card{min-width:0;}
+.price-card *,.testi-card *{overflow-wrap:break-word;}
+
+@media(max-width:768px){
+  [style*="width:"]:not([style*="position:absolute"]):not([style*="position:fixed"]){
+    max-width:100%;
+  }
+}
 
 @media(max-width:1024px){
   .features-grid,.pricing-grid,.testi-grid{grid-template-columns:repeat(2,1fr);}
