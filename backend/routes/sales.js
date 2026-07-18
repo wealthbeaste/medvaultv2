@@ -4,20 +4,24 @@ const err = require('./_err');
 module.exports = function registerSalesRoutes(app, { query, pool, getNextReceiptNumber, auth, validate, schemas, audit }) {
 
   // GET /api/sales
+  // By default only "live" (non-voided) sales are returned — pass
+  // ?include_voided=1 for an audit view that also shows voided ones.
   app.get('/api/sales', auth, async (req, res) => {
     const { pharmacyId } = req.user;
     try {
       const page   = Math.max(1, parseInt(req.query.page)  || 1);
-      const limit  = Math.min(100, parseInt(req.query.limit) || 50);
+      const limit  = Math.min(500, parseInt(req.query.limit) || 50);
       const offset = (page - 1) * limit;
+      const includeVoided = req.query.include_voided === '1';
+      const voidClause = includeVoided ? '' : 'AND s.voided_at IS NULL';
       const [rows, countRes] = await Promise.all([
         query(
           `SELECT s.*,json_agg(json_build_object('drug_name',si.drug_name,'quantity',si.quantity,'unit_price',si.unit_price,'total_price',si.total_price)) as items
            FROM sales s LEFT JOIN sale_items si ON si.sale_id=s.id
-           WHERE s.pharmacy_id=$1 GROUP BY s.id ORDER BY s.created_at DESC LIMIT $2 OFFSET $3`,
+           WHERE s.pharmacy_id=$1 ${voidClause} GROUP BY s.id ORDER BY s.created_at DESC LIMIT $2 OFFSET $3`,
           [pharmacyId, limit, offset]
         ),
-        query(`SELECT COUNT(*) as total FROM sales WHERE pharmacy_id=$1`, [pharmacyId]),
+        query(`SELECT COUNT(*) as total FROM sales s WHERE s.pharmacy_id=$1 ${voidClause}`, [pharmacyId]),
       ]);
       const total = parseInt(countRes.rows[0].total);
       res.json({ sales: rows.rows, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
@@ -367,7 +371,7 @@ module.exports = function registerSalesRoutes(app, { query, pool, getNextReceipt
     const { pharmacyId } = req.user;
     const { from, to, limit = 500 } = req.query;
     try {
-      let whereExtra = '';
+      let whereExtra = ' AND s.voided_at IS NULL';
       const params = [pharmacyId];
       if (from) { params.push(from); whereExtra += ` AND DATE(s.created_at) >= $${params.length}`; }
       if (to)   { params.push(to);   whereExtra += ` AND DATE(s.created_at) <= $${params.length}`; }

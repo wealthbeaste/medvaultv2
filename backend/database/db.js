@@ -309,19 +309,39 @@ async function runMigrations() {
 
     // Back-fill: find the highest sequential number already embedded in any
     // existing receipt_number for this pharmacy (pattern RCP-YYYY-NNNN).
-    // Using MAX of the numeric suffix means the next increment is always 1
-    // higher than any receipt that was ever issued — no collisions possible.
+    // Uses a strict anchored regex match instead of a blind REGEXP_REPLACE:
+    // the old version threw a Postgres error (and so was silently skipped,
+    // via the per-statement try/catch below) for ANY historical receipt
+    // number that didn't end in a plain digit suffix — e.g. the old
+    // offline-placeholder format 'RCP-2026-0007-OFF' — which meant
+    // receipt_counter never actually got backfilled for pharmacies that
+    // had any such rows, leaving their counter stuck near 0.
     `UPDATE pharmacies p
        SET receipt_counter = COALESCE((
-         SELECT MAX(
-           CAST(
-             NULLIF(REGEXP_REPLACE(s.receipt_number, '.*-', ''), '') AS INTEGER
-           )
-         )
+         SELECT MAX((regexp_match(s.receipt_number, '^RCP-\\d{4}-(\\d+)(-OFF)?$'))[1]::int)
          FROM sales s
          WHERE s.pharmacy_id = p.id
        ), 0)
        WHERE receipt_counter = 0`,
+
+    // ── CRITICAL FIX: receipt_number uniqueness must be PER PHARMACY ──────
+    // The original schema declared `receipt_number VARCHAR(50) UNIQUE`,
+    // which Postgres enforces as a single GLOBAL constraint named
+    // `sales_receipt_number_key` across the ENTIRE sales table — i.e.
+    // across every pharmacy on the platform. Meanwhile receipt numbers
+    // are generated from a PER-PHARMACY counter (pharmacies.receipt_counter),
+    // so two different pharmacies both legitimately produce "RCP-2026-0001"
+    // as their very first receipt. The global constraint then rejects the
+    // second pharmacy's insert with "duplicate key value violates unique
+    // constraint sales_receipt_number_key" — this is what was showing up
+    // repeatedly in production and blocking sale/dispatch-collect entirely
+    // for any pharmacy whose counter landed on a number already used by
+    // some other pharmacy. Fix: drop the global constraint, replace it
+    // with a composite unique index scoped to (pharmacy_id, receipt_number)
+    // — which is what "receipt numbers are unique" actually means here.
+    `ALTER TABLE sales DROP CONSTRAINT IF EXISTS sales_receipt_number_key`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_sales_receipt_number_per_pharmacy
+       ON sales(pharmacy_id, receipt_number)`,
 
     // =========================================================
     // NOTIFICATIONS
@@ -364,6 +384,21 @@ async function runMigrations() {
 
     `CREATE INDEX IF NOT EXISTS idx_audit_pharmacy
        ON audit_logs(pharmacy_id, created_at DESC)`,
+
+    // CREATE TABLE IF NOT EXISTS is a no-op if audit_logs already existed
+    // from an earlier schema version — which is exactly what happened here:
+    // the table was created before `org_id` was added above, so on this
+    // database it silently never gained the column, and every audit()
+    // call has been failing with "column org_id does not exist" ever
+    // since (visible in production logs as "[audit] write failed"). These
+    // idempotent ALTERs bring any pre-existing audit_logs table up to date.
+    `ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS org_id INTEGER`,
+    `ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS pharmacy_id INTEGER`,
+    `ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS user_id INTEGER`,
+    `ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS entity VARCHAR(100)`,
+    `ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS entity_id VARCHAR(100)`,
+    `ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS payload JSONB`,
+    `ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS ip_address VARCHAR(50)`,
 
     // =========================================================
     // SUPPLIERS
@@ -1497,7 +1532,7 @@ async function runMigrations() {
      SET receipt_counter = GREATEST(
        p.receipt_counter,
        COALESCE((
-         SELECT MAX((regexp_match(s.receipt_number, '^RCP-\\d{4}-(\\d+)$'))[1]::int)
+         SELECT MAX((regexp_match(s.receipt_number, '^RCP-\\d{4}-(\\d+)(-OFF)?$'))[1]::int)
          FROM sales s
          WHERE s.pharmacy_id = p.id
        ), 0)

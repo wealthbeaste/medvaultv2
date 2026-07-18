@@ -202,52 +202,86 @@ module.exports = function registerOperationsRoutes(app, { query, pool, getNextRe
     const { pharmacyId, userId } = req.user;
     const { payment_method } = req.body;
     if (!payment_method) return err(res, 400, 'VALIDATION_REQUIRED', 'Payment method is required', 'payment_method');
+    const client = await pool.connect();
     try {
-      const pr = await query(
-        `SELECT * FROM pending_sales WHERE id=$1 AND pharmacy_id=$2 AND status='pending'`,
+      await client.query('BEGIN');
+      // FOR UPDATE closes a race where two near-simultaneous "Confirm
+      // Payment" clicks (double-tap, or a retried request after a slow
+      // response) could both read status='pending' before either commits,
+      // each creating its own duplicate sale for the same dispatch. The
+      // row lock makes the second request wait, then see the
+      // already-collected status and cleanly reject instead.
+      const pr = await client.query(
+        `SELECT * FROM pending_sales WHERE id=$1 AND pharmacy_id=$2 AND status='pending' FOR UPDATE`,
         [req.params.id, pharmacyId]
       );
-      if (!pr.rows.length) return err(res, 404, 'CONFLICT_DISPATCH_DONE', 'Dispatch not found or already collected', 'id');
+      if (!pr.rows.length) {
+        await client.query('ROLLBACK');
+        return err(res, 404, 'CONFLICT_DISPATCH_DONE', 'Dispatch not found or already collected', 'id');
+      }
       const ps    = pr.rows[0];
       const items = typeof ps.items === 'string' ? JSON.parse(ps.items) : ps.items;
-      const receipt_number = await getNextReceiptNumber(pharmacyId);
-      const client = await pool.connect();
-      try {
-        await client.query('BEGIN');
-        const sr = await client.query(
-          `INSERT INTO sales (pharmacy_id,user_id,receipt_number,customer_name,customer_phone,subtotal,discount_pct,discount_amount,total_amount,payment_method)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
-          [pharmacyId, userId, receipt_number, ps.customer_name, ps.customer_phone,
-           parseFloat(ps.subtotal), parseFloat(ps.discount_pct),
-           parseFloat(ps.discount_amount), parseFloat(ps.total_amount), payment_method]
-        );
-        const saleId = sr.rows[0].id;
-        for (const item of items) {
-          await client.query(
-            `INSERT INTO sale_items (sale_id,drug_id,drug_name,quantity,unit_price,total_price) VALUES ($1,$2,$3,$4,$5,$6)`,
-            [saleId, item.drug_id || null, item.drug_name, item.quantity, item.unit_price, item.unit_price * item.quantity]
+
+      // Receipt numbering: same pattern as POST /api/sales — increment on
+      // its own auto-committing statement, OUTSIDE this transaction, so a
+      // rollback later never "un-burns" a number (which used to cause
+      // permanent collisions on retry). Retries on a genuine 23505 as a
+      // belt-and-suspenders measure.
+      let receipt_number = await getNextReceiptNumber(pharmacyId);
+      let sale, insertedItems = [];
+      let attempts = 0;
+      while (true) {
+        attempts++;
+        try {
+          const sr = await client.query(
+            `INSERT INTO sales (pharmacy_id,user_id,receipt_number,customer_name,customer_phone,subtotal,discount_pct,discount_amount,total_amount,payment_method)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+            [pharmacyId, userId, receipt_number, ps.customer_name, ps.customer_phone,
+             parseFloat(ps.subtotal), parseFloat(ps.discount_pct),
+             parseFloat(ps.discount_amount), parseFloat(ps.total_amount), payment_method]
           );
-          if (item.drug_id) {
-            await client.query(
-              `UPDATE drugs SET quantity=GREATEST(0,quantity-$1),updated_at=NOW() WHERE id=$2 AND pharmacy_id=$3`,
-              [item.quantity, item.drug_id, pharmacyId]
-            );
+          sale = sr.rows[0];
+          break;
+        } catch (insertErr) {
+          if (insertErr.code === '23505' && String(insertErr.constraint || '').includes('receipt_number') && attempts < 5) {
+            receipt_number = await getNextReceiptNumber(pharmacyId);
+            continue;
           }
+          throw insertErr;
         }
-        await client.query(
-          `UPDATE pending_sales SET status='collected',payment_method=$1,collected_at=NOW(),collected_by=$2,sale_id=$3 WHERE id=$4`,
-          [payment_method, userId, saleId, ps.id]
-        );
-        await client.query('COMMIT');
-        res.json({ success: true, sale: { id: saleId }, receipt_number });
-      } catch (e) {
-        await client.query('ROLLBACK');
-        throw e;
-      } finally {
-        client.release();
       }
+
+      for (const item of items) {
+        const siRes = await client.query(
+          `INSERT INTO sale_items (sale_id,drug_id,drug_name,quantity,unit_price,total_price) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+          [sale.id, item.drug_id || null, item.drug_name, item.quantity, item.unit_price, item.unit_price * item.quantity]
+        );
+        insertedItems.push(siRes.rows[0]);
+        if (item.drug_id) {
+          await client.query(
+            `UPDATE drugs SET quantity=GREATEST(0,quantity-$1),updated_at=NOW() WHERE id=$2 AND pharmacy_id=$3`,
+            [item.quantity, item.drug_id, pharmacyId]
+          );
+        }
+      }
+      await client.query(
+        `UPDATE pending_sales SET status='collected',payment_method=$1,collected_at=NOW(),collected_by=$2,sale_id=$3 WHERE id=$4`,
+        [payment_method, userId, sale.id, ps.id]
+      );
+      // Same automatic backup snapshot as the direct POS flow — see
+      // GET /api/sales/reconcile and /api/sales/:id/audit-trail.
+      await client.query(
+        `INSERT INTO sales_audit_log (pharmacy_id, sale_id, event, user_id, snapshot)
+         VALUES ($1,$2,'created',$3,$4)`,
+        [pharmacyId, sale.id, userId || null, JSON.stringify({ sale, items: insertedItems, source: 'dispatch_collect', dispatch_id: ps.id })]
+      );
+      await client.query('COMMIT');
+      res.json({ success: true, sale: { ...sale, items: insertedItems }, receipt_number });
     } catch (e) {
+      await client.query('ROLLBACK');
       return err(res, 500, 'SERVER_ERROR', e.message);
+    } finally {
+      client.release();
     }
   });
 
