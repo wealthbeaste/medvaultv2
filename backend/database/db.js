@@ -1478,7 +1478,30 @@ async function runMigrations() {
       snapshot       JSONB NOT NULL,
       created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE(pharmacy_id, backup_date)
-    )`
+    )`,
+
+    // ── Repair: resync receipt_counter to actual data ─────────
+    // Earlier bugs (counter incrementing *inside* a transaction that
+    // could roll back, plus a frontend double-submit bug) let
+    // pharmacies.receipt_counter drift BEHIND the highest receipt number
+    // actually committed in `sales`. When that happens, even the fixed
+    // "increment outside the transaction" code can still hand out a
+    // number that's already taken by an existing row, because the
+    // counter itself is starting from a stale/low value. This statement
+    // is idempotent and runs on every boot: it bumps each pharmacy's
+    // counter up to the highest numeric suffix actually found in its
+    // receipt numbers, if that's higher than what's currently stored.
+    // It only ever raises the counter, never lowers it, so it's always
+    // safe to re-run.
+    `UPDATE pharmacies p
+     SET receipt_counter = GREATEST(
+       p.receipt_counter,
+       COALESCE((
+         SELECT MAX((regexp_match(s.receipt_number, '^RCP-\\d{4}-(\\d+)$'))[1]::int)
+         FROM sales s
+         WHERE s.pharmacy_id = p.id
+       ), 0)
+     )`
 
   ];
 
