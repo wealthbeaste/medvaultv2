@@ -144,6 +144,16 @@ module.exports = function registerSalesRoutes(app, { query, pool, getNextReceipt
             // Belt-and-suspenders: even though the counter now increments
             // outside this transaction, grab a fresh number and retry
             // rather than failing the whole sale.
+            //
+            // IMPORTANT: once any statement inside a Postgres transaction
+            // fails, that transaction is "aborted" and every subsequent
+            // command on it errors with "current transaction is aborted,
+            // commands ignored until end of transaction block" until it's
+            // explicitly rolled back — you cannot just retry another
+            // statement on the same BEGIN block. Must ROLLBACK and BEGIN
+            // fresh before the retried INSERT.
+            await client.query('ROLLBACK');
+            await client.query('BEGIN');
             const retryRcpt = await query(
               `UPDATE pharmacies SET receipt_counter = receipt_counter + 1 WHERE id = $1 RETURNING receipt_counter`,
               [pharmacyId]
