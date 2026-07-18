@@ -77,51 +77,84 @@ module.exports = function registerSalesRoutes(app, { query, pool, getNextReceipt
 
     const client = await pool.connect();
     try {
-      await client.query('BEGIN');
-
-      // Receipt counter inside transaction — if sale rolls back, counter is not burned
-      const rcptRes = await client.query(
+      // Receipt counter is incremented on its own connection, OUTSIDE the
+      // sale transaction below, and commits immediately (autocommit).
+      // Previously this ran *inside* the sale's BEGIN…COMMIT block, so if
+      // anything later in that transaction failed (bad stock data, a
+      // loyalty check, a stale retry) the ROLLBACK undid the increment
+      // too — "un-burning" that number. A concurrent or later sale could
+      // then claim the same number, and when the original request was
+      // retried it would collide with it: "duplicate key value violates
+      // unique constraint sales_receipt_number_key", forever, on every
+      // retry, since nothing about the retry ever changed. Numbering it
+      // outside the transaction means a failed/retried sale can leave a
+      // gap in the sequence (normal for receipt/invoice numbering — most
+      // accounting systems have gaps from voided/failed transactions) but
+      // can never collide with one that already committed.
+      const rcptRes = await query(
         `UPDATE pharmacies SET receipt_counter = receipt_counter + 1 WHERE id = $1 RETURNING receipt_counter`,
         [pharmacyId]
       );
-      const receiptNum = rcptRes.rows.length
+      let receiptNum = rcptRes.rows.length
         ? `RCP-${new Date().getFullYear()}-${String(rcptRes.rows[0].receipt_counter).padStart(4, '0')}`
         : `RCP-${new Date().getFullYear()}-${Date.now().toString(36).toUpperCase()}`;
 
+      await client.query('BEGIN');
+
       let saleRes;
-      try {
-        saleRes = await client.query(
-          `INSERT INTO sales (pharmacy_id,user_id,receipt_number,customer_name,customer_phone,
-              subtotal,discount_pct,discount_amount,total_amount,payment_method,price_level_id,client_txn_id)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
-          [pharmacyId, userId || null, receiptNum,
-           customer_name || 'Walk-in', customer_phone || null,
-           parseFloat(subtotal || 0), parseFloat(discount_pct || 0),
-           parseFloat(discount_amount || 0) + redeemDiscount,
-           finalTotal, payment_method || 'cash',
-           price_level_id || null, client_txn_id || null]
-        );
-      } catch (insertErr) {
-        // Race condition: two near-simultaneous retries of the same
-        // client_txn_id both reached this point before either committed.
-        // The unique index rejects the second — fetch and return the
-        // sale the first request created instead of erroring out.
-        if (insertErr.code === '23505' && client_txn_id) {
-          await client.query('ROLLBACK');
-          const dupe = await query(
-            `SELECT * FROM sales WHERE pharmacy_id=$1 AND client_txn_id=$2`,
-            [pharmacyId, client_txn_id]
+      let attempts = 0;
+      while (true) {
+        attempts++;
+        try {
+          saleRes = await client.query(
+            `INSERT INTO sales (pharmacy_id,user_id,receipt_number,customer_name,customer_phone,
+                subtotal,discount_pct,discount_amount,total_amount,payment_method,price_level_id,client_txn_id)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+            [pharmacyId, userId || null, receiptNum,
+             customer_name || 'Walk-in', customer_phone || null,
+             parseFloat(subtotal || 0), parseFloat(discount_pct || 0),
+             parseFloat(discount_amount || 0) + redeemDiscount,
+             finalTotal, payment_method || 'cash',
+             price_level_id || null, client_txn_id || null]
           );
-          if (dupe.rows.length) {
-            return res.json({
-              message: '✅ Sale recorded!',
-              sale: dupe.rows[0],
-              receipt_number: dupe.rows[0].receipt_number,
-              duplicate: true,
-            });
+          break;
+        } catch (insertErr) {
+          // Two different unique constraints can fire here, and they need
+          // different handling:
+          if (insertErr.code === '23505' && client_txn_id && String(insertErr.constraint || '').includes('client_txn')) {
+            // A near-simultaneous retry of the same client_txn_id already
+            // committed. Return the sale that first request created
+            // instead of erroring out.
+            await client.query('ROLLBACK');
+            const dupe = await query(
+              `SELECT * FROM sales WHERE pharmacy_id=$1 AND client_txn_id=$2`,
+              [pharmacyId, client_txn_id]
+            );
+            if (dupe.rows.length) {
+              return res.json({
+                message: '✅ Sale recorded!',
+                sale: dupe.rows[0],
+                receipt_number: dupe.rows[0].receipt_number,
+                duplicate: true,
+              });
+            }
+            throw insertErr;
           }
+          if (insertErr.code === '23505' && String(insertErr.constraint || '').includes('receipt_number') && attempts < 5) {
+            // Belt-and-suspenders: even though the counter now increments
+            // outside this transaction, grab a fresh number and retry
+            // rather than failing the whole sale.
+            const retryRcpt = await query(
+              `UPDATE pharmacies SET receipt_counter = receipt_counter + 1 WHERE id = $1 RETURNING receipt_counter`,
+              [pharmacyId]
+            );
+            receiptNum = retryRcpt.rows.length
+              ? `RCP-${new Date().getFullYear()}-${String(retryRcpt.rows[0].receipt_counter).padStart(4, '0')}`
+              : `RCP-${new Date().getFullYear()}-${Date.now().toString(36).toUpperCase()}-${attempts}`;
+            continue;
+          }
+          throw insertErr;
         }
-        throw insertErr;
       }
       const sale = saleRes.rows[0];
 
