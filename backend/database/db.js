@@ -1432,7 +1432,53 @@ async function runMigrations() {
 
     // marketplace_orders: track whether stock has been received into inventory
     `ALTER TABLE marketplace_orders ADD COLUMN IF NOT EXISTS stock_received BOOLEAN NOT NULL DEFAULT false`,
-    `ALTER TABLE marketplace_orders ADD COLUMN IF NOT EXISTS stock_received_at TIMESTAMPTZ`
+    `ALTER TABLE marketplace_orders ADD COLUMN IF NOT EXISTS stock_received_at TIMESTAMPTZ`,
+
+    // ── Phase 4 — Sales Persistence & Integrity Hardening ─────
+    // client_txn_id: a UUID generated on the device *before* the request
+    // is sent. Because the offline queue retries requests whose response
+    // was lost (timeout, dropped connection after the server already
+    // committed), the same sale could previously be inserted twice. The
+    // unique index below lets POST /api/sales safely no-op on a repeat
+    // send instead of creating a duplicate sale + double stock deduction.
+    `ALTER TABLE sales ADD COLUMN IF NOT EXISTS client_txn_id VARCHAR(100)`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_sales_client_txn ON sales(pharmacy_id, client_txn_id) WHERE client_txn_id IS NOT NULL`,
+
+    // Soft-delete / integrity columns so a sale is never silently removed —
+    // any future correction is a flagged void, not a DELETE.
+    `ALTER TABLE sales ADD COLUMN IF NOT EXISTS voided_at TIMESTAMPTZ`,
+    `ALTER TABLE sales ADD COLUMN IF NOT EXISTS voided_by INTEGER REFERENCES users(id)`,
+    `ALTER TABLE sales ADD COLUMN IF NOT EXISTS void_reason TEXT`,
+
+    // Append-only ledger of every create/void touching a sale, independent
+    // of the generic audit_log table, so sales history can always be
+    // reconstructed even if audit_log is pruned.
+    `CREATE TABLE IF NOT EXISTS sale_audit_trail (
+      id           SERIAL PRIMARY KEY,
+      sale_id      INTEGER NOT NULL REFERENCES sales(id),
+      pharmacy_id  INTEGER NOT NULL REFERENCES pharmacies(id),
+      action       VARCHAR(50) NOT NULL,
+      user_id      INTEGER REFERENCES users(id),
+      before_data  JSONB,
+      after_data   JSONB,
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_sale_audit_sale ON sale_audit_trail(sale_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_sale_audit_pharmacy ON sale_audit_trail(pharmacy_id, created_at DESC)`,
+
+    // Nightly logical backup of sales + sale_items, written by the
+    // scheduler job. Gives us a restorable snapshot independent of
+    // Neon's own point-in-time recovery.
+    `CREATE TABLE IF NOT EXISTS sales_backup_log (
+      id             SERIAL PRIMARY KEY,
+      pharmacy_id    INTEGER NOT NULL REFERENCES pharmacies(id),
+      backup_date    DATE NOT NULL,
+      sale_count     INTEGER NOT NULL,
+      total_revenue  NUMERIC(14,2) NOT NULL,
+      snapshot       JSONB NOT NULL,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(pharmacy_id, backup_date)
+    )`
 
   ];
 

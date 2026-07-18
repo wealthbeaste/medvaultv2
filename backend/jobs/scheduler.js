@@ -184,13 +184,33 @@ async function writeDailySnapshots() {
                 COALESCE(SUM(total_amount), 0),
                 COUNT(*)
          FROM sales
-         WHERE pharmacy_id = $1 AND DATE(created_at) = $2
+         WHERE pharmacy_id = $1 AND voided_at IS NULL AND DATE(created_at) = $2
          ON CONFLICT (pharmacy_id, snapshot_date)
          DO UPDATE SET total_sales = EXCLUDED.total_sales, sale_count = EXCLUDED.sale_count`,
         [ph.id, today]
       );
+
+      // Full logical backup: every sale + its line items for the day,
+      // stored as JSON. This is a restorable copy independent of the
+      // live tables — if a row were ever lost or corrupted, this
+      // snapshot lets us reconstruct it.
+      const snap = await query(
+        `SELECT s.*, json_agg(json_build_object('drug_id',si.drug_id,'drug_name',si.drug_name,'quantity',si.quantity,'unit_price',si.unit_price,'total_price',si.total_price)) as items
+         FROM sales s LEFT JOIN sale_items si ON si.sale_id = s.id
+         WHERE s.pharmacy_id = $1 AND DATE(s.created_at) = $2
+         GROUP BY s.id`,
+        [ph.id, today]
+      );
+      const revenueForBackup = snap.rows.reduce((sum, s) => sum + (s.voided_at ? 0 : parseFloat(s.total_amount || 0)), 0);
+      await query(
+        `INSERT INTO sales_backup_log (pharmacy_id, backup_date, sale_count, total_revenue, snapshot)
+         VALUES ($1,$2,$3,$4,$5)
+         ON CONFLICT (pharmacy_id, backup_date)
+         DO UPDATE SET sale_count = EXCLUDED.sale_count, total_revenue = EXCLUDED.total_revenue, snapshot = EXCLUDED.snapshot, created_at = NOW()`,
+        [ph.id, today, snap.rows.length, revenueForBackup, JSON.stringify(snap.rows)]
+      );
     }
-    console.log(`⏰ [Scheduler] Daily snapshots written for ${pharmacies.rows.length} pharmacies`);
+    console.log(`⏰ [Scheduler] Daily snapshots + backups written for ${pharmacies.rows.length} pharmacies`);
   } catch (e) {
     console.error('⚠️  [Scheduler] Daily snapshot failed:', e.message);
   }

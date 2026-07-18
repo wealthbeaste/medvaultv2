@@ -19,7 +19,13 @@ const WA_CONFIG = {
 };
 
 const https = require('https');
-const { helpers } = require('../database/memdb');
+// NOTE: this module previously read from ../database/memdb, an in-memory
+// demo store that is empty/reset on every restart and is NOT the database
+// the rest of the app writes to (see database/db.js, which is real
+// Postgres). That meant every WhatsApp report/alert here was computed off
+// stale or empty data instead of actual sales/stock. Fixed to use the
+// real Postgres connection.
+const { query } = require('../database/db');
 
 // ── HTTP Helper ─────────────────────────────────────────────
 function postJSON(url, body, headers = {}) {
@@ -207,21 +213,26 @@ function buildPaymentReminder(pharmacy, amount, daysOverdue) {
 // ── SCHEDULED TASKS ─────────────────────────────────────────
 
 // Send daily report to all active pharmacies
+async function getPharmacyReportData(pharmacyId) {
+  const [drugsRes, salesRes, ordersRes] = await Promise.all([
+    query(`SELECT * FROM drugs WHERE pharmacy_id=$1`, [pharmacyId]),
+    query(`SELECT * FROM sales WHERE pharmacy_id=$1 AND voided_at IS NULL AND DATE(created_at)=CURRENT_DATE`, [pharmacyId]),
+    query(`SELECT * FROM orders WHERE pharmacy_id=$1`, [pharmacyId]),
+  ]);
+  return { drugs: drugsRes.rows, todaySales: salesRes.rows, orders: ordersRes.rows };
+}
+
 async function sendDailyReports() {
   console.log('📱 Sending daily WhatsApp reports…');
-  const pharmacies = helpers.find('pharmacies', {}).filter(p => p.is_active);
+  const pharmacies = (await query(`SELECT * FROM pharmacies WHERE is_active=true`)).rows;
   let sent = 0, failed = 0;
 
   for (const pharmacy of pharmacies) {
     try {
-      const drugs   = helpers.find('drugs',   { pharmacy_id: pharmacy.id });
-      const sales   = helpers.find('sales',   { pharmacy_id: pharmacy.id });
-      const orders  = helpers.find('orders',  { pharmacy_id: pharmacy.id });
-      const today   = new Date().toDateString();
-      const todaySales = sales.filter(s => new Date(s.created_at).toDateString() === today);
+      const { drugs, todaySales, orders } = await getPharmacyReportData(pharmacy.id);
 
       const stats = {
-        revenueToday:      todaySales.reduce((s, x) => s + x.total_amount, 0),
+        revenueToday:      todaySales.reduce((s, x) => s + parseFloat(x.total_amount || 0), 0),
         transactionsToday: todaySales.length,
         pendingOrders:     orders.filter(o => o.order_status === 'pending').length,
       };
@@ -253,11 +264,11 @@ async function sendDailyReports() {
 
 // Send alerts for any pharmacy with critical low stock
 async function sendLowStockAlerts() {
-  const pharmacies = helpers.find('pharmacies', {}).filter(p => p.is_active);
+  const pharmacies = (await query(`SELECT * FROM pharmacies WHERE is_active=true`)).rows;
   let sent = 0;
   for (const pharmacy of pharmacies) {
-    const critical = helpers.find('drugs', { pharmacy_id: pharmacy.id })
-      .filter(d => d.quantity <= d.threshold && d.quantity > 0);
+    const drugsRes = await query(`SELECT * FROM drugs WHERE pharmacy_id=$1`, [pharmacy.id]);
+    const critical = drugsRes.rows.filter(d => d.quantity <= d.threshold && d.quantity > 0);
     if (critical.length > 0) {
       const msg = buildLowStockAlert(pharmacy, critical);
       const result = await sendWhatsApp(pharmacy.phone, msg);
@@ -270,11 +281,14 @@ async function sendLowStockAlerts() {
 
 // Send payment reminders for overdue subscriptions
 async function sendPaymentReminders() {
-  const pharmacies = helpers.find('pharmacies', {});
+  const pharmacies = (await query(`SELECT * FROM pharmacies`)).rows;
   let sent = 0;
   for (const pharmacy of pharmacies) {
-    const sub = helpers.find('subscriptions', { pharmacy_id: pharmacy.id })
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+    const subRes = await query(
+      `SELECT * FROM subscriptions WHERE pharmacy_id=$1 ORDER BY created_at DESC LIMIT 1`,
+      [pharmacy.id]
+    );
+    const sub = subRes.rows[0];
     if (!sub) continue;
 
     const daysOverdue = Math.ceil((new Date() - new Date(sub.next_billing)) / 86400000);
@@ -316,18 +330,14 @@ function registerWhatsAppRoutes(app) {
 
   // Manual trigger: send daily report to a specific pharmacy
   app.post('/api/whatsapp/daily-report/:pharmacyId', auth, async (req, res) => {
-    const pharmacy = helpers.findOne('pharmacies', { id: parseInt(req.params.pharmacyId) });
+    const pharmacyRes = await query(`SELECT * FROM pharmacies WHERE id=$1`, [parseInt(req.params.pharmacyId)]);
+    const pharmacy = pharmacyRes.rows[0];
     if (!pharmacy) return res.json({ error: 'Pharmacy not found' }, 404);
 
-    const drugs  = helpers.find('drugs',  { pharmacy_id: pharmacy.id });
-    const sales  = helpers.find('sales',  { pharmacy_id: pharmacy.id });
-    const orders = helpers.find('orders', { pharmacy_id: pharmacy.id });
-    const today  = new Date().toDateString();
-    const ts     = sales.filter(s => new Date(s.created_at).toDateString() === today);
-
+    const { drugs, todaySales, orders } = await getPharmacyReportData(pharmacy.id);
     const stats  = {
-      revenueToday:      ts.reduce((s, x) => s + x.total_amount, 0),
-      transactionsToday: ts.length,
+      revenueToday:      todaySales.reduce((s, x) => s + parseFloat(x.total_amount || 0), 0),
+      transactionsToday: todaySales.length,
       pendingOrders:     orders.filter(o => o.order_status === 'pending').length,
     };
     const alerts = {
@@ -352,11 +362,11 @@ function registerWhatsAppRoutes(app) {
   // Send new order alert to pharmacy
   app.post('/api/whatsapp/order-alert', auth, async (req, res) => {
     const { pharmacyId, orderId } = req.body;
-    const pharmacy = helpers.findOne('pharmacies', { id: pharmacyId });
-    const order    = helpers.findOne('orders',     { id: orderId });
+    const pharmacy = (await query(`SELECT * FROM pharmacies WHERE id=$1`, [pharmacyId])).rows[0];
+    const order    = (await query(`SELECT * FROM orders WHERE id=$1`, [orderId])).rows[0];
     if (!pharmacy || !order) return res.json({ error: 'Not found' }, 404);
 
-    const items  = helpers.find('orderItems', { order_id: orderId });
+    const items  = (await query(`SELECT * FROM order_items WHERE order_id=$1`, [orderId])).rows;
     const msg    = buildNewOrderAlert(pharmacy, order, items);
     const result = await sendWhatsApp(pharmacy.phone, msg);
 
@@ -365,10 +375,10 @@ function registerWhatsAppRoutes(app) {
 
   // Send low stock alert manually
   app.post('/api/whatsapp/low-stock-alert/:pharmacyId', auth, async (req, res) => {
-    const pharmacy = helpers.findOne('pharmacies', { id: parseInt(req.params.pharmacyId) });
+    const pharmacy = (await query(`SELECT * FROM pharmacies WHERE id=$1`, [parseInt(req.params.pharmacyId)])).rows[0];
     if (!pharmacy) return res.json({ error: 'Pharmacy not found' }, 404);
-    const critical = helpers.find('drugs', { pharmacy_id: pharmacy.id })
-      .filter(d => d.quantity <= d.threshold);
+    const drugs = (await query(`SELECT * FROM drugs WHERE pharmacy_id=$1`, [pharmacy.id])).rows;
+    const critical = drugs.filter(d => d.quantity <= d.threshold);
     if (!critical.length) return res.json({ message: 'No low stock drugs', sent: false });
     const msg    = buildLowStockAlert(pharmacy, critical);
     const result = await sendWhatsApp(pharmacy.phone, msg);
@@ -377,11 +387,13 @@ function registerWhatsAppRoutes(app) {
 
   // Send payment reminder manually (from admin panel)
   app.post('/api/whatsapp/payment-reminder/:pharmacyId', auth, async (req, res) => {
-    const pharmacy = helpers.findOne('pharmacies', { id: parseInt(req.params.pharmacyId) });
+    const pharmacy = (await query(`SELECT * FROM pharmacies WHERE id=$1`, [parseInt(req.params.pharmacyId)])).rows[0];
     if (!pharmacy) return res.json({ error: 'Not found' }, 404);
     const prices   = { basic: 20000, pro: 50000, enterprise: 150000 };
-    const sub      = helpers.find('subscriptions', { pharmacy_id: pharmacy.id })
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+    const sub      = (await query(
+      `SELECT * FROM subscriptions WHERE pharmacy_id=$1 ORDER BY created_at DESC LIMIT 1`,
+      [pharmacy.id]
+    )).rows[0];
     const amount   = prices[sub?.plan] || 50000;
     const msg      = buildPaymentReminder(pharmacy, amount, 0);
     const result   = await sendWhatsApp(pharmacy.phone, msg);
@@ -396,14 +408,10 @@ function registerWhatsAppRoutes(app) {
 
   // Preview a message without sending
   app.get('/api/whatsapp/preview/:pharmacyId', auth, async (req, res) => {
-    const pharmacy = helpers.findOne('pharmacies', { id: parseInt(req.params.pharmacyId) });
+    const pharmacy = (await query(`SELECT * FROM pharmacies WHERE id=$1`, [parseInt(req.params.pharmacyId)])).rows[0];
     if (!pharmacy) return res.json({ error: 'Not found' }, 404);
-    const drugs  = helpers.find('drugs',  { pharmacy_id: pharmacy.id });
-    const sales  = helpers.find('sales',  { pharmacy_id: pharmacy.id });
-    const orders = helpers.find('orders', { pharmacy_id: pharmacy.id });
-    const today  = new Date().toDateString();
-    const ts     = sales.filter(s => new Date(s.created_at).toDateString() === today);
-    const stats  = { revenueToday: ts.reduce((s,x) => s+x.total_amount,0), transactionsToday: ts.length, pendingOrders: orders.filter(o=>o.order_status==='pending').length };
+    const { drugs, todaySales, orders } = await getPharmacyReportData(pharmacy.id);
+    const stats  = { revenueToday: todaySales.reduce((s,x) => s+parseFloat(x.total_amount||0),0), transactionsToday: todaySales.length, pendingOrders: orders.filter(o=>o.order_status==='pending').length };
     const alerts = { lowStock: drugs.filter(d=>d.quantity<=d.threshold), expiring: drugs.filter(d=>{ const days=Math.ceil((new Date(d.expiry_date)-new Date())/86400000); return days<=30&&days>=0; }) };
     res.json({ phone: pharmacy.phone, preview: buildDailyReport(pharmacy, stats, alerts) });
   });

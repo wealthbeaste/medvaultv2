@@ -9,12 +9,12 @@ module.exports = function registerReportsRoutes(app, { query, auth, can }) {
     if (!pharmacyId) return err(res, 400, 'AUTH_NO_PHARMACY', 'No pharmacy assigned. Ask your owner to reassign you.', 'pharmacyId');
     try {
       const [rev, tx, low, exp, week, recent] = await Promise.all([
-        query(`SELECT COALESCE(SUM(total_amount),0) as rev FROM sales WHERE pharmacy_id=$1 AND DATE(created_at)=CURRENT_DATE`, [pharmacyId]),
-        query(`SELECT COUNT(*) as cnt FROM sales WHERE pharmacy_id=$1 AND DATE(created_at)=CURRENT_DATE`, [pharmacyId]),
+        query(`SELECT COALESCE(SUM(total_amount),0) as rev FROM sales WHERE pharmacy_id=$1 AND voided_at IS NULL AND DATE(created_at)=CURRENT_DATE`, [pharmacyId]),
+        query(`SELECT COUNT(*) as cnt FROM sales WHERE pharmacy_id=$1 AND voided_at IS NULL AND DATE(created_at)=CURRENT_DATE`, [pharmacyId]),
         query(`SELECT COUNT(*) as cnt FROM drugs WHERE pharmacy_id=$1 AND quantity<=threshold`, [pharmacyId]),
         query(`SELECT COUNT(*) as cnt FROM drugs WHERE pharmacy_id=$1 AND expiry_date IS NOT NULL AND expiry_date<=CURRENT_DATE+INTERVAL '30 days' AND expiry_date>=CURRENT_DATE`, [pharmacyId]),
-        query(`SELECT DATE(created_at) as day,COALESCE(SUM(total_amount),0) as revenue FROM sales WHERE pharmacy_id=$1 AND created_at>=CURRENT_DATE-INTERVAL '6 days' GROUP BY DATE(created_at) ORDER BY day`, [pharmacyId]),
-        query(`SELECT id,customer_name,total_amount,payment_method,created_at FROM sales WHERE pharmacy_id=$1 ORDER BY created_at DESC LIMIT 5`, [pharmacyId]),
+        query(`SELECT DATE(created_at) as day,COALESCE(SUM(total_amount),0) as revenue FROM sales WHERE pharmacy_id=$1 AND voided_at IS NULL AND created_at>=CURRENT_DATE-INTERVAL '6 days' GROUP BY DATE(created_at) ORDER BY day`, [pharmacyId]),
+        query(`SELECT id,customer_name,total_amount,payment_method,created_at FROM sales WHERE pharmacy_id=$1 AND voided_at IS NULL ORDER BY created_at DESC LIMIT 5`, [pharmacyId]),
       ]);
       res.json({
         revenueToday:       parseFloat(rev.rows[0].rev),
@@ -83,7 +83,7 @@ module.exports = function registerReportsRoutes(app, { query, auth, can }) {
     try {
       const [pharma, rxSales, stock, expiring] = await Promise.all([
         query(`SELECT p.*,o.name as org_name FROM pharmacies p JOIN organisations o ON o.id=p.organisation_id WHERE p.id=$1`, [pharmacyId]),
-        query(`SELECT s.created_at,s.receipt_number,s.customer_name,si.drug_name,si.quantity,si.unit_price,d.requires_rx,d.category FROM sales s JOIN sale_items si ON si.sale_id=s.id LEFT JOIN drugs d ON d.id=si.drug_id WHERE s.pharmacy_id=$1 AND DATE(s.created_at) BETWEEN $2 AND $3 AND (d.requires_rx=true OR d.category IN ('Antibiotics','Antimalarials')) ORDER BY s.created_at DESC`, [pharmacyId, from, to]),
+        query(`SELECT s.created_at,s.receipt_number,s.customer_name,si.drug_name,si.quantity,si.unit_price,d.requires_rx,d.category FROM sales s JOIN sale_items si ON si.sale_id=s.id LEFT JOIN drugs d ON d.id=si.drug_id WHERE s.pharmacy_id=$1 AND s.voided_at IS NULL AND DATE(s.created_at) BETWEEN $2 AND $3 AND (d.requires_rx=true OR d.category IN ('Antibiotics','Antimalarials')) ORDER BY s.created_at DESC`, [pharmacyId, from, to]),
         query(`SELECT name,generic_name,category,quantity,expiry_date,supplier,requires_rx,unit_price,threshold FROM drugs WHERE pharmacy_id=$1 ORDER BY category,name`, [pharmacyId]),
         query(`SELECT name,quantity,expiry_date,(expiry_date-CURRENT_DATE)::int as days_left FROM drugs WHERE pharmacy_id=$1 AND expiry_date IS NOT NULL AND expiry_date<=CURRENT_DATE+INTERVAL '60 days' ORDER BY expiry_date`, [pharmacyId]),
       ]);
@@ -168,8 +168,8 @@ module.exports = function registerReportsRoutes(app, { query, auth, can }) {
     try {
       const [pharma, sales, daily, drugs] = await Promise.all([
         query(`SELECT p.*,o.name as org_name FROM pharmacies p JOIN organisations o ON o.id=p.organisation_id WHERE p.id=$1`, [pharmacyId]),
-        query(`SELECT COUNT(*) as transaction_count,COALESCE(SUM(total_amount),0) as gross_revenue,COALESCE(SUM(discount_amount),0) as total_discounts,COALESCE(SUM(total_amount-discount_amount),0) as net_revenue,SUM(CASE WHEN payment_method='momo' THEN total_amount ELSE 0 END) as momo_revenue,SUM(CASE WHEN payment_method='cash' THEN total_amount ELSE 0 END) as cash_revenue FROM sales WHERE pharmacy_id=$1 AND EXTRACT(MONTH FROM created_at)=$2 AND EXTRACT(YEAR FROM created_at)=$3`, [pharmacyId, m, y]),
-        query(`SELECT DATE(created_at) as day,SUM(total_amount) as revenue,COUNT(*) as txns FROM sales WHERE pharmacy_id=$1 AND EXTRACT(MONTH FROM created_at)=$2 AND EXTRACT(YEAR FROM created_at)=$3 GROUP BY DATE(created_at) ORDER BY day`, [pharmacyId, m, y]),
+        query(`SELECT COUNT(*) as transaction_count,COALESCE(SUM(total_amount),0) as gross_revenue,COALESCE(SUM(discount_amount),0) as total_discounts,COALESCE(SUM(total_amount-discount_amount),0) as net_revenue,SUM(CASE WHEN payment_method='momo' THEN total_amount ELSE 0 END) as momo_revenue,SUM(CASE WHEN payment_method='cash' THEN total_amount ELSE 0 END) as cash_revenue FROM sales WHERE pharmacy_id=$1 AND voided_at IS NULL AND EXTRACT(MONTH FROM created_at)=$2 AND EXTRACT(YEAR FROM created_at)=$3`, [pharmacyId, m, y]),
+        query(`SELECT DATE(created_at) as day,SUM(total_amount) as revenue,COUNT(*) as txns FROM sales WHERE pharmacy_id=$1 AND voided_at IS NULL AND EXTRACT(MONTH FROM created_at)=$2 AND EXTRACT(YEAR FROM created_at)=$3 GROUP BY DATE(created_at) ORDER BY day`, [pharmacyId, m, y]),
         query(`SELECT si.drug_name,SUM(si.quantity) as units,SUM(si.total_price) as revenue FROM sale_items si JOIN sales s ON s.id=si.sale_id WHERE s.pharmacy_id=$1 AND EXTRACT(MONTH FROM s.created_at)=$2 AND EXTRACT(YEAR FROM s.created_at)=$3 GROUP BY si.drug_name ORDER BY revenue DESC LIMIT 10`, [pharmacyId, m, y]),
       ]);
       const gross     = parseFloat(sales.rows[0].gross_revenue);
@@ -187,10 +187,10 @@ module.exports = function registerReportsRoutes(app, { query, auth, can }) {
     const date = req.query.date || new Date().toISOString().slice(0, 10);
     try {
       const [salesRes, topDrugsRes, paymentRes, staffRes, lowStockRes, expRes] = await Promise.all([
-        query(`SELECT COUNT(*) AS sale_count,COALESCE(SUM(total_amount),0) AS revenue,COALESCE(SUM(discount_amount),0) AS total_discounts,COALESCE(AVG(total_amount),0) AS avg_basket FROM sales WHERE pharmacy_id=$1 AND DATE(created_at)=$2`, [pharmacyId, date]),
+        query(`SELECT COUNT(*) AS sale_count,COALESCE(SUM(total_amount),0) AS revenue,COALESCE(SUM(discount_amount),0) AS total_discounts,COALESCE(AVG(total_amount),0) AS avg_basket FROM sales WHERE pharmacy_id=$1 AND voided_at IS NULL AND DATE(created_at)=$2`, [pharmacyId, date]),
         query(`SELECT si.drug_name,SUM(si.quantity) AS units_sold,SUM(si.total_price) AS revenue FROM sale_items si JOIN sales s ON s.id=si.sale_id WHERE s.pharmacy_id=$1 AND DATE(s.created_at)=$2 GROUP BY si.drug_name ORDER BY revenue DESC LIMIT 5`, [pharmacyId, date]),
-        query(`SELECT payment_method,COUNT(*) AS count,COALESCE(SUM(total_amount),0) AS total FROM sales WHERE pharmacy_id=$1 AND DATE(created_at)=$2 GROUP BY payment_method`, [pharmacyId, date]),
-        query(`SELECT u.name AS staff_name,COUNT(s.id) AS sales,COALESCE(SUM(s.total_amount),0) AS revenue FROM sales s LEFT JOIN users u ON u.id=s.user_id WHERE s.pharmacy_id=$1 AND DATE(s.created_at)=$2 GROUP BY u.name ORDER BY revenue DESC`, [pharmacyId, date]),
+        query(`SELECT payment_method,COUNT(*) AS count,COALESCE(SUM(total_amount),0) AS total FROM sales WHERE pharmacy_id=$1 AND voided_at IS NULL AND DATE(created_at)=$2 GROUP BY payment_method`, [pharmacyId, date]),
+        query(`SELECT u.name AS staff_name,COUNT(s.id) AS sales,COALESCE(SUM(s.total_amount),0) AS revenue FROM sales s LEFT JOIN users u ON u.id=s.user_id WHERE s.pharmacy_id=$1 AND s.voided_at IS NULL AND DATE(s.created_at)=$2 GROUP BY u.name ORDER BY revenue DESC`, [pharmacyId, date]),
         query(`SELECT COUNT(*) AS cnt FROM drugs WHERE pharmacy_id=$1 AND quantity<=threshold`, [pharmacyId]),
         query(`SELECT COUNT(*) AS cnt FROM drugs WHERE pharmacy_id=$1 AND expiry_date IS NOT NULL AND expiry_date<=CURRENT_DATE+INTERVAL '30 days' AND quantity>0`, [pharmacyId]),
       ]);

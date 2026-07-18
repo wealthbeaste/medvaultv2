@@ -1734,6 +1734,10 @@ img,svg,video{max-width:100%;}
         "
       >
 
+        <div style="display:flex;justify-content:flex-end;padding:6px 4px">
+          <button onclick="backupSalesNow()" style="padding:6px 12px;border-radius:8px;background:var(--s2);border:1px solid var(--border);color:var(--text);font-size:11px;font-weight:600;cursor:pointer">💾 Backup sales (.json)</button>
+        </div>
+
         <table class="tbl">
 
           <thead>
@@ -3661,12 +3665,42 @@ const MedVaultOffline = {
     this.updateSyncUI();
   },
 
+  // Merge server rows into a local table by id instead of replacing the
+  // table outright. This is the fix for the core data-loss bug: the old
+  // pullFromServer did `db.sales = sales.data.sales`, which — because the
+  // server call only ever asked for the newest 100 rows — permanently
+  // discarded every older sale from local storage on every sync (every
+  // 2 minutes). Sales were always safe in Postgres; they were just being
+  // erased from the *local cache* that the UI reads from. Merging instead
+  // of replacing means the local cache only ever grows/updates, and nothing
+  // already known locally is deleted just because it fell outside the
+  // most recent page.
+  mergeTable(t, serverRows, {keepUnsynced=false} = {}){
+    if (!Array.isArray(serverRows)) return;
+    const existing = this.getTable(t);
+    const byId = new Map(existing.map(r => [String(r.id), r]));
+    for (const row of serverRows) byId.set(String(row.id), row);
+    if (keepUnsynced) {
+      // Never let a pull silently delete a locally-recorded record that
+      // hasn't been confirmed synced yet (e.g. an offline sale still
+      // sitting in the sync queue).
+      for (const row of existing) {
+        if (row._offline && !row._synced && !byId.has(String(row.id))) {
+          byId.set(String(row.id), row);
+        }
+      }
+    }
+    const merged = Array.from(byId.values())
+      .sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+    this.saveTable(t, merged);
+  },
+
   async pullFromServer(token){
     if(!this.isOnline()) return {success:false, reason:'offline'};
     try{
       const [inv,sales,orders,customers] = await Promise.all([
         this.requestJSON('/api/inventory', { token, timeoutMs: 15000 }),
-        this.requestJSON('/api/sales?limit=100', { token, timeoutMs: 15000 }),
+        this.requestJSON('/api/sales?limit=200', { token, timeoutMs: 15000 }),
         this.requestJSON('/api/orders', { token, timeoutMs: 15000 }),
         this.requestJSON('/api/customers', { token, timeoutMs: 15000 }),
       ]);
@@ -3676,14 +3710,12 @@ const MedVaultOffline = {
         return { success:false, reason:'401-auth-expired' };
       }
 
-      const db=this.getDB();
       let gotAny = false;
-      if(inv.ok && inv.data.drugs)           { db.drugs=inv.data.drugs;           gotAny=true; }
-      if(sales.ok && sales.data.sales)       { db.sales=sales.data.sales;         gotAny=true; }
-      if(orders.ok && orders.data.orders)    { db.orders=orders.data.orders;      gotAny=true; }
-      if(customers.ok && customers.data.customers){ db.customers=customers.data.customers; gotAny=true; }
+      if(inv.ok && inv.data.drugs)           { this.saveTable('drugs', inv.data.drugs);      gotAny=true; }
+      if(sales.ok && sales.data.sales)       { this.mergeTable('sales', sales.data.sales, {keepUnsynced:true}); gotAny=true; }
+      if(orders.ok && orders.data.orders)    { this.mergeTable('orders', orders.data.orders); gotAny=true; }
+      if(customers.ok && customers.data.customers){ this.saveTable('customers', customers.data.customers); gotAny=true; }
       if(gotAny){
-        this.saveDB(db);
         this.saveMeta({lastSync:new Date().toISOString(),status:'synced'});
         this.updateSyncUI();
         return {success:true};
@@ -3695,10 +3727,11 @@ const MedVaultOffline = {
   },
 
   async pushToServer(token){
-    if(!this.isOnline()) return {success:false,pushed:0};
+    if(!this.isOnline()) return {success:false,pushed:0,results:[]};
     const queue=this.getQueue().filter(a=>!a.synced);
-    if(!queue.length) return {success:true,pushed:0};
+    if(!queue.length) return {success:true,pushed:0,results:[]};
     let pushed=0;
+    const results=[];
     for(const action of queue){
       try{
         const res=await this.requestJSON(action.url,{
@@ -3707,14 +3740,29 @@ const MedVaultOffline = {
           body: action.body,
           timeoutMs: 12000,
         });
-        if(res.ok){action.synced=true;pushed++;}
+        if(res.ok){
+          action.synced=true;pushed++;
+          results.push({action, response:res.data});
+          // Reconcile: swap the temporary local-id sale record for the
+          // server's authoritative row (real id, real receipt number),
+          // so the local cache never has to be blown away wholesale to
+          // stay correct — see pullFromServer's merge logic below.
+          if (action.type === 'sale' && action.localSaleId && res.data?.sale) {
+            const sales = this.getTable('sales');
+            const idx = sales.findIndex(s => s.id === action.localSaleId);
+            if (idx !== -1) {
+              sales[idx] = { ...res.data.sale, items: action.body?.items, _offline:false, _synced:true, _loyaltyResult: res.data.loyalty || null };
+              this.saveTable('sales', sales);
+            }
+          }
+        }
       }catch(e){}
     }
     const remaining=queue.filter(a=>!a.synced);
     localStorage.setItem(this.QUEUE_KEY,JSON.stringify(remaining));
     this.saveMeta({lastPush:new Date().toISOString()});
     this.updateSyncUI();
-    return {success:true,pushed};
+    return {success:true,pushed,results};
   },
 
   async sync(token){ const push=await this.pushToServer(token); const pull=await this.pullFromServer(token); return {push,pull}; },
@@ -3722,7 +3770,15 @@ const MedVaultOffline = {
   recordSaleLocal(saleData){
     const sales=this.getTable('sales');
     const receiptNum='RCP-'+new Date().getFullYear()+'-'+String(sales.length+1).padStart(4,'0')+'-OFF';
-    const sale={id:Date.now(),...saleData,receipt_number:receiptNum,created_at:new Date().toISOString(),_offline:true};
+    // client_txn_id: generated once per checkout, travels with the sale
+    // through local storage, the sync queue, and the API request body.
+    // The backend uses it to recognise a resend of the same sale (retry
+    // after a dropped response, or — see fix below — no longer a risk,
+    // but this remains the safety net) and returns the original record
+    // instead of inserting a duplicate.
+    const clientTxnId = saleData.client_txn_id || (crypto?.randomUUID ? crypto.randomUUID() : ('txn_'+Date.now()+'_'+Math.random().toString(36).slice(2)));
+    saleData = { ...saleData, client_txn_id: clientTxnId };
+    const sale={id:Date.now(),...saleData,receipt_number:receiptNum,created_at:new Date().toISOString(),_offline:true,_synced:false};
     sales.unshift(sale); this.saveTable('sales',sales);
 
     // Upsert customer into local customers table
@@ -3731,8 +3787,14 @@ const MedVaultOffline = {
     const drugs=this.getTable('drugs');
     (saleData.items||[]).forEach(item=>{const d=drugs.find(x=>x.id===item.drug_id);if(d)d.quantity=Math.max(0,d.quantity-item.quantity);});
     this.saveTable('drugs',drugs);
-    this.queueAction({type:'sale',method:'POST',url:'/api/sales',body:saleData});
-    return {sale,receipt_number:receiptNum};
+    // Single queue entry is now the ONLY path a sale takes to the server —
+    // completeSale() used to ALSO fire a separate direct POST when online,
+    // which meant every online sale was submitted twice (once here via
+    // the queue, once via that direct fetch), creating duplicate sales
+    // and double stock deduction on the backend. That direct fetch has
+    // been removed; see completeSale().
+    this.queueAction({type:'sale',method:'POST',url:'/api/sales',body:saleData,localSaleId:sale.id});
+    return {sale,receipt_number:receiptNum,client_txn_id:clientTxnId};
   },
 
   upsertCustomerFromSale(saleData){
@@ -5067,7 +5129,8 @@ function completeSale() {
     subtotal: sub, discount_amount: da, total_amount: tot,
   };
 
-  // Always save locally first (works offline)
+  // Always save locally first (works offline) — this also enqueues the
+  // sale for sync with a client_txn_id the backend uses to de-dupe.
   const { sale, receipt_number } = MedVaultOffline.recordSaleLocal(saleData);
   const isOffline = !MedVaultOffline.isOnline();
 
@@ -5100,22 +5163,16 @@ function completeSale() {
   if (isOffline) {
     showToast(`✅ Sale saved offline! Will sync when reconnected.`, 'warn');
   } else {
-    // Try to also save to server
-    fetch(MedVaultOffline.API_BASE+'/api/sales',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
-      body:JSON.stringify(saleData)
-    }).then(async r => {
-      if (r.ok) {
-        // Also sync customer to server
-        const cd = await r.json().catch(()=>({}));
-        if (cust && cust !== 'Walk-in' && custPhone) {
-          fetch(MedVaultOffline.API_BASE+'/api/customers', {
-            method:'POST',
-            headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
-            body: JSON.stringify({ name: cust, phone: custPhone, total_spent: tot })
-          }).catch(()=>{});
-        }
+    // Push through the sync queue (the only path a sale takes to the
+    // server now — see recordSaleLocal). This both submits the sale and,
+    // on success, reconciles the local record with the server's copy.
+    MedVaultOffline.pushToServer(token).then(() => {
+      if (cust && cust !== 'Walk-in' && custPhone) {
+        fetch(MedVaultOffline.API_BASE+'/api/customers', {
+          method:'POST',
+          headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+          body: JSON.stringify({ name: cust, phone: custPhone, total_spent: tot })
+        }).catch(()=>{});
       }
     }).catch(()=>{});
     showToast('✅ Sale saved! Receipt: '+receipt_number);
@@ -5247,27 +5304,58 @@ dispatchPollTimer = setInterval(async () => {
 
 function loadSalesHistory(resetPage = false) {
   if (resetPage) salesPage = 1;
-  const allSales = MedVaultOffline.getSales(1000);
+
+  // Paint instantly from local cache so the page never looks empty while
+  // the network request is in flight.
+  renderSalesHistoryFrom(MedVaultOffline.getSales(1000));
+
+  // Then refresh from the live backend — this is the actual fix for sales
+  // "disappearing": the local cache is a bounded, best-effort mirror, but
+  // the backend/Postgres is the permanent record. Sales History should
+  // always end up showing what the server has, not just what happens to
+  // still be in local storage.
+  const token = localStorage.getItem('mv_token');
+  if (token && MedVaultOffline.isOnline()) {
+    fetch(`${MedVaultOffline.API_BASE}/api/sales?page=${salesPage}&limit=${SALES_PAGE_SIZE}`, {
+      headers: { 'Authorization': 'Bearer ' + token }
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data || !Array.isArray(data.sales)) return;
+        // Keep the local cache in sync with what we just saw, merging
+        // rather than overwriting so nothing else gets lost.
+        MedVaultOffline.mergeTable('sales', data.sales, {keepUnsynced:true});
+        renderSalesPage(data.sales, data.pagination?.total ?? data.sales.length, data.pagination?.pages ?? 1);
+      })
+      .catch(() => {}); // offline / network error — cached render above stands
+  }
+}
+
+function renderSalesHistoryFrom(allSales) {
   const totalPages = Math.max(1, Math.ceil(allSales.length / SALES_PAGE_SIZE));
   if (salesPage > totalPages) salesPage = totalPages;
   const start = (salesPage - 1) * SALES_PAGE_SIZE;
   const sales = allSales.slice(start, start + SALES_PAGE_SIZE);
+  renderSalesPage(sales, allSales.length, totalPages);
+}
 
+function renderSalesPage(sales, total, totalPages) {
   document.getElementById('sHistory').innerHTML = sales.map(s => {
     const mc = s.payment_method==='cash'?'ok':s.payment_method?.includes('mtn')?'low':'online';
+    const voidTag = s.voided_at ? '<span class="offline-tag" title="'+(s.void_reason||'Voided')+'">🚫 voided</span>' : '';
     return `<tr>
-      <td style="font-family:'Syne',sans-serif;font-weight:700;font-size:11px;color:var(--accent)">${s.receipt_number||'—'}${s._offline?'<span class="offline-tag">📴</span>':''}</td>
+      <td style="font-family:'Syne',sans-serif;font-weight:700;font-size:11px;color:var(--accent)">${s.receipt_number||'—'}${s._offline?'<span class="offline-tag">📴</span>':''}${voidTag}</td>
       <td style="font-size:13px;font-weight:500">${s.customer_name||'Walk-in'}</td>
       <td style="font-family:'Syne',sans-serif;font-weight:700">UGX ${parseInt(s.total_amount||0).toLocaleString()}</td>
       <td><span class="pill ${mc}" style="font-size:10px">${s.payment_method||'—'}</span></td>
     </tr>`;
   }).join('') || '<tr><td colspan="4" style="text-align:center;padding:16px;color:var(--muted)">No sales yet</td></tr>';
-  document.getElementById('salesTodayRev').textContent = 'UGX ' + MedVaultOffline.getDashboardStats().revenueToday.toLocaleString();
-  document.getElementById('salesTodayTx').textContent  = MedVaultOffline.getDashboardStats().transactionsToday;
-  document.getElementById('salesTotalCount').textContent = allSales.length;
-  document.getElementById('rcptId').textContent = 'RCP-'+new Date().getFullYear()+'-'+String(allSales.length+1).padStart(4,'0');
-
-  renderSalesPagination(allSales.length, totalPages);
+  const stats = MedVaultOffline.getDashboardStats();
+  document.getElementById('salesTodayRev').textContent = 'UGX ' + stats.revenueToday.toLocaleString();
+  document.getElementById('salesTodayTx').textContent  = stats.transactionsToday;
+  document.getElementById('salesTotalCount').textContent = total;
+  document.getElementById('rcptId').textContent = 'RCP-'+new Date().getFullYear()+'-'+String(total+1).padStart(4,'0');
+  renderSalesPagination(total, totalPages);
 }
 
 function renderSalesPagination(total, totalPages) {
@@ -5291,6 +5379,26 @@ function renderSalesPagination(total, totalPages) {
     </div>`;
 }
 function salesPageNav(dir) { salesPage += dir; loadSalesHistory(); }
+
+async function backupSalesNow() {
+  const token = localStorage.getItem('mv_token');
+  if (!token) return;
+  if (!MedVaultOffline.isOnline()) { showToast('Connect to the internet to back up sales', 'warn'); return; }
+  try {
+    const res = await fetch(`${MedVaultOffline.API_BASE}/api/sales/export`, { headers: { 'Authorization': 'Bearer ' + token } });
+    if (!res.ok) throw new Error('Export failed');
+    const data = await res.json();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = `medvault-sales-backup-${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    showToast(`✅ Backed up ${data.count} sale(s)`);
+  } catch (e) {
+    showToast('❌ Backup failed: ' + e.message, 'warn');
+  }
+}
 
 // ═══════════════════════════════════════════════════════════
 // ORDERS
@@ -9317,23 +9425,24 @@ function completeSale() {
     showToast('✅ Sale saved offline! Will sync when reconnected.', 'warn');
   } else {
     const t = localStorage.getItem('mv_token');
-    fetch(MedVaultOffline.API_BASE + '/api/sales', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + t },
-      body: JSON.stringify(saleData),
-    }).then(async r => {
-      if (r.ok) {
-        const cd = await r.json().catch(() => ({}));
-        if (cd.loyalty?.points_earned > 0) {
-          showToast(`⭐ +${cd.loyalty.points_earned} loyalty point(s) earned!`);
-        }
-        if (cust && cust !== 'Walk-in' && custPhone) {
-          fetch(MedVaultOffline.API_BASE + '/api/customers', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + t },
-            body: JSON.stringify({ name: cust, phone: custPhone, total_spent: tot }),
-          }).catch(() => {});
-        }
+    // Push through the sync queue — the single path a sale takes to the
+    // server (see recordSaleLocal). Previously this also fired an extra
+    // direct POST with the *original* saleData (no client_txn_id), so a
+    // sale made while online was submitted twice and created two rows in
+    // Postgres: once via the queued/idempotent path and once via this
+    // duplicate call. Removed; we now just push the queue and read back
+    // the loyalty result the server attached to the reconciled record.
+    MedVaultOffline.pushToServer(t).then(({results}) => {
+      const mine = results?.find(r => r.action?.body?.client_txn_id === sale.client_txn_id);
+      if (mine?.response?.loyalty?.points_earned > 0) {
+        showToast(`⭐ +${mine.response.loyalty.points_earned} loyalty point(s) earned!`);
+      }
+      if (cust && cust !== 'Walk-in' && custPhone) {
+        fetch(MedVaultOffline.API_BASE + '/api/customers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + t },
+          body: JSON.stringify({ name: cust, phone: custPhone, total_spent: tot }),
+        }).catch(() => {});
       }
     }).catch(() => {});
     showToast('✅ Sale saved! Receipt: ' + receipt_number);
