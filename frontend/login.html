@@ -111,11 +111,11 @@ footer{padding:24px 40px;border-top:1px solid var(--border);display:flex;align-i
 
     <div class="card-header">
       <div class="card-icon">💊</div>
-      <div class="card-title">Welcome back</div>
-      <div class="card-sub">Sign in to your MedVault pharmacy dashboard</div>
+      <div class="card-title" id="cardTitle">Welcome back</div>
+      <div class="card-sub" id="cardSub">Sign in to your MedVault pharmacy dashboard</div>
     </div>
 
-    <div class="card-body">
+    <div class="card-body" id="loginPanel">
 
       <!-- Error banner -->
       <div class="error-banner" id="errorBanner">
@@ -143,12 +143,49 @@ footer{padding:24px 40px;border-top:1px solid var(--border);display:flex;align-i
       <!-- Submit -->
       <button class="submit-btn" id="loginBtn" onclick="doLogin()">🔐 Sign In to Dashboard</button>
 
+      <div style="text-align:center;margin-top:10px">
+        <a href="#" onclick="showForgotPanel();return false" style="color:var(--muted);font-size:12.5px;text-decoration:underline">Forgot password?</a>
+      </div>
+
       <div class="divider">or</div>
 
       <div style="text-align:center;font-size:13px;color:var(--muted)">
         Don't have an account? <a href="index.html#signup" style="color:var(--accent);font-weight:600">Start your free 14-day trial →</a>
       </div>
 
+    </div>
+
+    <!-- FORGOT PASSWORD PANEL (hidden by default) -->
+    <div class="card-body" id="forgotPanel" style="display:none">
+      <div class="fg">
+        <label class="fl" style="margin-bottom:10px;display:block">Enter the email on your MedVault account and we'll send you a link to reset your password.</label>
+        <div class="fi-wrap">
+          <input class="fi" id="forgotEmail" type="email" placeholder="your@email.com" onkeydown="if(event.key==='Enter')submitForgotPassword()"/>
+        </div>
+      </div>
+      <div id="forgotMsg" style="font-size:12.5px;color:var(--muted);margin-bottom:14px;display:none"></div>
+      <button class="submit-btn" id="forgotBtn" onclick="submitForgotPassword()">📧 Send reset link</button>
+      <div style="text-align:center;margin-top:12px">
+        <a href="#" onclick="showLoginPanel();return false" style="color:var(--muted);font-size:12.5px;text-decoration:underline">← Back to sign in</a>
+      </div>
+    </div>
+
+    <!-- RESET PASSWORD PANEL (shown when arriving via ?resetToken=...) -->
+    <div class="card-body" id="resetPanel" style="display:none">
+      <div class="fg">
+        <label class="fl" for="newPass1">New password</label>
+        <div class="fi-wrap">
+          <input class="fi" id="newPass1" type="password" placeholder="At least 6 characters" autocomplete="new-password"/>
+        </div>
+      </div>
+      <div class="fg">
+        <label class="fl" for="newPass2">Confirm new password</label>
+        <div class="fi-wrap">
+          <input class="fi" id="newPass2" type="password" placeholder="Retype your new password" autocomplete="new-password" onkeydown="if(event.key==='Enter')submitResetPassword()"/>
+        </div>
+      </div>
+      <div id="resetMsg" style="font-size:12.5px;color:var(--muted);margin-bottom:14px;display:none"></div>
+      <button class="submit-btn" id="resetBtn" onclick="submitResetPassword()">🔑 Set new password</button>
     </div>
 
     <div class="card-footer">
@@ -191,6 +228,104 @@ function togglePassword() {
     btn.textContent = '👁';
   }
 }
+
+// ── Panel switching: sign in / forgot password / set new password ──
+function showLoginPanel() {
+  document.getElementById('loginPanel').style.display   = '';
+  document.getElementById('forgotPanel').style.display   = 'none';
+  document.getElementById('resetPanel').style.display    = 'none';
+  document.getElementById('cardTitle').textContent = 'Welcome back';
+  document.getElementById('cardSub').textContent   = 'Sign in to your MedVault pharmacy dashboard';
+}
+
+function showForgotPanel() {
+  document.getElementById('loginPanel').style.display  = 'none';
+  document.getElementById('forgotPanel').style.display  = '';
+  document.getElementById('resetPanel').style.display   = 'none';
+  document.getElementById('cardTitle').textContent = 'Reset your password';
+  document.getElementById('cardSub').textContent   = "We'll email you a secure link";
+  document.getElementById('forgotEmail').focus();
+}
+
+function showResetPanel() {
+  document.getElementById('loginPanel').style.display  = 'none';
+  document.getElementById('forgotPanel').style.display  = 'none';
+  document.getElementById('resetPanel').style.display   = '';
+  document.getElementById('cardTitle').textContent = 'Choose a new password';
+  document.getElementById('cardSub').textContent   = 'This link is single-use and expires in 1 hour';
+}
+
+function setPanelMsg(elId, msg, isError) {
+  const el = document.getElementById(elId);
+  el.textContent = msg;
+  el.style.color = isError ? '#ef4444' : 'var(--muted)';
+  el.style.display = msg ? 'block' : 'none';
+}
+
+async function submitForgotPassword() {
+  const email = document.getElementById('forgotEmail').value.trim();
+  if (!email) { setPanelMsg('forgotMsg', 'Please enter your email address.', true); return; }
+  const btn = document.getElementById('forgotBtn');
+  btn.disabled = true; btn.textContent = '⏳ Sending…';
+  setPanelMsg('forgotMsg', '', false);
+  try {
+    const r = await fetch(API_BASE + '/api/auth/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const data = await r.json().catch(() => ({}));
+    // Backend always returns a generic success message here regardless of
+    // whether the email exists — that's intentional (no account
+    // enumeration), so we always show it as success too.
+    setPanelMsg('forgotMsg', data.message || 'If an account exists with that email, a reset link has been sent. Check your inbox (and spam folder).', false);
+    btn.textContent = '✅ Link sent';
+  } catch (e) {
+    setPanelMsg('forgotMsg', 'Network error — please try again, or contact your MedVault admin for a manual reset.', true);
+    btn.disabled = false; btn.textContent = '📧 Send reset link';
+  }
+}
+
+async function submitResetPassword() {
+  const p1 = document.getElementById('newPass1').value;
+  const p2 = document.getElementById('newPass2').value;
+  if (!p1 || p1.length < 6) { setPanelMsg('resetMsg', 'Password must be at least 6 characters.', true); return; }
+  if (p1 !== p2) { setPanelMsg('resetMsg', 'Passwords do not match.', true); return; }
+  const btn = document.getElementById('resetBtn');
+  btn.disabled = true; btn.textContent = '⏳ Saving…';
+  try {
+    const r = await fetch(API_BASE + '/api/auth/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: window._resetToken, password: p1 }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      setPanelMsg('resetMsg', data.error || 'This link is invalid or has expired. Please request a new one.', true);
+      btn.disabled = false; btn.textContent = '🔑 Set new password';
+      return;
+    }
+    setPanelMsg('resetMsg', '✅ Password updated! Redirecting to sign in…', false);
+    setTimeout(() => {
+      window.history.replaceState({}, '', 'login.html');
+      showLoginPanel();
+      btn.disabled = false; btn.textContent = '🔑 Set new password';
+    }, 1500);
+  } catch (e) {
+    setPanelMsg('resetMsg', 'Network error — please try again.', true);
+    btn.disabled = false; btn.textContent = '🔑 Set new password';
+  }
+}
+
+// Arriving from the emailed reset link? Jump straight to the reset panel.
+(function checkForResetToken() {
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('resetToken');
+  if (token) {
+    window._resetToken = token;
+    showResetPanel();
+  }
+})();
 
 function handleKey(e) {
   if (e.key === 'Enter') doLogin();

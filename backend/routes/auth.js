@@ -1,7 +1,9 @@
 'use strict';
 const err = require('./_err');
+const crypto = require('crypto');
+const { sendEmail, passwordResetEmailHtml } = require('../core/email');
 
-module.exports = function registerAuthRoutes(app, { query, pool, hash, compare, sign, auth, rateLimit }) {
+module.exports = function registerAuthRoutes(app, { query, pool, hash, compare, sign, auth, rateLimit, audit }) {
 
   app.post(
     '/api/auth/register',
@@ -153,4 +155,110 @@ module.exports = function registerAuthRoutes(app, { query, pool, hash, compare, 
       return err(res, 500, 'SERVER_ERROR', e.message);
     }
   });
+
+  // ============================================================
+  // SELF-SERVICE PASSWORD RESET (email-based, via Resend)
+  // ============================================================
+
+  // POST /api/auth/forgot-password
+  // Always responds with the same generic message whether or not the
+  // email exists — this prevents an attacker from using this endpoint
+  // to discover which emails are registered on the platform.
+  app.post(
+    '/api/auth/forgot-password',
+    rateLimit({ max: 3, windowMs: 15 * 60 * 1000, message: 'Too many reset requests from this device. Try again in 15 minutes.' }),
+    async (req, res) => {
+      const { email } = req.body;
+      if (!email) return err(res, 400, 'VALIDATION_REQUIRED', 'Email is required', 'email');
+      const generic = { message: 'If an account exists with that email, a password reset link has been sent.' };
+      try {
+        const u = await query(
+          `SELECT id, name, email FROM users WHERE email=$1 AND is_active=true`,
+          [email.toLowerCase().trim()]
+        );
+        if (!u.rows.length) return res.json(generic); // don't reveal non-existence
+        const user = u.rows[0];
+
+        // Raw token goes only in the email link. Only its SHA-256 hash is
+        // stored — mirrors how passwords themselves are never stored raw.
+        const rawToken   = crypto.randomBytes(32).toString('hex');
+        const tokenHash  = crypto.createHash('sha256').update(rawToken).digest('hex');
+        const expiresAt  = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+        const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket?.remoteAddress || null;
+
+        // Invalidate any earlier unused tokens for this user first, so only
+        // the most recently requested link can ever be used.
+        await query(`UPDATE password_resets SET used_at=NOW() WHERE user_id=$1 AND used_at IS NULL`, [user.id]);
+        await query(
+          `INSERT INTO password_resets (user_id, token_hash, expires_at, requested_ip) VALUES ($1,$2,$3,$4)`,
+          [user.id, tokenHash, expiresAt, ip]
+        );
+
+        const appUrl   = process.env.APP_URL || 'https://medvaultv3.vercel.app';
+        const resetUrl = `${appUrl}/login.html?resetToken=${rawToken}`;
+        const emailResult = await sendEmail({
+          to: user.email,
+          subject: 'Reset your MedVault password',
+          html: passwordResetEmailHtml({ name: user.name, resetUrl }),
+          text: `Hi ${user.name}, reset your MedVault password here (expires in 1 hour, single use): ${resetUrl}\n\nIf you didn't request this, you can ignore this email.`,
+        });
+        if (!emailResult.sent) {
+          // Not fatal to the request (still return generic success — see
+          // comment above), but must be visible in logs/audit for support
+          // to catch a broken Resend key etc. If this keeps failing, the
+          // admin manual reset (POST /api/admin/users/:id/reset-password)
+          // is the fallback path.
+          console.error(`[auth] Password reset email failed for user ${user.id} (${user.email}):`, emailResult.reason);
+        }
+
+        await audit(query, {
+          req, action: 'auth.password_reset_requested', entity: 'user', entityId: user.id,
+          payload: { email: user.email, email_sent: emailResult.sent, email_fail_reason: emailResult.sent ? null : emailResult.reason },
+        });
+
+        return res.json(generic);
+      } catch (e) {
+        return err(res, 500, 'SERVER_ERROR', e.message);
+      }
+    }
+  );
+
+  // POST /api/auth/reset-password
+  app.post(
+    '/api/auth/reset-password',
+    rateLimit({ max: 8, windowMs: 15 * 60 * 1000, message: 'Too many attempts. Try again in 15 minutes.' }),
+    async (req, res) => {
+      const { token, password } = req.body;
+      if (!token)    return err(res, 400, 'VALIDATION_REQUIRED', 'Reset token is required', 'token');
+      if (!password || password.length < 6)
+        return err(res, 400, 'VALIDATION_REQUIRED', 'Password must be at least 6 characters', 'password');
+      try {
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+        const r = await query(
+          `SELECT pr.id, pr.user_id, u.email
+           FROM password_resets pr JOIN users u ON u.id = pr.user_id
+           WHERE pr.token_hash=$1 AND pr.used_at IS NULL AND pr.expires_at > NOW()`,
+          [tokenHash]
+        );
+        if (!r.rows.length)
+          return err(res, 400, 'AUTH_RESET_INVALID', 'This reset link is invalid or has expired. Please request a new one.');
+        const resetRow = r.rows[0];
+
+        const pwHash = await hash(password);
+        await query(`UPDATE users SET password_hash=$1 WHERE id=$2`, [pwHash, resetRow.user_id]);
+        // Mark used, and defensively invalidate any other outstanding
+        // tokens for this user (e.g. if they requested the email twice).
+        await query(`UPDATE password_resets SET used_at=NOW() WHERE user_id=$1 AND used_at IS NULL`, [resetRow.user_id]);
+
+        await audit(query, {
+          req, action: 'auth.password_reset_completed', entity: 'user', entityId: resetRow.user_id,
+          payload: { email: resetRow.email },
+        });
+
+        res.json({ message: '✅ Password reset successfully. You can now log in with your new password.' });
+      } catch (e) {
+        return err(res, 500, 'SERVER_ERROR', e.message);
+      }
+    }
+  );
 };

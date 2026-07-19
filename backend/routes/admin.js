@@ -1,7 +1,8 @@
 'use strict';
 const err = require('./_err');
+const crypto = require('crypto');
 
-module.exports = function registerAdminRoutes(app, { query, auth, can, hash }) {
+module.exports = function registerAdminRoutes(app, { query, auth, can, hash, audit }) {
   const adminOnly = can('admin:platform');
 
   app.get('/api/admin/stats', auth, adminOnly, async (req, res) => {
@@ -179,13 +180,31 @@ module.exports = function registerAdminRoutes(app, { query, auth, can, hash }) {
     } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
   });
 
+  // Admin manual reset — the fallback for when self-service email reset
+  // isn't usable (no email service configured, user lost access to their
+  // inbox, etc). Generates a strong random password out-of-band; the
+  // platform admin is expected to relay it to the user securely (phone
+  // call, in person) rather than it going anywhere over email/SMS here.
   app.post('/api/admin/users/:id/reset-password', auth, adminOnly, async (req, res) => {
     try {
-      const u = await query(`SELECT email,phone FROM users u LEFT JOIN organisations o ON o.id=u.organisation_id WHERE u.id=$1`, [req.params.id]);
+      const u = await query(`SELECT id,email,name FROM users WHERE id=$1`, [req.params.id]);
       if (!u.rows.length) return err(res, 404, 'NOT_FOUND_USER', 'User not found', 'id');
-      const newPw   = 'MedVault' + Math.floor(1000 + Math.random() * 9000) + '!';
-      const pwHash  = await hash(newPw);
+      const target = u.rows[0];
+
+      // Cryptographically random, not the old predictable "MedVault####!"
+      // pattern (only 9,000 possible values via Math.random()).
+      const newPw  = crypto.randomBytes(9).toString('base64').replace(/\+/g, '8').replace(/\//g, '9');
+      const pwHash = await hash(newPw);
       await query(`UPDATE users SET password_hash=$1 WHERE id=$2`, [pwHash, req.params.id]);
+
+      // Security-sensitive action — always leaves a trace of who did this,
+      // to whom, and when, independent of the self-service reset's own
+      // audit trail (auth.password_reset_requested/completed).
+      await audit(query, {
+        req, action: 'auth.password_reset_by_admin', entity: 'user', entityId: target.id,
+        payload: { target_email: target.email, target_name: target.name },
+      });
+
       res.json({ success: true, new_password: newPw });
     } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
   });

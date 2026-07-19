@@ -1536,7 +1536,30 @@ async function runMigrations() {
          FROM sales s
          WHERE s.pharmacy_id = p.id
        ), 0)
-     )`
+     )`,
+
+    // =========================================================
+    // PASSWORD RESET (self-service, email-based)
+    // Only a SHA-256 hash of the reset token is ever stored — the raw
+    // token exists only in the emailed link, never in the database, so
+    // a database leak alone can't be used to hijack an account (same
+    // principle as never storing plaintext passwords).
+    // =========================================================
+    `CREATE TABLE IF NOT EXISTS password_resets (
+      id           SERIAL PRIMARY KEY,
+      user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token_hash   VARCHAR(128) NOT NULL,
+      expires_at   TIMESTAMPTZ NOT NULL,
+      used_at      TIMESTAMPTZ,
+      requested_ip VARCHAR(50),
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_password_resets_user  ON password_resets(user_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_password_resets_token ON password_resets(token_hash)`,
+    // Housekeeping: old expired/used tokens are harmless to keep (they're
+    // useless without the raw token anyway) but this index keeps lookups
+    // fast even after months of accumulation.
+    `CREATE INDEX IF NOT EXISTS idx_password_resets_expiry ON password_resets(expires_at)`
 
   ];
 
