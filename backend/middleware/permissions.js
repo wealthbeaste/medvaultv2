@@ -24,6 +24,7 @@ const PERMISSIONS = {
   // ── Inventory ────────────────────────────────────────────
   'inventory:read':           ['owner', 'manager', 'pharmacist', 'inventory_manager', 'cashier', 'dispensor', 'staff'],
   'inventory:write':          ['owner', 'manager', 'pharmacist', 'inventory_manager'],
+  'settings:write':           ['owner', 'manager'],
   'inventory:delete':         ['owner', 'manager', 'pharmacist', 'inventory_manager'],
   'inventory:alerts':         ['owner', 'manager', 'pharmacist', 'inventory_manager', 'cashier', 'staff', 'dispensor'],
 

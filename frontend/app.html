@@ -1631,6 +1631,11 @@ img,svg,video{max-width:100%;}
               <span class="tv" id="tLoyaltyDisc" style="color:var(--accent)">- UGX 0</span>
             </div>
 
+            <div class="trow" id="vatRow" style="display:none">
+              <span class="tl" style="color:var(--muted);font-size:11px">Incl. VAT (<span id="vatRateLabel">18</span>%)</span>
+              <span class="tv" id="tVat" style="color:var(--muted);font-size:11px;font-weight:600">UGX 0</span>
+            </div>
+
             <div class="trow grand">
 
               <span class="tl">
@@ -3603,6 +3608,7 @@ Or open: https://app.medvault.ug</div>
       <div style="margin-top:10px">
         <div class="rtr"><span>Subtotal</span><span id="rSub"></span></div>
         <div class="rtr"><span>Discount</span><span id="rDisc"></span></div>
+        <div class="rtr" id="rVatRow" style="display:none"><span>Incl. VAT (<span id="rVatRate"></span>%)</span><span id="rVat"></span></div>
         <div class="rtr rgrand"><span>TOTAL</span><span id="rTot"></span></div>
         <div class="rtr" style="margin-top:5px"><span>Payment</span><span id="rPay"></span></div>
         <div class="rtr" style="margin-top:5px"><span>Dispensed by</span><span id="rDisp" style="color:var(--muted)"></span></div>
@@ -4810,6 +4816,7 @@ function openEditDrugModal(id) {
   document.getElementById('adSupplier').value = d.supplier || '';
   document.getElementById('adThreshold').value = d.threshold ?? 20;
   document.getElementById('adRx').checked = !!d.requires_rx;
+  document.getElementById('adTaxType').value = d.tax_type || 'zero_rated';
 
   const btn = document.getElementById('addDrugBtn');
   if (btn) btn.textContent = '✅ Save Changes';
@@ -4829,6 +4836,7 @@ async function submitAddDrug() {
   const batch_number   = document.getElementById('batch_number').value.trim();
   const sku        = document.getElementById('drugSku').value.trim();
   const requires_rx= document.getElementById('adRx').checked;
+  const tax_type   = document.getElementById('adTaxType').value;
   const btn        = document.getElementById('addDrugBtn');
 
   if (!name)       { showToast('Drug name is required','warn'); return; }
@@ -4849,7 +4857,7 @@ async function submitAddDrug() {
       unit_price: parseFloat(unit_price), cost_price: parseFloat(cost_price||0),
       expiry_date: expiry_date||null, supplier, threshold: parseInt(threshold||20),
       barcode: barcode||null, sku: sku||null, batch_number: finalBatch,
-      requires_rx };
+      requires_rx, tax_type };
     console.log('Frontend: Sending drugData:', drugData);
 
     // Always save locally first (works offline)
@@ -5111,6 +5119,7 @@ function addToCart(id) {
   else cart.push({
     drug_id: id, drug_name: d.name, unit_price: d.unit_price, quantity: 1,
     batch_number: d.batch_number || null, expiry_date: d.expiry_date || null,
+    tax_type: d.tax_type || 'zero_rated',
   });
   document.getElementById('drugSrch').value = '';
   document.getElementById('drugDrop').classList.remove('open');
@@ -5128,6 +5137,8 @@ function renderCart() {
       const soon = days <= 30;
       meta.push(`<span style="${soon ? 'color:var(--danger);font-weight:600' : ''}">Exp ${new Date(c.expiry_date).toLocaleDateString('en-UG',{month:'short',year:'numeric'})}</span>`);
     }
+    const taxLabel = { vatable: 'VATABLE', zero_rated: 'ZERO-RATED', exempt: 'EXEMPT' }[c.tax_type] || 'ZERO-RATED';
+    meta.push(`<span style="opacity:0.7">${taxLabel}</span>`);
     return `<div class="citem">
     <div><div class="cinm">${c.drug_name}</div><div class="ciup">UGX ${parseInt(c.unit_price).toLocaleString()} each${meta.length ? ' · ' + meta.join(' · ') : ''}</div></div>
     <div class="qctrl"><button class="qbtn" onclick="cq(${i},-1)">−</button><div class="qnum">${c.quantity}</div><button class="qbtn" onclick="cq(${i},1)">+</button></div>
@@ -9230,6 +9241,8 @@ let _activePriceLevelId = null;
 let _loyaltyCustomerId  = null;
 let _loyaltyBalance     = 0;
 
+let _pharmacyVatRate = 18;
+
 /** Called when sales page loads — fetch price levels once */
 async function initSalesPriceLevels() {
   const base  = MedVaultOffline?.API_BASE || '';
@@ -9248,6 +9261,11 @@ async function initSalesPriceLevels() {
       sel.innerHTML = '<option value="">— Retail (default) —</option>' +
         extras.map(p => `<option value="${p.id}">${p.name}${p.discount_pct > 0 ? ' (-' + p.discount_pct + '%)' : ''}</option>`).join('');
     }
+  } catch (_) {}
+  try {
+    const r2 = await fetch(base + '/api/pharmacy/settings', { headers: { 'Authorization': 'Bearer ' + t } });
+    const d2 = await r2.json();
+    if (d2.vat_rate != null) _pharmacyVatRate = parseFloat(d2.vat_rate);
   } catch (_) {}
 }
 
@@ -9415,6 +9433,23 @@ function updTotals() {
   document.getElementById('tSub').textContent  = 'UGX ' + sub.toLocaleString();
   document.getElementById('tDisc').textContent = '- UGX ' + da.toLocaleString();
   document.getElementById('tTot').textContent  = 'UGX ' + tot.toLocaleString();
+
+  // VAT breakdown — informational only, prices are VAT-inclusive so this
+  // doesn't change the total, it just shows how much of it is tax (for
+  // items marked 'vatable' on the drug record).
+  const vatRow = document.getElementById('vatRow');
+  const vatable = cart.filter(c => c.tax_type === 'vatable');
+  if (vatable.length) {
+    const vatSum = vatable.reduce((s, c) => {
+      const lineTotal = c.unit_price * c.quantity;
+      return s + (lineTotal - lineTotal / (1 + _pharmacyVatRate / 100));
+    }, 0);
+    document.getElementById('vatRateLabel').textContent = _pharmacyVatRate;
+    document.getElementById('tVat').textContent = 'UGX ' + Math.round(vatSum).toLocaleString();
+    if (vatRow) vatRow.style.display = '';
+  } else if (vatRow) {
+    vatRow.style.display = 'none';
+  }
 }
 
 // Patch custPh input to trigger loyalty lookup on blur
@@ -9467,6 +9502,19 @@ function completeSale() {
   document.getElementById('rSub').textContent  = 'UGX ' + sub.toLocaleString();
   document.getElementById('rDisc').textContent = disc || redeemPts ? `- UGX ${(da + redeemDisc).toLocaleString()}` : 'None';
   document.getElementById('rTot').textContent  = 'UGX ' + tot.toLocaleString();
+  const vatableItems = cart.filter(c => c.tax_type === 'vatable');
+  const rVatRow = document.getElementById('rVatRow');
+  if (vatableItems.length && rVatRow) {
+    const vatSum = vatableItems.reduce((s, c) => {
+      const lineTotal = c.unit_price * c.quantity;
+      return s + (lineTotal - lineTotal / (1 + _pharmacyVatRate / 100));
+    }, 0);
+    document.getElementById('rVatRate').textContent = _pharmacyVatRate;
+    document.getElementById('rVat').textContent = 'UGX ' + Math.round(vatSum).toLocaleString();
+    rVatRow.style.display = '';
+  } else if (rVatRow) {
+    rVatRow.style.display = 'none';
+  }
   document.getElementById('rPay').textContent  = payMethod;
   document.getElementById('rDisp').textContent = getCurrentUser()?.name || currentUser?.name || '—';
   document.getElementById('rItems').innerHTML  = cart.map(c =>
@@ -11406,6 +11454,15 @@ async function submitDept() {
         <div style="display:flex;flex-direction:column;gap:5px">
           <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Batch Number <span style="font-weight:400;text-transform:none;letter-spacing:0">(auto if blank)</span></label>
           <input id="batch_number" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. BN-2025-001 (auto-generated if empty)"/>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Tax Type</label>
+          <select id="adTaxType" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px">
+            <option value="zero_rated">Zero-rated</option>
+            <option value="vatable">VATable</option>
+            <option value="exempt">Exempt</option>
+          </select>
         </div>
 
         <div style="display:flex;flex-direction:column;gap:5px">

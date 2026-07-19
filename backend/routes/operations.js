@@ -244,6 +244,14 @@ module.exports = function registerOperationsRoutes(app, { query, pool, getNextRe
           break;
         } catch (insertErr) {
           if (insertErr.code === '23505' && String(insertErr.constraint || '').includes('receipt_number') && attempts < 5) {
+            // Same fix as POST /api/sales: once a statement inside a
+            // transaction fails, Postgres poisons the whole transaction
+            // until an explicit ROLLBACK — retrying another statement on
+            // it without one fails immediately with "current transaction
+            // is aborted, commands ignored until end of transaction
+            // block". Must roll back and start fresh before the retry.
+            await client.query('ROLLBACK');
+            await client.query('BEGIN');
             receipt_number = await getNextReceiptNumber(pharmacyId);
             continue;
           }
@@ -251,10 +259,29 @@ module.exports = function registerOperationsRoutes(app, { query, pool, getNextRe
         }
       }
 
+      // VAT snapshot — same logic/columns as POST /api/sales, so a
+      // dispatch-collected sale reports identically to a direct one.
+      const vatRateRes = await client.query(`SELECT vat_rate FROM pharmacies WHERE id=$1`, [pharmacyId]);
+      const vatRate = parseFloat(vatRateRes.rows[0]?.vat_rate ?? 18);
+      const dItemDrugIds = items.map(i => i.drug_id).filter(Boolean);
+      let dTaxTypeByDrug = {};
+      if (dItemDrugIds.length) {
+        const taxRes = await client.query(
+          `SELECT id, tax_type FROM drugs WHERE id = ANY($1::int[]) AND pharmacy_id=$2`,
+          [dItemDrugIds, pharmacyId]
+        );
+        dTaxTypeByDrug = Object.fromEntries(taxRes.rows.map(r => [r.id, r.tax_type]));
+      }
+
       for (const item of items) {
+        const lineTotal = item.unit_price * item.quantity;
+        const taxType = (item.drug_id && dTaxTypeByDrug[item.drug_id]) || 'zero_rated';
+        const taxAmount = taxType === 'vatable'
+          ? Math.round(lineTotal - lineTotal / (1 + vatRate / 100))
+          : 0;
         const siRes = await client.query(
-          `INSERT INTO sale_items (sale_id,drug_id,drug_name,quantity,unit_price,total_price) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-          [sale.id, item.drug_id || null, item.drug_name, item.quantity, item.unit_price, item.unit_price * item.quantity]
+          `INSERT INTO sale_items (sale_id,drug_id,drug_name,quantity,unit_price,total_price,tax_type,tax_amount) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+          [sale.id, item.drug_id || null, item.drug_name, item.quantity, item.unit_price, lineTotal, taxType, taxAmount]
         );
         insertedItems.push(siRes.rows[0]);
         if (item.drug_id) {

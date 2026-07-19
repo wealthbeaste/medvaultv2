@@ -1567,7 +1567,31 @@ async function runMigrations() {
     // limit" the way Vitaria-style POS systems do, using the
     // outstanding balance already tracked in ar_ledger.
     // =========================================================
-    `ALTER TABLE customers ADD COLUMN IF NOT EXISTS credit_limit NUMERIC(14,2) NOT NULL DEFAULT 0`
+    `ALTER TABLE customers ADD COLUMN IF NOT EXISTS credit_limit NUMERIC(14,2) NOT NULL DEFAULT 0`,
+
+    // =========================================================
+    // POS checkout enhancements — VAT / tax type per item
+    // Mirrors the ZERORATED / VATABLE tax column seen on other
+    // regional POS systems (e.g. Vitaria). Uganda's standard VAT
+    // rate is 18%, but it's stored per-pharmacy (not hardcoded)
+    // so other markets/rates can be supported later.
+    // =========================================================
+
+    // Default is 'zero_rated' rather than 'vatable' — most staple/
+    // essential medicines are commonly zero-rated or VAT-exempt, and
+    // defaulting existing inventory to VAT-free avoids silently
+    // inflating prices for pharmacies that don't set this up. Owners
+    // can mark specific items 'vatable' as needed.
+    `ALTER TABLE drugs ADD COLUMN IF NOT EXISTS tax_type VARCHAR(20) NOT NULL DEFAULT 'zero_rated'`,
+    `ALTER TABLE pharmacies ADD COLUMN IF NOT EXISTS vat_rate NUMERIC(5,2) NOT NULL DEFAULT 18.00`,
+
+    // Snapshot the tax type + computed VAT amount onto sale_items at the
+    // moment of sale — same reasoning as unit_price already being
+    // snapshotted there: a drug's tax_type or the pharmacy's vat_rate
+    // could change later, but a receipt/VAT return must reflect what was
+    // actually true at the time of that specific sale.
+    `ALTER TABLE sale_items ADD COLUMN IF NOT EXISTS tax_type VARCHAR(20) NOT NULL DEFAULT 'zero_rated'`,
+    `ALTER TABLE sale_items ADD COLUMN IF NOT EXISTS tax_amount NUMERIC(12,2) NOT NULL DEFAULT 0`
 
   ];
 
