@@ -8,7 +8,7 @@ module.exports = function registerCustomersRoutes(app, { query, auth, validate, 
     const { pharmacyId } = req.user;
     const { search } = req.query;
     try {
-      let sql = `SELECT id,pharmacy_id,name,phone,email,notes,total_spent,
+      let sql = `SELECT id,pharmacy_id,name,phone,email,notes,total_spent,credit_limit,
                  visit_count AS order_count,created_at,updated_at
                  FROM customers WHERE pharmacy_id=$1`;
       const params = [pharmacyId];
@@ -16,6 +16,38 @@ module.exports = function registerCustomersRoutes(app, { query, auth, validate, 
       sql += ' ORDER BY total_spent DESC';
       const result = await query(sql, params);
       res.json({ customers: result.rows });
+    } catch (e) {
+      return err(res, 500, 'SERVER_ERROR', e.message);
+    }
+  });
+
+  // GET /api/customers/:id/credit-summary — for the checkout screen:
+  // "Credit: UGX X used of Y limit", mirroring the Prepayment/Credit
+  // Limit/Receivables strip on Vitaria-style POS systems. Uses the
+  // existing ar_ledger running balance rather than a separate tally.
+  app.get('/api/customers/:id/credit-summary', auth, async (req, res) => {
+    const { pharmacyId } = req.user;
+    try {
+      const cust = await query(
+        `SELECT id, name, credit_limit FROM customers WHERE id=$1 AND pharmacy_id=$2`,
+        [req.params.id, pharmacyId]
+      );
+      if (!cust.rows.length) return err(res, 404, 'NOT_FOUND_CUSTOMER', 'Customer not found', 'id');
+
+      const bal = await query(
+        `SELECT COALESCE(SUM(CASE WHEN type='invoice' THEN amount ELSE -amount END),0) AS outstanding
+         FROM ar_ledger WHERE customer_id=$1 AND pharmacy_id=$2`,
+        [req.params.id, pharmacyId]
+      );
+      const creditLimit  = parseFloat(cust.rows[0].credit_limit || 0);
+      const outstanding  = parseFloat(bal.rows[0].outstanding || 0);
+      res.json({
+        customer_id: cust.rows[0].id,
+        credit_limit: creditLimit,
+        outstanding_balance: outstanding,
+        available_credit: Math.max(0, creditLimit - outstanding),
+        over_limit: creditLimit > 0 && outstanding > creditLimit,
+      });
     } catch (e) {
       return err(res, 500, 'SERVER_ERROR', e.message);
     }
@@ -45,7 +77,7 @@ module.exports = function registerCustomersRoutes(app, { query, auth, validate, 
   // POST /api/customers/manual
   app.post('/api/customers/manual', auth, validate(schemas.customer), async (req, res) => {
     const { pharmacyId } = req.user;
-    const { name, phone, email, notes } = req.body;
+    const { name, phone, email, notes, credit_limit } = req.body;
     if (!name) return err(res, 400, 'VALIDATION_REQUIRED', 'Customer name is required', 'name');
     try {
       const existing = phone
@@ -53,8 +85,8 @@ module.exports = function registerCustomersRoutes(app, { query, auth, validate, 
         : await query(`SELECT id FROM customers WHERE pharmacy_id=$1 AND name ILIKE $2 LIMIT 1`, [pharmacyId, name]);
       if (existing.rows.length) return err(res, 409, 'CONFLICT_CUSTOMER_EXISTS', 'Customer with this phone/name already exists', phone ? 'phone' : 'name');
       const r = await query(
-        `INSERT INTO customers (pharmacy_id,name,phone,email,notes,visit_count,total_spent) VALUES ($1,$2,$3,$4,$5,0,0) RETURNING *`,
-        [pharmacyId, name.trim(), phone || null, email || null, notes || null]
+        `INSERT INTO customers (pharmacy_id,name,phone,email,notes,credit_limit,visit_count,total_spent) VALUES ($1,$2,$3,$4,$5,$6,0,0) RETURNING *`,
+        [pharmacyId, name.trim(), phone || null, email || null, notes || null, parseFloat(credit_limit || 0)]
       );
       res.json({ customer: r.rows[0], created: true });
     } catch (e) {
@@ -93,12 +125,12 @@ module.exports = function registerCustomersRoutes(app, { query, auth, validate, 
   // PUT /api/customers/:id
   app.put('/api/customers/:id', auth, validate(schemas.customer), async (req, res) => {
     const { pharmacyId } = req.user;
-    const { name, phone, email, notes } = req.body;
+    const { name, phone, email, notes, credit_limit } = req.body;
     if (!name) return err(res, 400, 'VALIDATION_REQUIRED', 'Customer name is required', 'name');
     try {
       const r = await query(
-        `UPDATE customers SET name=$1,phone=$2,email=$3,notes=$4,updated_at=NOW() WHERE id=$5 AND pharmacy_id=$6 RETURNING *`,
-        [name.trim(), phone || null, email || null, notes || null, req.params.id, pharmacyId]
+        `UPDATE customers SET name=$1,phone=$2,email=$3,notes=$4,credit_limit=COALESCE($5,credit_limit),updated_at=NOW() WHERE id=$6 AND pharmacy_id=$7 RETURNING *`,
+        [name.trim(), phone || null, email || null, notes || null, credit_limit != null ? parseFloat(credit_limit) : null, req.params.id, pharmacyId]
       );
       if (!r.rows.length) return err(res, 404, 'NOT_FOUND_CUSTOMER', 'Customer not found', 'id');
       res.json({ customer: r.rows[0], updated: true });

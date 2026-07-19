@@ -1581,6 +1581,24 @@ img,svg,video{max-width:100%;}
             <div id="loyaltyEarnPreview" style="font-size:11px;color:var(--muted);margin-top:6px"></div>
           </div>
 
+          <!-- CREDIT ACCOUNT WIDGET -->
+          <div id="creditWidget" style="display:none;background:rgba(255,159,10,0.06);border:1px solid rgba(255,159,10,0.25);border-radius:10px;padding:12px 14px;margin-bottom:12px">
+            <div style="font-size:12px;font-weight:700;color:var(--warn);margin-bottom:8px">💳 Credit Account</div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:4px">
+              <span>Outstanding balance</span>
+              <span id="creditOutstanding" style="font-weight:700;color:var(--text)">UGX 0</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:4px">
+              <span>Credit limit</span>
+              <span id="creditLimitVal" style="font-weight:700;color:var(--text)">UGX 0</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted)">
+              <span>Available credit</span>
+              <span id="creditAvailable" style="font-weight:800;color:var(--accent)">UGX 0</span>
+            </div>
+            <div id="creditOverLimitWarn" style="display:none;font-size:11px;color:var(--danger);margin-top:6px;font-weight:600">⚠️ This customer is over their credit limit</div>
+          </div>
+
           <!-- TOTALS -->
           <div class="totbox">
 
@@ -1851,6 +1869,10 @@ img,svg,video{max-width:100%;}
         <div style="display:flex;flex-direction:column;gap:5px">
           <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Notes</label>
           <input id="custNotes" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Diabetic patient, prefers generics"/>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Credit Limit (UGX)</label>
+          <input id="custCreditLimit" type="number" min="0" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="0 = no credit account"/>
         </div>
       </div>
       <div style="display:flex;gap:10px;margin-top:20px">
@@ -5072,7 +5094,7 @@ function searchDrug() {
   if (!q) { dd.classList.remove('open'); return; }
   const m = allDrugs.filter(d => d.name.toLowerCase().includes(q)).slice(0, 8);
   if (!m.length) { dd.classList.remove('open'); return; }
-  dd.innerHTML = m.map(d => `<div class="ddi" onclick="addToCart(${d.id},'${d.name.replace(/'/g,"\x27")}',${d.unit_price})">
+  dd.innerHTML = m.map(d => `<div class="ddi" onclick="addToCart(${d.id})">
     <div><div style="font-weight:500">${d.name}</div><div style="font-size:11px;color:var(--muted)">${d.category}</div></div>
     <div style="text-align:right"><div style="color:var(--accent);font-weight:600">UGX ${parseInt(d.unit_price).toLocaleString()}</div>
     <div style="font-size:11px;color:var(--muted)">${d.quantity} in stock</div></div>
@@ -5081,23 +5103,38 @@ function searchDrug() {
 }
 document.addEventListener('click', e => { if (!e.target.closest('.dsrch')) document.getElementById('drugDrop')?.classList.remove('open'); });
 
-function addToCart(id, name, price) {
+function addToCart(id) {
+  const d = (allDrugs || MedVaultOffline.getDrugs()).find(x => x.id === id);
+  if (!d) return;
   const ex = cart.find(x => x.drug_id === id);
-  if (ex) ex.quantity++; else cart.push({ drug_id: id, drug_name: name, unit_price: price, quantity: 1 });
+  if (ex) ex.quantity++;
+  else cart.push({
+    drug_id: id, drug_name: d.name, unit_price: d.unit_price, quantity: 1,
+    batch_number: d.batch_number || null, expiry_date: d.expiry_date || null,
+  });
   document.getElementById('drugSrch').value = '';
   document.getElementById('drugDrop').classList.remove('open');
-  renderCart(); updTotals(); showToast('Added: ' + name);
+  renderCart(); updTotals(); showToast('Added: ' + d.name);
 }
 function renderCart() {
   const el = document.getElementById('cartEl');
   document.getElementById('cartCount').textContent = cart.reduce((s,c)=>s+c.quantity,0);
   if (!cart.length) { el.innerHTML='<div class="cempty">💊 No items. Search above to add drugs.</div>'; document.getElementById('chargeBtn').disabled=true; const db=document.getElementById('dispatchBtn'); if(db) db.disabled=true; return; }
-  el.innerHTML = cart.map((c,i) => `<div class="citem">
-    <div><div class="cinm">${c.drug_name}</div><div class="ciup">UGX ${parseInt(c.unit_price).toLocaleString()} each</div></div>
+  el.innerHTML = cart.map((c,i) => {
+    const meta = [];
+    if (c.batch_number) meta.push(`Batch ${c.batch_number}`);
+    if (c.expiry_date) {
+      const days = Math.ceil((new Date(c.expiry_date) - new Date()) / 86400000);
+      const soon = days <= 30;
+      meta.push(`<span style="${soon ? 'color:var(--danger);font-weight:600' : ''}">Exp ${new Date(c.expiry_date).toLocaleDateString('en-UG',{month:'short',year:'numeric'})}</span>`);
+    }
+    return `<div class="citem">
+    <div><div class="cinm">${c.drug_name}</div><div class="ciup">UGX ${parseInt(c.unit_price).toLocaleString()} each${meta.length ? ' · ' + meta.join(' · ') : ''}</div></div>
     <div class="qctrl"><button class="qbtn" onclick="cq(${i},-1)">−</button><div class="qnum">${c.quantity}</div><button class="qbtn" onclick="cq(${i},1)">+</button></div>
     <div class="citot">UGX ${(c.unit_price*c.quantity).toLocaleString()}</div>
     <div class="cirm" onclick="cr(${i})">✕</div>
-  </div>`).join('');
+  </div>`;
+  }).join('');
   document.getElementById('chargeBtn').disabled = false;
   const _db=document.getElementById('dispatchBtn'); if(_db) _db.disabled=false;
 }
@@ -5570,7 +5607,7 @@ function openAddCustomer() {
   editingCustomerId = null;
   document.getElementById('addCustTitle').textContent = '👤 Add Customer';
   document.getElementById('addCustBtn').textContent = '✅ Save Customer';
-  ['custName','custPhone','custEmail','custNotes'].forEach(id => document.getElementById(id).value = '');
+  ['custName','custPhone','custEmail','custNotes','custCreditLimit'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('addCustomerOverlay').style.display = 'flex';
 }
 
@@ -5582,6 +5619,7 @@ function editCustomer(c) {
   document.getElementById('custPhone').value = c.phone || '';
   document.getElementById('custEmail').value = c.email || '';
   document.getElementById('custNotes').value = c.notes || '';
+  document.getElementById('custCreditLimit').value = c.credit_limit || '';
   document.getElementById('addCustomerOverlay').style.display = 'flex';
 }
 
@@ -5595,6 +5633,7 @@ async function submitAddCustomer() {
   const phone = document.getElementById('custPhone').value.trim();
   const email = document.getElementById('custEmail').value.trim();
   const notes = document.getElementById('custNotes').value.trim();
+  const credit_limit = parseFloat(document.getElementById('custCreditLimit').value) || 0;
   if (!name) { showToast('Customer name is required','warn'); return; }
   const btn = document.getElementById('addCustBtn');
   btn.disabled = true; btn.textContent = '⏳ Saving…';
@@ -5609,7 +5648,7 @@ async function submitAddCustomer() {
     const method = editingCustomerId ? 'PUT' : 'POST';
     const res = await fetch(url, {
       method, headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, phone, email, notes }),
+      body: JSON.stringify({ name, phone, email, notes, credit_limit }),
     });
     const data = await res.json();
     if (data.error) { showToast('❌ ' + data.error, 'error'); return; }
@@ -9237,9 +9276,10 @@ async function checkLoyaltyOnCustomer(phone) {
     });
     const custData = await custRes.json();
     const cust = custData.customers?.find(c => c.phone === phone);
-    if (!cust) { hideLoyaltyWidget(); return; }
+    if (!cust) { hideLoyaltyWidget(); hideCreditWidget(); return; }
 
     _loyaltyCustomerId = cust.id;
+    checkCreditOnCustomer(cust.id);
 
     const loyRes = await fetch(`${base}/api/loyalty/${cust.id}`, {
       headers: { 'Authorization': 'Bearer ' + t },
@@ -9254,6 +9294,34 @@ async function checkLoyaltyOnCustomer(phone) {
       showLoyaltyEnrollPrompt(cust);
     }
   } catch (_) { hideLoyaltyWidget(); }
+}
+
+/** Called once a registered customer is matched — shows the Vitaria-style
+ *  "Credit: UGX X used of Y limit" strip using the ar_ledger balance. Only
+ *  renders anything if the customer actually has a credit_limit set, so
+ *  walk-in/cash customers never see an empty box. */
+async function checkCreditOnCustomer(customerId) {
+  if (!customerId) { hideCreditWidget(); return; }
+  const base = MedVaultOffline?.API_BASE || '';
+  const t    = localStorage.getItem('mv_token');
+  if (!t) return;
+  try {
+    const r = await fetch(`${base}/api/customers/${customerId}/credit-summary`, {
+      headers: { 'Authorization': 'Bearer ' + t },
+    });
+    if (!r.ok) { hideCreditWidget(); return; }
+    const d = await r.json();
+    if (!d.credit_limit || d.credit_limit <= 0) { hideCreditWidget(); return; }
+    document.getElementById('creditOutstanding').textContent = 'UGX ' + Math.round(d.outstanding_balance).toLocaleString();
+    document.getElementById('creditLimitVal').textContent    = 'UGX ' + Math.round(d.credit_limit).toLocaleString();
+    document.getElementById('creditAvailable').textContent   = 'UGX ' + Math.round(d.available_credit).toLocaleString();
+    document.getElementById('creditOverLimitWarn').style.display = d.over_limit ? '' : 'none';
+    document.getElementById('creditWidget').style.display = '';
+  } catch (_) { hideCreditWidget(); }
+}
+function hideCreditWidget() {
+  const w = document.getElementById('creditWidget');
+  if (w) w.style.display = 'none';
 }
 
 function showLoyaltyWidget(loyData) {
@@ -9416,6 +9484,7 @@ function completeSale() {
   document.getElementById('discInp').value = '';
   if (document.getElementById('loyaltyRedeemInput')) document.getElementById('loyaltyRedeemInput').value = '';
   hideLoyaltyWidget();
+  hideCreditWidget();
   _activePriceLevelId = null;
   const psel = document.getElementById('priceLevelSel');
   if (psel) psel.value = '';

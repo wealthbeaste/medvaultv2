@@ -1559,7 +1559,15 @@ async function runMigrations() {
     // Housekeeping: old expired/used tokens are harmless to keep (they're
     // useless without the raw token anyway) but this index keeps lookups
     // fast even after months of accumulation.
-    `CREATE INDEX IF NOT EXISTS idx_password_resets_expiry ON password_resets(expires_at)`
+    `CREATE INDEX IF NOT EXISTS idx_password_resets_expiry ON password_resets(expires_at)`,
+
+    // =========================================================
+    // POS checkout enhancements — customer credit limit
+    // Lets the checkout screen show "Credit: UGX X used of Y
+    // limit" the way Vitaria-style POS systems do, using the
+    // outstanding balance already tracked in ar_ledger.
+    // =========================================================
+    `ALTER TABLE customers ADD COLUMN IF NOT EXISTS credit_limit NUMERIC(14,2) NOT NULL DEFAULT 0`
 
   ];
 
