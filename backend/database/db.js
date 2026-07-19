@@ -1591,7 +1591,37 @@ async function runMigrations() {
     // could change later, but a receipt/VAT return must reflect what was
     // actually true at the time of that specific sale.
     `ALTER TABLE sale_items ADD COLUMN IF NOT EXISTS tax_type VARCHAR(20) NOT NULL DEFAULT 'zero_rated'`,
-    `ALTER TABLE sale_items ADD COLUMN IF NOT EXISTS tax_amount NUMERIC(12,2) NOT NULL DEFAULT 0`
+    `ALTER TABLE sale_items ADD COLUMN IF NOT EXISTS tax_amount NUMERIC(12,2) NOT NULL DEFAULT 0`,
+
+    // =========================================================
+    // UNIT OF MEASURE
+    // Before this, `drugs.quantity` was a bare integer with no
+    // defined meaning — one drug's "200" might be 200 loose tablets,
+    // another's might be 200 boxes of 21. Nothing recorded which, so
+    // stock deduction, reordering, and per-unit pricing were all
+    // silently inconsistent between drugs.
+    //
+    // Fix: `quantity` is now ALWAYS in `unit_label` units (the
+    // smallest unit the pharmacy actually sells/dispenses — tablet,
+    // capsule, bottle, ml, piece, etc). `pack_size` is a separate,
+    // optional convenience number: how many unit_label units come in
+    // one pack as typically purchased from a supplier, so staff can
+    // receive stock by entering "5 packs" instead of doing the
+    // multiplication by hand — see GRN unit-of-measure UI.
+    //
+    // Defaults (unit_label='unit', pack_size=1) are a no-op for every
+    // existing drug — "1 unit = 1 unit" — so nothing already in
+    // inventory changes meaning or behaviour until an owner
+    // deliberately sets a more specific unit on a drug.
+    // =========================================================
+    `ALTER TABLE drugs ADD COLUMN IF NOT EXISTS unit_label VARCHAR(30) NOT NULL DEFAULT 'unit'`,
+    `ALTER TABLE drugs ADD COLUMN IF NOT EXISTS pack_size  INTEGER NOT NULL DEFAULT 1 CHECK (pack_size >= 1)`,
+
+    // Snapshot the unit label onto sale_items too — same rationale as
+    // tax_type/unit_price: a drug's unit_label could be edited later,
+    // but a historical receipt/report line must keep showing what the
+    // unit actually was at the moment of that sale.
+    `ALTER TABLE sale_items ADD COLUMN IF NOT EXISTS unit_label VARCHAR(30) NOT NULL DEFAULT 'unit'`
 
   ];
 

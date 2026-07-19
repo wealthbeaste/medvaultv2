@@ -4789,6 +4789,17 @@ function openAddDrugModal() {
   const btn = document.getElementById('addDrugBtn');
   if (btn) btn.textContent = '✅ Add Drug';
   document.getElementById('addDrugOverlay').classList.add('open');
+  updateQtyLabel();
+}
+
+// Keeps the "Quantity in Stock (___)" hint in sync with the chosen Unit,
+// so it's always clear what the number staff type actually counts.
+function updateQtyLabel() {
+  const sel  = document.getElementById('adUnitLabel');
+  const hint = document.getElementById('adQtyUnitHint');
+  if (!sel || !hint) return;
+  const label = sel.options[sel.selectedIndex]?.text || 'units';
+  hint.textContent = `(${label.toLowerCase()}s)`;
 }
 
 function closeAddDrug() {
@@ -4817,6 +4828,9 @@ function openEditDrugModal(id) {
   document.getElementById('adThreshold').value = d.threshold ?? 20;
   document.getElementById('adRx').checked = !!d.requires_rx;
   document.getElementById('adTaxType').value = d.tax_type || 'zero_rated';
+  document.getElementById('adUnitLabel').value = d.unit_label || 'unit';
+  document.getElementById('adPackSize').value = d.pack_size ?? 1;
+  updateQtyLabel();
 
   const btn = document.getElementById('addDrugBtn');
   if (btn) btn.textContent = '✅ Save Changes';
@@ -4837,6 +4851,8 @@ async function submitAddDrug() {
   const sku        = document.getElementById('drugSku').value.trim();
   const requires_rx= document.getElementById('adRx').checked;
   const tax_type   = document.getElementById('adTaxType').value;
+  const unit_label = document.getElementById('adUnitLabel').value;
+  const pack_size  = document.getElementById('adPackSize').value;
   const btn        = document.getElementById('addDrugBtn');
 
   if (!name)       { showToast('Drug name is required','warn'); return; }
@@ -4857,7 +4873,7 @@ async function submitAddDrug() {
       unit_price: parseFloat(unit_price), cost_price: parseFloat(cost_price||0),
       expiry_date: expiry_date||null, supplier, threshold: parseInt(threshold||20),
       barcode: barcode||null, sku: sku||null, batch_number: finalBatch,
-      requires_rx, tax_type };
+      requires_rx, tax_type, unit_label, pack_size: parseInt(pack_size) || 1 };
     console.log('Frontend: Sending drugData:', drugData);
 
     // Always save locally first (works offline)
@@ -5051,13 +5067,13 @@ function loadInventory(resetPage = false) {
     return `<tr>
       <td><strong>${d.name}</strong>${d._offline?'<span class="offline-tag">📴</span>':''}<div style="font-size:11px;color:var(--muted)">${d.supplier||'—'}</div></td>
       <td><span style="background:rgba(59,130,246,0.12);color:#93c5fd;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600">${d.category||'—'}</span></td>
-      <td><strong>${d.quantity}</strong><span style="color:var(--muted);font-size:11px"> / ${d.max_quantity||'—'}</span></td>
+      <td><strong>${d.quantity}</strong> <span style="color:var(--muted);font-size:11px">${(d.unit_label||'unit')}${d.quantity===1?'':'s'}</span><span style="color:var(--muted);font-size:11px"> / ${d.max_quantity||'—'}</span></td>
       <td><div class="sb"><div class="sf ${fc}" style="width:${pct}%;height:100%"></div></div></td>
       <td>UGX ${parseInt(d.unit_price||0).toLocaleString()}</td>
       <td style="${ec}">${exp?exp.toLocaleDateString('en-UG',{month:'short',year:'numeric'}):'—'}</td>
       <td><span class="pill ${d.stock_status}">${sl}</span></td>
       <td>${canEdit
-        ? `<button class="ab" onclick="openEditDrugModal('${String(d.id).replace(/'/g, '&apos;')}')">✏️</button><button class="ab" title="Adjust Stock" onclick="openStockAdjModal('${String(d.id).replace(/'/g, '&apos;')}','${d.name.replace(/'/g,'&apos;')}',${d.quantity})">📦</button>`
+        ? `<button class="ab" onclick="openEditDrugModal('${String(d.id).replace(/'/g, '&apos;')}')">✏️</button><button class="ab" title="Adjust Stock" onclick="openStockAdjModal('${String(d.id).replace(/'/g, '&apos;')}','${d.name.replace(/'/g,'&apos;')}',${d.quantity},'${(d.unit_label||'unit').replace(/'/g,'&apos;')}')">📦</button>`
         : `<span style="color:var(--muted);font-size:12px">—</span>`}
       </td>
     </tr>`;
@@ -5105,7 +5121,7 @@ function searchDrug() {
   dd.innerHTML = m.map(d => `<div class="ddi" onclick="addToCart(${d.id})">
     <div><div style="font-weight:500">${d.name}</div><div style="font-size:11px;color:var(--muted)">${d.category}</div></div>
     <div style="text-align:right"><div style="color:var(--accent);font-weight:600">UGX ${parseInt(d.unit_price).toLocaleString()}</div>
-    <div style="font-size:11px;color:var(--muted)">${d.quantity} in stock</div></div>
+    <div style="font-size:11px;color:var(--muted)">${d.quantity} ${(d.unit_label||'unit')}${d.quantity===1?'':'s'} in stock</div></div>
   </div>`).join('');
   dd.classList.add('open');
 }
@@ -5119,7 +5135,7 @@ function addToCart(id) {
   else cart.push({
     drug_id: id, drug_name: d.name, unit_price: d.unit_price, quantity: 1,
     batch_number: d.batch_number || null, expiry_date: d.expiry_date || null,
-    tax_type: d.tax_type || 'zero_rated',
+    tax_type: d.tax_type || 'zero_rated', unit_label: d.unit_label || 'unit',
   });
   document.getElementById('drugSrch').value = '';
   document.getElementById('drugDrop').classList.remove('open');
@@ -5140,7 +5156,7 @@ function renderCart() {
     const taxLabel = { vatable: 'VATABLE', zero_rated: 'ZERO-RATED', exempt: 'EXEMPT' }[c.tax_type] || 'ZERO-RATED';
     meta.push(`<span style="opacity:0.7">${taxLabel}</span>`);
     return `<div class="citem">
-    <div><div class="cinm">${c.drug_name}</div><div class="ciup">UGX ${parseInt(c.unit_price).toLocaleString()} each${meta.length ? ' · ' + meta.join(' · ') : ''}</div></div>
+    <div><div class="cinm">${c.drug_name}</div><div class="ciup">UGX ${parseInt(c.unit_price).toLocaleString()} per ${c.unit_label||'unit'}${meta.length ? ' · ' + meta.join(' · ') : ''}</div></div>
     <div class="qctrl"><button class="qbtn" onclick="cq(${i},-1)">−</button><div class="qnum">${c.quantity}</div><button class="qbtn" onclick="cq(${i},1)">+</button></div>
     <div class="citot">UGX ${(c.unit_price*c.quantity).toLocaleString()}</div>
     <div class="cirm" onclick="cr(${i})">✕</div>
@@ -5197,7 +5213,7 @@ function completeSale() {
   document.getElementById('rTot').textContent  = 'UGX '+tot.toLocaleString();
   document.getElementById('rPay').textContent  = payMethod;
   document.getElementById('rDisp').textContent = (getCurrentUser()?.name) || currentUser?.name || '—';
-  document.getElementById('rItems').innerHTML  = cart.map(c=>`<div class="ri"><span>${c.drug_name}</span><span style="text-align:center">${c.quantity}</span><span style="text-align:right">UGX ${(c.unit_price*c.quantity).toLocaleString()}</span></div>`).join('');
+  document.getElementById('rItems').innerHTML  = cart.map(c=>`<div class="ri"><span>${c.drug_name}</span><span style="text-align:center">${fmtQty(c.quantity,c.unit_label)}</span><span style="text-align:right">UGX ${(c.unit_price*c.quantity).toLocaleString()}</span></div>`).join('');
   document.getElementById('overlay').classList.add('open');
 
   // Stop any dispatch polling since we completed sale directly
@@ -5305,7 +5321,7 @@ document.getElementById('rTot').textContent   = 'UGX ' + dispatchTot.toLocaleStr
 document.getElementById('rPay').textContent   = '⏳ Proceed to Cashier';
 document.getElementById('rDisp').textContent  = (getCurrentUser()?.name) || currentUser?.name || '—';
 document.getElementById('rItems').innerHTML   = dispatchCart.map(c =>
-  `<div class="ri"><span>${c.drug_name}</span><span style="text-align:center">${c.quantity}</span><span style="text-align:right">UGX ${(c.unit_price * c.quantity).toLocaleString()}</span></div>`
+  `<div class="ri"><span>${c.drug_name}</span><span style="text-align:center">${fmtQty(c.quantity,c.unit_label)}</span><span style="text-align:right">UGX ${(c.unit_price * c.quantity).toLocaleString()}</span></div>`
 ).join('');
 document.getElementById('overlay').classList.add('open');
 
@@ -6615,11 +6631,13 @@ function openStockCountModal() {
 }
 
 // ── Stock Adjustment ────────────────────────────────────────
-function openStockAdjModal(id, name, currentQty) {
+function openStockAdjModal(id, name, currentQty, unitLabel) {
   if (!canManageDrugs()) { showToast('⛔ Not allowed', 'warn'); return; }
   adjDrugId = id;
+  window._adjUnitLabel = unitLabel || 'unit';
+  window._adjCurrentQty = currentQty;
   document.getElementById('adjDrugName').textContent = name;
-  document.getElementById('adjCurrentQty').textContent = currentQty;
+  document.getElementById('adjCurrentQty').textContent = fmtQty(currentQty, window._adjUnitLabel);
   document.getElementById('adjQtyInput').value = '';
   document.getElementById('adjReason').value = '';
   document.getElementById('adjPreview').style.display = 'none';
@@ -6633,7 +6651,7 @@ function closeStockAdj() {
 }
 
 function updateAdjPreview() {
-  const current = parseInt(document.getElementById('adjCurrentQty').textContent) || 0;
+  const current = window._adjCurrentQty ?? (parseInt(document.getElementById('adjCurrentQty').textContent) || 0);
   const qty = parseInt(document.getElementById('adjQtyInput').value) || 0;
   const type = document.querySelector('input[name="adjType"]:checked')?.value || 'add';
   let newVal;
@@ -6644,7 +6662,7 @@ function updateAdjPreview() {
   const previewVal = document.getElementById('adjPreviewVal');
   if (qty > 0 || type === 'set') {
     preview.style.display = 'block';
-    previewVal.textContent = newVal;
+    previewVal.textContent = fmtQty(newVal, window._adjUnitLabel);
     previewVal.style.color = newVal < 10 ? 'var(--danger)' : newVal < 30 ? 'var(--warn)' : 'var(--accent)';
   } else {
     preview.style.display = 'none';
@@ -7262,7 +7280,7 @@ async function confirmCollectPayment() {
       document.getElementById('rPay').textContent   = snapshotPayMethod.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
       document.getElementById('rDisp').textContent  = collectedUser?.name || '—';
       document.getElementById('rItems').innerHTML   = its.length
-        ? its.map(i => `<div class="ri"><span>${i.drug_name||i.name||'Item'}</span><span style="text-align:center">${i.quantity}</span><span style="text-align:right">UGX ${Number((i.unit_price||0)*i.quantity).toLocaleString()}</span></div>`).join('')
+        ? its.map(i => `<div class="ri"><span>${i.drug_name||i.name||'Item'}</span><span style="text-align:center">${fmtQty(i.quantity,i.unit_label)}</span><span style="text-align:right">UGX ${Number((i.unit_price||0)*i.quantity).toLocaleString()}</span></div>`).join('')
         : `<div class="ri"><span>Sale items</span><span style="text-align:center">—</span><span style="text-align:right">UGX ${saleTot.toLocaleString()}</span></div>`;
       document.getElementById('overlay').classList.add('open');
     } catch(receiptErr) {
@@ -8190,9 +8208,9 @@ function renderWarehouseTable(filtered) {
       <td style="font-family:monospace;font-size:11px;color:var(--muted)">#${d.id}</td>
       <td><strong>${d.name}</strong>${d.generic_name?`<div style="font-size:11px;color:var(--muted)">${d.generic_name}</div>`:''}</td>
       <td style="font-size:12px;color:var(--muted)">${d.category||'—'}</td>
-      <td style="font-weight:700;text-align:center;color:var(--accent)">${d.quantity}</td>
+      <td style="font-weight:700;text-align:center;color:var(--accent)">${d.quantity}<div style="font-size:10px;font-weight:400;color:var(--muted)">${d.unit_label||'unit'}${d.quantity===1?'':'s'}</div></td>
       <td>
-        <input type="number" min="0" id="wcount_${d.id}" placeholder="Count..."
+        <input type="number" min="0" id="wcount_${d.id}" placeholder="Count in ${d.unit_label||'unit'}s..."
           style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text);width:90px;text-align:center;font-size:13px;font-weight:700;outline:none"
           oninput="highlightVariance(${d.id}, ${d.quantity})"/>
       </td>
@@ -8273,8 +8291,8 @@ function exportCountSheet() {
   table{width:100%;border-collapse:collapse}th{background:#f5f5f5;padding:8px;border:1px solid #ddd;text-align:left}
   td{padding:8px;border:1px solid #ddd}.count-box{width:80px;border:1px solid #999;height:24px}</style></head>
   <body><h2>📦 Stock Count Sheet — ${new Date().toLocaleDateString()}</h2>
-  <table><thead><tr><th>#ID</th><th>Drug Name</th><th>Category</th><th>System Qty</th><th>Counted Qty</th><th>Variance</th><th>Notes</th></tr></thead>
-  <tbody>${warehouseDrugs.map(d=>`<tr><td>#${d.id}</td><td>${d.name}</td><td>${d.category||'—'}</td><td style="text-align:center;font-weight:700">${d.quantity}</td><td><div class="count-box"></div></td><td><div class="count-box"></div></td><td><div style="width:120px;border-bottom:1px solid #999;height:20px"></div></td></tr>`).join('')}</tbody>
+  <table><thead><tr><th>#ID</th><th>Drug Name</th><th>Category</th><th>Unit</th><th>System Qty</th><th>Counted Qty</th><th>Variance</th><th>Notes</th></tr></thead>
+  <tbody>${warehouseDrugs.map(d=>`<tr><td>#${d.id}</td><td>${d.name}</td><td>${d.category||'—'}</td><td style="text-align:center">${d.unit_label||'unit'}${d.quantity===1?'':'s'}</td><td style="text-align:center;font-weight:700">${d.quantity}</td><td><div class="count-box"></div></td><td><div class="count-box"></div></td><td><div style="width:120px;border-bottom:1px solid #999;height:20px"></div></td></tr>`).join('')}</tbody>
   </table><br><p>Counted by: _____________________ &nbsp;&nbsp; Date: ___________</p>
   <p>Approved by: _____________________ &nbsp;&nbsp; Date: ___________</p>
   <script>window.onload=()=>window.print()<\/script>
@@ -9518,7 +9536,7 @@ function completeSale() {
   document.getElementById('rPay').textContent  = payMethod;
   document.getElementById('rDisp').textContent = getCurrentUser()?.name || currentUser?.name || '—';
   document.getElementById('rItems').innerHTML  = cart.map(c =>
-    `<div class="ri"><span>${c.drug_name}</span><span style="text-align:center">${c.quantity}</span><span style="text-align:right">UGX ${(c.unit_price*c.quantity).toLocaleString()}</span></div>`
+    `<div class="ri"><span>${c.drug_name}</span><span style="text-align:center">${fmtQty(c.quantity,c.unit_label)}</span><span style="text-align:right">UGX ${(c.unit_price*c.quantity).toLocaleString()}</span></div>`
   ).join('');
   document.getElementById('overlay').classList.add('open');
 
@@ -11421,7 +11439,28 @@ async function submitDept() {
           </select>
         </div>
         <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Quantity in Stock *</label>
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Unit <span style="font-weight:400;text-transform:none;letter-spacing:0">(what quantity counts)</span></label>
+          <select id="adUnitLabel" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" onchange="updateQtyLabel()">
+            <option value="unit">Unit (generic)</option>
+            <option value="tablet">Tablet</option>
+            <option value="capsule">Capsule</option>
+            <option value="bottle">Bottle</option>
+            <option value="vial">Vial</option>
+            <option value="ampoule">Ampoule</option>
+            <option value="sachet">Sachet</option>
+            <option value="tube">Tube</option>
+            <option value="box">Box</option>
+            <option value="piece">Piece</option>
+            <option value="ml">ml</option>
+            <option value="pack">Pack</option>
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Units per Pack <span style="font-weight:400;text-transform:none;letter-spacing:0">(for receiving stock)</span></label>
+          <input id="adPackSize" type="number" min="1" value="1" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. 100 (leave 1 if none)"/>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Quantity in Stock * <span id="adQtyUnitHint" style="font-weight:400;text-transform:none;letter-spacing:0">(units)</span></label>
           <input id="adQty" type="number" min="0" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. 200" required/>
         </div>
         <div style="display:flex;flex-direction:column;gap:5px">
@@ -11595,7 +11634,7 @@ async function submitDept() {
     <div style="background:var(--s2);border-radius:12px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between">
       <div>
         <div id="adjDrugName" style="font-weight:700;font-size:15px">—</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:2px">Current stock: <strong id="adjCurrentQty" style="color:var(--accent)">—</strong> units</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px">Current stock: <strong id="adjCurrentQty" style="color:var(--accent)">—</strong></div>
       </div>
       <div style="font-size:28px">💊</div>
     </div>
@@ -11640,7 +11679,7 @@ async function submitDept() {
 
       <!-- Live preview -->
       <div id="adjPreview" style="background:rgba(0,212,170,0.06);border:1px solid rgba(0,212,170,0.2);border-radius:10px;padding:12px 16px;font-size:13px;display:none">
-        <span style="color:var(--muted)">New stock will be: </span><strong id="adjPreviewVal" style="color:var(--accent);font-size:16px">—</strong> units
+        <span style="color:var(--muted)">New stock will be: </span><strong id="adjPreviewVal" style="color:var(--accent);font-size:16px">—</strong>
       </div>
     </div>
 
@@ -12356,6 +12395,7 @@ async function _submitCSVImport() {
 
 // ── Helpers ───────────────────────────────────────────────
 function fmt(n) { return Number(n||0).toLocaleString('en-UG'); }
+function fmtQty(qty, unit) { unit = unit || 'unit'; return `${qty} ${unit}${qty === 1 ? '' : 's'}`; }
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString('en-UG',{day:'numeric',month:'short',year:'numeric'}) : '—'; }
 
 function statusPill(s) {
@@ -12584,24 +12624,62 @@ function addGRNItemRow(name='', qty='', cost='') {
   const c = document.getElementById('grnItemsContainer');
   if (!c) return;
   const row = document.createElement('div');
-  row.style.cssText = 'display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:6px;align-items:end;margin-bottom:6px';
+  row.style.cssText = 'display:grid;grid-template-columns:1.6fr 0.8fr 1fr 1fr 1fr auto;gap:6px;align-items:end;margin-bottom:2px';
   row.innerHTML = `
-    <input class="chat-input" style="min-height:auto;padding:8px 12px;border-radius:8px" placeholder="Drug name" value="${name}" list="drugNamesDatalist"/>
-    <input type="number" class="chat-input" style="min-height:auto;padding:8px 12px;border-radius:8px" placeholder="Qty" value="${qty}" oninput="calcGRNTotal()"/>
-    <input type="number" class="chat-input" style="min-height:auto;padding:8px 12px;border-radius:8px" placeholder="Unit cost" value="${cost}" oninput="calcGRNTotal()"/>
-    <input class="chat-input" style="min-height:auto;padding:8px 12px;border-radius:8px;font-size:11px" placeholder="Batch / expiry"/>
-    <button onclick="this.parentElement.remove();calcGRNTotal()" style="padding:8px 10px;border-radius:8px;background:rgba(239,68,68,0.1);color:var(--danger);border:none;cursor:pointer">✕</button>`;
-  c.appendChild(row);
+    <input class="chat-input grn-name" style="min-height:auto;padding:8px 12px;border-radius:8px" placeholder="Drug name" value="${name}" list="drugNamesDatalist" oninput="onGRNNameChange(this)"/>
+    <input type="number" min="0" class="chat-input grn-packs" style="min-height:auto;padding:8px 12px;border-radius:8px;font-size:12px" placeholder="Packs" title="Optional: packs received — auto-fills Qty using this drug's pack size" oninput="onGRNPacksChange(this)"/>
+    <input type="number" class="chat-input grn-qty" style="min-height:auto;padding:8px 12px;border-radius:8px" placeholder="Qty (units)" value="${qty}" oninput="calcGRNTotal()"/>
+    <input type="number" class="chat-input grn-cost" style="min-height:auto;padding:8px 12px;border-radius:8px" placeholder="Unit cost" value="${cost}" oninput="calcGRNTotal()"/>
+    <input class="chat-input grn-batch" style="min-height:auto;padding:8px 12px;border-radius:8px;font-size:11px" placeholder="Batch / expiry"/>
+    <button onclick="this.parentElement.parentElement.remove();calcGRNTotal()" style="padding:8px 10px;border-radius:8px;background:rgba(239,68,68,0.1);color:var(--danger);border:none;cursor:pointer">✕</button>`;
+  const wrap = document.createElement('div');
+  wrap.appendChild(row);
+  const hint = document.createElement('div');
+  hint.className = 'grn-unit-hint';
+  hint.style.cssText = 'font-size:10.5px;color:var(--muted);margin:-4px 0 8px 2px';
+  wrap.appendChild(hint);
+  c.appendChild(wrap);
+}
+
+// When the drug name matches a known drug, show its unit/pack size so
+// staff know what "Packs" will multiply against (e.g. "1 pack = 100 tablets").
+function onGRNNameChange(input) {
+  const wrap = input.closest('div').parentElement;
+  const hint = wrap.querySelector('.grn-unit-hint');
+  const packsInput = wrap.querySelector('.grn-packs');
+  const matched = (typeof allDrugs !== 'undefined' ? allDrugs : [])
+    .find(d => d.name.toLowerCase() === input.value.trim().toLowerCase());
+  if (matched && hint) {
+    const packSize = matched.pack_size || 1;
+    const unit = matched.unit_label || 'unit';
+    hint.textContent = packSize > 1
+      ? `1 pack = ${packSize} ${unit}s — enter Packs to auto-fill Qty, or type Qty (${unit}s) directly`
+      : `Stocked in ${unit}s — enter Qty directly`;
+    packsInput.disabled = packSize <= 1;
+    packsInput.dataset.packSize = packSize;
+  } else if (hint) {
+    hint.textContent = '';
+    packsInput.disabled = false;
+    delete packsInput.dataset.packSize;
+  }
+}
+
+function onGRNPacksChange(input) {
+  const packSize = parseFloat(input.dataset.packSize || 1);
+  const packs = parseFloat(input.value || 0);
+  const row = input.closest('div');
+  const qtyInput = row.querySelector('.grn-qty');
+  if (qtyInput && packs > 0) qtyInput.value = Math.round(packs * packSize);
+  calcGRNTotal();
 }
 
 function calcGRNTotal() {
-  const rows = document.querySelectorAll('#grnItemsContainer > div');
+  const rows = document.querySelectorAll('#grnItemsContainer .grn-qty');
   let total = 0;
-  rows.forEach(row => {
-    const inputs = row.querySelectorAll('input');
-    const qty  = parseFloat(inputs[1]?.value||0);
-    const cost = parseFloat(inputs[2]?.value||0);
-    total += qty * cost;
+  rows.forEach(qtyInput => {
+    const row  = qtyInput.closest('div');
+    const cost = parseFloat(row.querySelector('.grn-cost')?.value || 0);
+    total += parseFloat(qtyInput.value || 0) * cost;
   });
   document.getElementById('grnTotalDisplay').textContent = 'Total: UGX '+fmt(total);
 }
@@ -12614,14 +12692,14 @@ async function submitGRN() {
 
   if (!poId && !supId) { showToast('Please select a supplier','warn'); return; }
 
-  const rows = document.querySelectorAll('#grnItemsContainer > div');
+  const rows = document.querySelectorAll('#grnItemsContainer .grn-qty');
   const items = [];
-  for (const row of rows) {
-    const inputs = row.querySelectorAll('input');
-    const name  = inputs[0]?.value.trim();
-    const qty   = parseInt(inputs[1]?.value||0);
-    const cost  = parseFloat(inputs[2]?.value||0);
-    const batch = inputs[3]?.value.trim();
+  for (const qtyInput of rows) {
+    const row   = qtyInput.closest('div');
+    const name  = row.querySelector('.grn-name')?.value.trim();
+    const qty   = parseInt(qtyInput.value || 0);
+    const cost  = parseFloat(row.querySelector('.grn-cost')?.value || 0);
+    const batch = row.querySelector('.grn-batch')?.value.trim();
     if (!name || qty < 1) continue;
     // Resolve drug_id from in-memory cache so cost_price writeback works
     const matched = (typeof allDrugs !== 'undefined' ? allDrugs : [])

@@ -16,7 +16,7 @@ module.exports = function registerSalesRoutes(app, { query, pool, getNextReceipt
       const voidClause = includeVoided ? '' : 'AND s.voided_at IS NULL';
       const [rows, countRes] = await Promise.all([
         query(
-          `SELECT s.*,json_agg(json_build_object('drug_name',si.drug_name,'quantity',si.quantity,'unit_price',si.unit_price,'total_price',si.total_price,'tax_type',si.tax_type,'tax_amount',si.tax_amount)) as items
+          `SELECT s.*,json_agg(json_build_object('drug_name',si.drug_name,'quantity',si.quantity,'unit_price',si.unit_price,'total_price',si.total_price,'tax_type',si.tax_type,'tax_amount',si.tax_amount,'unit_label',si.unit_label)) as items
            FROM sales s LEFT JOIN sale_items si ON si.sale_id=s.id
            WHERE s.pharmacy_id=$1 ${voidClause} GROUP BY s.id ORDER BY s.created_at DESC LIMIT $2 OFFSET $3`,
           [pharmacyId, limit, offset]
@@ -182,12 +182,14 @@ module.exports = function registerSalesRoutes(app, { query, pool, getNextReceipt
 
       const drugIds = items.map(i => i.drug_id).filter(Boolean);
       let taxTypeByDrug = {};
+      let unitLabelByDrug = {};
       if (drugIds.length) {
         const taxRes = await client.query(
-          `SELECT id, tax_type FROM drugs WHERE id = ANY($1::int[]) AND pharmacy_id=$2`,
+          `SELECT id, tax_type, unit_label FROM drugs WHERE id = ANY($1::int[]) AND pharmacy_id=$2`,
           [drugIds, pharmacyId]
         );
-        taxTypeByDrug = Object.fromEntries(taxRes.rows.map(r => [r.id, r.tax_type]));
+        taxTypeByDrug   = Object.fromEntries(taxRes.rows.map(r => [r.id, r.tax_type]));
+        unitLabelByDrug = Object.fromEntries(taxRes.rows.map(r => [r.id, r.unit_label]));
       }
 
       let vatCollected = 0;
@@ -202,12 +204,13 @@ module.exports = function registerSalesRoutes(app, { query, pool, getNextReceipt
           ? Math.round(lineTotal - lineTotal / (1 + vatRate / 100))
           : 0;
         vatCollected += taxAmount;
+        const unitLabel = (item.drug_id && unitLabelByDrug[item.drug_id]) || item.unit_label || 'unit';
 
         await client.query(
-          `INSERT INTO sale_items (sale_id,drug_id,drug_name,quantity,unit_price,total_price,tax_type,tax_amount)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+          `INSERT INTO sale_items (sale_id,drug_id,drug_name,quantity,unit_price,total_price,tax_type,tax_amount,unit_label)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
           [sale.id, item.drug_id || null, item.drug_name,
-           item.quantity, item.unit_price, lineTotal, taxType, taxAmount]
+           item.quantity, item.unit_price, lineTotal, taxType, taxAmount, unitLabel]
         );
         if (item.drug_id) {
           await client.query(
@@ -386,7 +389,7 @@ module.exports = function registerSalesRoutes(app, { query, pool, getNextReceipt
     const { pharmacyId } = req.user;
     try {
       const result = await query(
-        `SELECT s.*, json_agg(json_build_object('drug_id',si.drug_id,'drug_name',si.drug_name,'quantity',si.quantity,'unit_price',si.unit_price,'total_price',si.total_price,'tax_type',si.tax_type,'tax_amount',si.tax_amount)) as items
+        `SELECT s.*, json_agg(json_build_object('drug_id',si.drug_id,'drug_name',si.drug_name,'quantity',si.quantity,'unit_price',si.unit_price,'total_price',si.total_price,'tax_type',si.tax_type,'tax_amount',si.tax_amount,'unit_label',si.unit_label)) as items
          FROM sales s LEFT JOIN sale_items si ON si.sale_id=s.id
          WHERE s.pharmacy_id=$1 GROUP BY s.id ORDER BY s.created_at ASC`,
         [pharmacyId]
