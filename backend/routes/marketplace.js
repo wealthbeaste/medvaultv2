@@ -96,6 +96,64 @@ module.exports = function registerMarketplaceRoutes(app, { query, hash, compare,
     } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
   });
 
+  // GET /api/marketplace/public/suppliers/:id/products — ALL active brands/products
+  // for one approved supplier. Paginated + searchable so the Marketplace "Browse"
+  // button can show a supplier's full catalogue without loading everything at once.
+  // Query params: page (default 1), limit (default 24, max 100), search (optional)
+  app.get('/api/marketplace/public/suppliers/:id/products', async (req, res) => {
+    try {
+      const supplierId = parseInt(req.params.id);
+      if (!supplierId) return err(res, 400, 'VALIDATION_INVALID', 'Invalid supplier id', 'id');
+
+      const page   = Math.max(parseInt(req.query.page)  || 1, 1);
+      const limit  = Math.min(Math.max(parseInt(req.query.limit) || 24, 1), 100);
+      const offset = (page - 1) * limit;
+      const search = (req.query.search || '').trim();
+
+      // Only expose products for suppliers that are publicly approved
+      const supRes = await query(
+        `SELECT id, business_name AS name, supplier_type FROM marketplace_suppliers
+         WHERE id = $1 AND status = 'approved'`,
+        [supplierId]
+      );
+      if (!supRes.rows.length) return err(res, 404, 'NOT_FOUND_SUPPLIER', 'Supplier not found');
+
+      const params = [supplierId];
+      let searchClause = '';
+      if (search) {
+        params.push(`%${search}%`);
+        searchClause = ` AND (name ILIKE $${params.length} OR generic_name ILIKE $${params.length} OR category ILIKE $${params.length})`;
+      }
+
+      const countRes = await query(
+        `SELECT COUNT(*) AS cnt FROM marketplace_products
+         WHERE supplier_id = $1 AND is_active = true${searchClause}`,
+        params
+      );
+      const total = parseInt(countRes.rows[0].cnt) || 0;
+
+      params.push(limit, offset);
+      const productsRes = await query(
+        `SELECT id, name, generic_name, category, unit, pack_size, wholesale_price,
+                min_order_qty, stock_qty, description, image_url, requires_rx
+         FROM marketplace_products
+         WHERE supplier_id = $1 AND is_active = true${searchClause}
+         ORDER BY name ASC
+         LIMIT $${params.length - 1} OFFSET $${params.length}`,
+        params
+      );
+
+      res.json({
+        supplier:   supRes.rows[0],
+        products:   productsRes.rows,
+        total,
+        page,
+        limit,
+        totalPages: Math.max(Math.ceil(total / limit), 1),
+      });
+    } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
+  });
+
   // ─────────────────────────────────────────────────────────
 
   app.post('/api/marketplace/supplier/register',
