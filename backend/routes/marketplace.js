@@ -174,6 +174,118 @@ module.exports = function registerMarketplaceRoutes(app, { query, hash, compare,
     } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
   });
 
+  // ══════════════════════════════════════════════════════════
+  // SMART REORDER SUGGESTIONS (pharmacy-facing)
+  // ══════════════════════════════════════════════════════════
+  // GET /api/marketplace/reorder-suggestions
+  // For the calling pharmacy's low/out-of-stock drugs, finds matching
+  // marketplace brands from approved suppliers with stock on hand,
+  // ranked cheapest-first, and attaches each supplier's fulfillment
+  // scorecard so the pharmacist can weigh price against reliability
+  // without leaving MedVault. Query param: limit (max drugs considered,
+  // default 20, max 50) — keeps the match query bounded.
+  app.get('/api/marketplace/reorder-suggestions', auth, async (req, res) => {
+    const pharmacyId = req.user.pharmacyId;
+    if (!pharmacyId) return err(res, 400, 'NO_PHARMACY', 'User has no pharmacy assigned');
+
+    try {
+      const limit = Math.min(Math.max(parseInt(req.query.limit) || 20, 1), 50);
+
+      // Top 3 cheapest active, in-stock marketplace matches per low-stock drug
+      const matchesRes = await query(
+        `WITH low_stock AS (
+           SELECT id, name, generic_name, quantity, threshold
+           FROM drugs
+           WHERE pharmacy_id = $1 AND quantity <= threshold
+           ORDER BY quantity ASC
+           LIMIT $2
+         ),
+         ranked AS (
+           SELECT
+             ls.id AS drug_id, ls.name AS drug_name, ls.quantity AS current_stock, ls.threshold,
+             mp.id AS product_id, mp.name AS product_name, mp.wholesale_price, mp.stock_qty,
+             mp.min_order_qty, mp.unit, mp.pack_size,
+             ms.id AS supplier_id, ms.business_name AS supplier_name,
+             ROW_NUMBER() OVER (PARTITION BY ls.id ORDER BY mp.wholesale_price ASC) AS rn
+           FROM low_stock ls
+           JOIN marketplace_products mp
+             ON mp.is_active = true AND mp.stock_qty > 0
+            AND (mp.name ILIKE '%' || ls.name || '%' OR ls.name ILIKE '%' || mp.name || '%'
+                 OR (ls.generic_name IS NOT NULL AND ls.generic_name <> '' AND mp.generic_name ILIKE '%' || ls.generic_name || '%'))
+           JOIN marketplace_suppliers ms ON ms.id = mp.supplier_id AND ms.status = 'approved'
+         )
+         SELECT * FROM ranked WHERE rn <= 3 ORDER BY drug_id, rn`,
+        [pharmacyId, limit]
+      );
+
+      const totalLowStockRes = await query(
+        `SELECT COUNT(*) AS cnt FROM drugs WHERE pharmacy_id = $1 AND quantity <= threshold`,
+        [pharmacyId]
+      );
+
+      // Attach fulfillment scorecards for just the suppliers that showed up
+      const supplierIds = [...new Set(matchesRes.rows.map(r => r.supplier_id))];
+      let scoreBySupplier = {};
+      if (supplierIds.length) {
+        const scoreRes = await query(
+          `SELECT supplier_id,
+                  COUNT(*) FILTER (WHERE status IN ('delivered','cancelled')) AS scored_orders,
+                  COUNT(*) FILTER (WHERE status = 'delivered')                AS delivered_orders,
+                  ROUND(AVG(EXTRACT(EPOCH FROM (delivered_at - placed_at)) / 86400.0)
+                        FILTER (WHERE status = 'delivered' AND delivered_at IS NOT NULL), 1) AS avg_fulfillment_days
+           FROM marketplace_orders
+           WHERE supplier_id = ANY($1::int[])
+           GROUP BY supplier_id`,
+          [supplierIds]
+        );
+        const MIN_SAMPLE = 5;
+        scoreRes.rows.forEach(r => {
+          const scored    = parseInt(r.scored_orders) || 0;
+          const delivered = parseInt(r.delivered_orders) || 0;
+          scoreBySupplier[r.supplier_id] = {
+            fulfillment_rate:     scored >= MIN_SAMPLE ? Math.round((delivered / scored) * 100) : null,
+            avg_fulfillment_days: r.avg_fulfillment_days !== null ? parseFloat(r.avg_fulfillment_days) : null,
+          };
+        });
+      }
+
+      // Group flat rows into one entry per drug, with its ranked supplier matches
+      const byDrug = {};
+      for (const r of matchesRes.rows) {
+        if (!byDrug[r.drug_id]) {
+          byDrug[r.drug_id] = {
+            drug_id:       r.drug_id,
+            drug_name:     r.drug_name,
+            current_stock: r.current_stock,
+            threshold:     r.threshold,
+            // Simple restock heuristic: bring stock back up to 2x the reorder
+            // threshold. Good enough as a default suggestion — the pharmacist
+            // can always edit quantity before placing the order.
+            suggested_qty: Math.max((r.threshold * 2) - r.current_stock, r.min_order_qty || 1),
+            matches:       [],
+          };
+        }
+        byDrug[r.drug_id].matches.push({
+          supplier_id:     r.supplier_id,
+          supplier_name:   r.supplier_name,
+          product_id:      r.product_id,
+          product_name:    r.product_name,
+          wholesale_price: parseFloat(r.wholesale_price),
+          stock_qty:       r.stock_qty,
+          min_order_qty:   r.min_order_qty,
+          unit:            r.unit,
+          pack_size:       r.pack_size,
+          ...(scoreBySupplier[r.supplier_id] || { fulfillment_rate: null, avg_fulfillment_days: null }),
+        });
+      }
+
+      res.json({
+        suggestions:     Object.values(byDrug),
+        total_low_stock: parseInt(totalLowStockRes.rows[0].cnt) || 0,
+      });
+    } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
+  });
+
   // GET /api/marketplace/public/suppliers/:id/products — ALL active brands/products
   // for one approved supplier. Paginated + searchable so the Marketplace "Browse"
   // button can show a supplier's full catalogue without loading everything at once.

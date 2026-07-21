@@ -1233,6 +1233,24 @@ img,svg,video{max-width:100%;}
 .brand-price{font-weight:800;font-size:13px;color:var(--accent);margin-top:auto;}
 .brand-skel{background:linear-gradient(90deg,var(--surface2) 25%,var(--surface3,#2b3a55) 50%,var(--surface2) 75%);background-size:200% 100%;animation:brandSkel 1.2s ease-in-out infinite;}
 @keyframes brandSkel{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* ══════════════ SMART REORDER SUGGESTION CARDS ══════════════ */
+.reorder-card{
+  flex:0 0 260px;
+  scroll-snap-align:start;
+  background:var(--surface2);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:14px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.reorder-card:hover{border-color:var(--accent);}
+#reorderCardsRow{scroll-snap-type:x proximity;}
+@media(max-width:480px){
+  .reorder-card{flex-basis:82vw;}
+}
 </style>
 </head>
 <body>
@@ -2097,6 +2115,15 @@ Or open: https://app.medvault.ug</div>
     <div style="background:rgba(0,212,170,0.06);border:1px solid rgba(0,212,170,0.18);border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:var(--muted);display:flex;align-items:center;gap:10px">
       <span style="font-size:18px">💡</span>
       <span><strong style="color:var(--text)">How it works:</strong> MedVault negotiates bulk deals with verified suppliers. You order through MedVault, save 15–30% per drug, and we take a small 3–8% commission.</span>
+    </div>
+
+    <!-- Smart Reorder Suggestions -->
+    <div id="reorderWidget" style="display:none;margin-bottom:22px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:15px">🔁 Smart Reorder Suggestions</div>
+        <div id="reorderSubtitle" style="font-size:12px;color:var(--muted)"></div>
+      </div>
+      <div id="reorderCardsRow" style="display:flex;gap:12px;overflow-x:auto;padding-bottom:6px"></div>
     </div>
 
     <!-- Search & Filter -->
@@ -8541,7 +8568,7 @@ function supTab(tab, el) {
   });
   if (el) { el.style.background = 'var(--accent)'; el.style.color = '#000'; }
   if (tab === 'orders')      loadMktOrders();
-  if (tab === 'marketplace') renderSupplierCards();
+  if (tab === 'marketplace') { renderSupplierCards(); loadReorderSuggestions(); }
   if (tab === 'markup')      renderSupMarkup();
 }
 
@@ -8589,6 +8616,7 @@ async function loadSuppliersPage() {
     console.warn('Could not load live suppliers:', e.message);
   }
   renderSupplierCards();
+  loadReorderSuggestions();
 }
 
 // ── MARKETPLACE ───────────────────────────────────────────────
@@ -8600,6 +8628,85 @@ function setSupMktFilter(btn, val) {
   });
   btn.style.background = 'var(--accent)'; btn.style.color = '#000'; btn.style.border = 'none';
   renderSupplierCards();
+}
+
+// ── SMART REORDER SUGGESTIONS ──────────────────────────────────
+// Cross-references the pharmacy's own low/out-of-stock drugs against
+// live marketplace stock across ALL approved suppliers, so reordering
+// is a suggestion pushed to the pharmacist instead of a catalog they
+// have to go search themselves. Cached for the session so switching
+// tabs doesn't re-hit the API every time.
+let _reorderCache = null;
+
+async function loadReorderSuggestions({ force = false } = {}) {
+  const widget = document.getElementById('reorderWidget');
+  if (!widget) return;
+
+  if (_reorderCache && !force) { renderReorderWidget(_reorderCache); return; }
+
+  try {
+    const res  = await fetch(API() + '/api/marketplace/reorder-suggestions?limit=20', { headers: H() });
+    const data = res.ok ? await res.json() : { suggestions: [], total_low_stock: 0 };
+    _reorderCache = data;
+    renderReorderWidget(data);
+  } catch (e) {
+    console.warn('Could not load reorder suggestions:', e.message);
+    widget.style.display = 'none';
+  }
+}
+
+function renderReorderWidget(data) {
+  const widget  = document.getElementById('reorderWidget');
+  const row     = document.getElementById('reorderCardsRow');
+  const subtitle = document.getElementById('reorderSubtitle');
+  if (!widget || !row) return;
+
+  const suggestions = data.suggestions || [];
+  if (!suggestions.length) { widget.style.display = 'none'; return; }
+
+  widget.style.display = '';
+  const unmatched = (data.total_low_stock || 0) - suggestions.length;
+  subtitle.textContent = `${suggestions.length} low-stock drug${suggestions.length===1?'':'s'} matched to suppliers` +
+    (unmatched > 0 ? ` · ${unmatched} more low on stock with no marketplace match yet` : '');
+
+  row.innerHTML = suggestions.map(s => {
+    const best = s.matches[0];
+    if (!best) return '';
+    const scoreTxt = best.fulfillment_rate !== null
+      ? `✓ ${best.fulfillment_rate}% fulfilled${best.avg_fulfillment_days !== null ? ` · ~${best.avg_fulfillment_days}d` : ''}`
+      : '🆕 New supplier';
+    const outOf = s.current_stock === 0 ? 'Out of stock' : `${s.current_stock} left (reorder at ${s.threshold})`;
+    const moreCount = s.matches.length - 1;
+    return `
+    <div class="reorder-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px">
+        <div style="font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(s.drug_name||'').replace(/"/g,'&quot;')}">${s.drug_name}</div>
+      </div>
+      <div style="font-size:11px;color:${s.current_stock===0?'var(--danger)':'#f59e0b'};font-weight:600">${outOf}</div>
+      <div style="border-top:1px solid var(--border);margin:2px 0;padding-top:8px">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:2px">Best match</div>
+        <div style="font-weight:700;font-size:13px">${best.supplier_name}</div>
+        <div style="font-size:11px;color:var(--muted);margin:3px 0">${scoreTxt}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">
+          <span style="font-weight:800;color:var(--accent);font-size:13px">UGX ${best.wholesale_price.toLocaleString()}</span>
+          <span style="font-size:11px;color:var(--muted)">Suggest: ${s.suggested_qty} ${best.unit || 'units'}</span>
+        </div>
+      </div>
+      <button class="mkt-btn mkt-btn-primary" style="margin-top:2px" onclick="quickReorderFromSuggestion(${best.supplier_id}, '${(best.supplier_name||'').replace(/'/g,"\\'")}', '${(s.drug_name||'').replace(/'/g,"\\'")}', ${s.suggested_qty}, ${best.wholesale_price})" aria-label="Reorder ${(s.drug_name||'').replace(/"/g,'&quot;')} from ${(best.supplier_name||'').replace(/"/g,'&quot;')}">Reorder Now</button>
+      ${moreCount > 0 ? `<button class="mkt-btn mkt-btn-secondary" onclick="openSupplierBrowseModal(${best.supplier_id}, '${(best.supplier_name||'').replace(/'/g,"\\'")}')">+${moreCount} other supplier${moreCount===1?'':'s'} have it</button>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// Pre-fills the existing "New Order" modal with the suggested supplier,
+// drug, quantity and price so the pharmacist just has to confirm and
+// place the order — no manual re-typing of what MedVault already knows.
+async function quickReorderFromSuggestion(supplierId, supplierName, drugName, qty, price) {
+  await openSupplierOrderModal(supplierName);
+  const container = document.getElementById('supNewOrderItems');
+  if (container) container.innerHTML = '';
+  addSupOrderItem({ name: drugName, qty, price });
+  calcSupOrderTotal();
 }
 
 // ── SUPPLIER SCORECARD BADGE ──────────────────────────────────
@@ -9350,15 +9457,18 @@ async function submitReceiveFromOrder() {
   }
 }
 
-function addSupOrderItem() {
+function addSupOrderItem(prefill) {
   const container = document.getElementById('supNewOrderItems');
   if (!container) return;
   const row = document.createElement('div');
   row.style.cssText = 'display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;align-items:end;margin-bottom:8px';
+  const nameVal  = prefill?.name  ? String(prefill.name).replace(/"/g,'&quot;') : '';
+  const qtyVal   = prefill?.qty   ? Number(prefill.qty)   : '';
+  const priceVal = prefill?.price ? Number(prefill.price) : '';
   row.innerHTML = `
-    <input placeholder="Drug name" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none">
-    <input type="number" placeholder="Qty" oninput="calcSupOrderTotal()" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none">
-    <input type="number" placeholder="Unit price" oninput="calcSupOrderTotal()" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none">
+    <input placeholder="Drug name" value="${nameVal}" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none">
+    <input type="number" placeholder="Qty" value="${qtyVal}" oninput="calcSupOrderTotal()" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none">
+    <input type="number" placeholder="Unit price" value="${priceVal}" oninput="calcSupOrderTotal()" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none">
     <button onclick="this.closest('div').remove();calcSupOrderTotal()" style="padding:10px 12px;border-radius:9px;background:rgba(239,68,68,0.1);color:var(--danger);border:none;cursor:pointer">✕</button>`;
   container.appendChild(row);
 }
