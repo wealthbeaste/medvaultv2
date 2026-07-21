@@ -79,20 +79,98 @@ module.exports = function registerMarketplaceRoutes(app, { query, hash, compare,
   });
 
   // GET /api/marketplace/public/suppliers — approved suppliers + their products
+  // NOTE: contact_name/phone/email/commission_rate are intentionally NOT exposed
+  // here. Revealing a supplier's direct contact details before an order exists
+  // lets pharmacies and suppliers connect off-platform and cut MedVault out —
+  // that contact info is only released once an order is placed through the
+  // platform. Commission rate is a supplier's own business detail, returned
+  // only via their authenticated /supplier/me endpoint.
   app.get('/api/marketplace/public/suppliers', async (req, res) => {
     try {
       const suppliersRes = await query(
         `SELECT ms.id, ms.business_name AS company_name, ms.supplier_type,
-                ms.contact_name, ms.phone, ms.email,
-                ms.address, ms.commission_rate, ms.verified_at,
-                COUNT(mp.id) AS product_count
+                ms.address, ms.verified_at,
+                COUNT(DISTINCT mp.id) AS product_count,
+                COUNT(DISTINCT mo.id) FILTER (WHERE mo.status IN ('delivered','cancelled')) AS scored_orders,
+                COUNT(DISTINCT mo.id) FILTER (WHERE mo.status = 'delivered') AS delivered_orders,
+                ROUND(AVG(EXTRACT(EPOCH FROM (mo.delivered_at - mo.placed_at)) / 86400.0)
+                      FILTER (WHERE mo.status = 'delivered' AND mo.delivered_at IS NOT NULL), 1) AS avg_fulfillment_days
          FROM marketplace_suppliers ms
-         LEFT JOIN marketplace_products mp ON mp.supplier_id=ms.id AND mp.is_active=true
-         WHERE ms.status='approved'
+         LEFT JOIN marketplace_products mp ON mp.supplier_id = ms.id AND mp.is_active = true
+         LEFT JOIN marketplace_orders   mo ON mo.supplier_id = ms.id
+         WHERE ms.status = 'approved'
          GROUP BY ms.id
          ORDER BY ms.verified_at DESC`
       );
-      res.json({ suppliers: suppliersRes.rows, total: suppliersRes.rowCount });
+
+      // Fulfillment rate = delivered / (delivered + cancelled). Suppliers with
+      // fewer than 5 scored orders don't have a reliable enough sample yet —
+      // the frontend shows "New supplier" instead of a misleading percentage.
+      const MIN_SAMPLE = 5;
+      const suppliers = suppliersRes.rows.map(s => {
+        const scored    = parseInt(s.scored_orders) || 0;
+        const delivered = parseInt(s.delivered_orders) || 0;
+        return {
+          ...s,
+          fulfillment_rate:    scored >= MIN_SAMPLE ? Math.round((delivered / scored) * 100) : null,
+          avg_fulfillment_days: s.avg_fulfillment_days !== null ? parseFloat(s.avg_fulfillment_days) : null,
+          scored_orders: scored,
+        };
+      });
+
+      res.json({ suppliers, total: suppliers.length });
+    } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
+  });
+
+  // GET /api/marketplace/public/suppliers/:id/scorecard — detailed fulfillment
+  // scorecard for one supplier (used in the Browse modal). Built entirely from
+  // real order lifecycle timestamps already recorded on marketplace_orders —
+  // no self-reported ratings, so it can't be gamed by review-stuffing.
+  app.get('/api/marketplace/public/suppliers/:id/scorecard', async (req, res) => {
+    try {
+      const supplierId = parseInt(req.params.id);
+      if (!supplierId) return err(res, 400, 'VALIDATION_INVALID', 'Invalid supplier id', 'id');
+
+      const supRes = await query(
+        `SELECT id FROM marketplace_suppliers WHERE id = $1 AND status = 'approved'`,
+        [supplierId]
+      );
+      if (!supRes.rows.length) return err(res, 404, 'NOT_FOUND_SUPPLIER', 'Supplier not found');
+
+      const statsRes = await query(
+        `SELECT
+           COUNT(*) FILTER (WHERE status IN ('delivered','cancelled'))                      AS scored_orders,
+           COUNT(*) FILTER (WHERE status = 'delivered')                                      AS delivered_orders,
+           COUNT(*) FILTER (WHERE status = 'cancelled')                                      AS cancelled_orders,
+           COUNT(*)                                                                          AS total_orders,
+           ROUND(AVG(EXTRACT(EPOCH FROM (delivered_at - placed_at)) / 86400.0)
+                 FILTER (WHERE status = 'delivered' AND delivered_at IS NOT NULL), 1)         AS avg_fulfillment_days,
+           ROUND(AVG(EXTRACT(EPOCH FROM (confirmed_at - placed_at)) / 3600.0)
+                 FILTER (WHERE confirmed_at IS NOT NULL), 1)                                  AS avg_confirmation_hours,
+           MAX(placed_at)                                                                    AS last_order_at
+         FROM marketplace_orders
+         WHERE supplier_id = $1`,
+        [supplierId]
+      );
+
+      const s = statsRes.rows[0];
+      const MIN_SAMPLE = 5;
+      const scored    = parseInt(s.scored_orders) || 0;
+      const delivered = parseInt(s.delivered_orders) || 0;
+
+      res.json({
+        supplier_id:           supplierId,
+        total_orders:          parseInt(s.total_orders) || 0,
+        scored_orders:         scored,
+        delivered_orders:      delivered,
+        cancelled_orders:      parseInt(s.cancelled_orders) || 0,
+        fulfillment_rate:      scored >= MIN_SAMPLE ? Math.round((delivered / scored) * 100) : null,
+        avg_fulfillment_days:  s.avg_fulfillment_days !== null ? parseFloat(s.avg_fulfillment_days) : null,
+        avg_confirmation_hours: s.avg_confirmation_hours !== null ? parseFloat(s.avg_confirmation_hours) : null,
+        last_order_at:         s.last_order_at,
+        has_enough_data:       scored >= MIN_SAMPLE,
+        min_sample:            MIN_SAMPLE,
+      });
     } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
   });
 

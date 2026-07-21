@@ -2258,6 +2258,7 @@ Or open: https://app.medvault.ug</div>
           </div>
           <button onclick="closeSupplierBrowseModal()" aria-label="Close brand browser" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;width:34px;height:34px;flex-shrink:0;cursor:pointer;color:var(--muted);font-size:18px;display:flex;align-items:center;justify-content:center">×</button>
         </div>
+        <div id="brandModalScorecard" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px"></div>
         <div style="margin-top:14px;position:relative">
           <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;pointer-events:none" aria-hidden="true">🔍</span>
           <input id="brandSearchInput" type="search" oninput="onBrandSearchInput()" placeholder="Search brands by name…" aria-label="Search brands by name"
@@ -8567,8 +8568,9 @@ async function loadSuppliersPage() {
         emoji:      typeEmoji[s.supplier_type] || '🏢',
         tags:       (s.product_categories || 'General').split(',').map(t => t.trim()),
         products:   parseInt(s.product_count) || 0,
-        rating:     s.rating || 4.5,
-        commission: s.commission_rate || 5,
+        fulfillmentRate:   s.fulfillment_rate,       // null until 5+ scored orders exist
+        avgFulfillDays:    s.avg_fulfillment_days,    // null until at least one delivered order
+        scoredOrders:      s.scored_orders || 0,
         verified:   true,
         featured:   false,
         location:   s.address || 'Uganda',
@@ -8598,6 +8600,22 @@ function setSupMktFilter(btn, val) {
   });
   btn.style.background = 'var(--accent)'; btn.style.color = '#000'; btn.style.border = 'none';
   renderSupplierCards();
+}
+
+// ── SUPPLIER SCORECARD BADGE ──────────────────────────────────
+// Built entirely from real order timestamps (see /public/suppliers and
+// /public/suppliers/:id/scorecard) — never a self-reported star rating,
+// so it can't be inflated by review-stuffing. Suppliers with fewer than
+// 5 scored (delivered+cancelled) orders show "New supplier" instead of
+// a misleadingly precise percentage.
+function renderScoreBadge(s) {
+  if (s.fulfillmentRate === null || s.fulfillmentRate === undefined) {
+    return `<span style="font-size:11px;font-weight:600;color:var(--muted)">🆕 New supplier</span>`;
+  }
+  const rate = s.fulfillmentRate;
+  const color = rate >= 90 ? 'var(--accent)' : rate >= 75 ? '#f59e0b' : 'var(--danger)';
+  const days  = s.avgFulfillDays !== null && s.avgFulfillDays !== undefined ? ` · ~${s.avgFulfillDays}d delivery` : '';
+  return `<span style="font-size:11px;font-weight:700;color:${color}" title="${s.scoredOrders} completed orders on MedVault">✓ ${rate}% fulfilled${days}</span>`;
 }
 
 function renderSupplierCards() {
@@ -8631,9 +8649,8 @@ function renderSupplierCards() {
         <div style="font-size:11px;color:var(--muted);margin-bottom:10px">${s.type==='mfg'?'Manufacturer':s.type==='dist'?'Distributor':'Importer'} · ${s.location}</div>
         <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:11px">${s.tags.map(t=>`<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:5px;background:var(--surface2);color:var(--muted)">${t}</span>`).join('')}</div>
         <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px">
-          <span style="color:#f59e0b">${'★'.repeat(Math.floor(s.rating))}<span style="color:var(--muted)"> ${s.rating}</span></span>
+          ${renderScoreBadge(s)}
           <span style="color:var(--muted)">${s.products} products</span>
-          <span style="font-weight:600;color:var(--accent)">${s.commission}% fee</span>
         </div>
       </div>
       <div class="mkt-card-actions" style="padding:10px 14px;border-top:1px solid var(--border)">
@@ -8662,11 +8679,42 @@ function openSupplierBrowseModal(supplierId, supplierName) {
   document.getElementById('brandSearchInput').value = '';
   document.getElementById('brandModalCount').textContent = 'Loading…';
   document.getElementById('brandGrid').innerHTML = '';
+  document.getElementById('brandModalScorecard').innerHTML = '';
   overlay.style.display = 'flex';
   overlay.setAttribute('aria-hidden', 'false');
   document.addEventListener('keydown', _brandModalEscHandler);
   loadSupplierBrands({ reset: true });
+  loadSupplierScorecard(supplierId);
   setTimeout(() => document.getElementById('brandSearchInput')?.focus(), 60);
+}
+
+async function loadSupplierScorecard(supplierId) {
+  const el = document.getElementById('brandModalScorecard');
+  if (!el) return;
+  try {
+    const res = await fetch(API() + `/api/marketplace/public/suppliers/${supplierId}/scorecard`);
+    const d   = res.ok ? await res.json() : null;
+    if (!d) { el.innerHTML = ''; return; }
+
+    const chip = (label, bg, color) =>
+      `<span style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;background:${bg};color:${color}">${label}</span>`;
+
+    if (!d.has_enough_data) {
+      el.innerHTML = chip(`🆕 New supplier · ${d.total_orders} order${d.total_orders===1?'':'s'} so far`, 'var(--surface2)', 'var(--muted)');
+      return;
+    }
+
+    const rateBg    = d.fulfillment_rate >= 90 ? 'rgba(0,212,170,0.15)' : d.fulfillment_rate >= 75 ? 'rgba(245,166,35,0.15)' : 'rgba(239,68,68,0.15)';
+    const rateColor = d.fulfillment_rate >= 90 ? 'var(--accent)' : d.fulfillment_rate >= 75 ? '#f59e0b' : 'var(--danger)';
+    const parts = [chip(`✓ ${d.fulfillment_rate}% fulfilled`, rateBg, rateColor)];
+    if (d.avg_fulfillment_days !== null) parts.push(chip(`🚚 ~${d.avg_fulfillment_days}d avg delivery`, 'var(--surface2)', 'var(--text)'));
+    if (d.avg_confirmation_hours !== null) parts.push(chip(`⚡ ~${d.avg_confirmation_hours}h to confirm`, 'var(--surface2)', 'var(--text)'));
+    parts.push(chip(`📦 ${d.total_orders} total orders on MedVault`, 'var(--surface2)', 'var(--muted)'));
+    el.innerHTML = parts.join('');
+  } catch (e) {
+    console.warn('Could not load supplier scorecard:', e.message);
+    el.innerHTML = '';
+  }
 }
 
 function closeSupplierBrowseModal() {
