@@ -1621,51 +1621,7 @@ async function runMigrations() {
     // tax_type/unit_price: a drug's unit_label could be edited later,
     // but a historical receipt/report line must keep showing what the
     // unit actually was at the moment of that sale.
-    `ALTER TABLE sale_items ADD COLUMN IF NOT EXISTS unit_label VARCHAR(30) NOT NULL DEFAULT 'unit'`,
-
-    // =========================================================
-    // DRUG CATALOG
-    // A shared, canonical list of drugs (by generic name + strength +
-    // form) that both a pharmacy's own `drugs` table and a supplier's
-    // `marketplace_products` can optionally link to via catalog_id.
-    //
-    // Why: matching a pharmacy's low-stock drug to a supplier's listing
-    // by free-text name (ILIKE) is fuzzy — it can match the wrong
-    // strength/formulation, or miss an exact match entirely because a
-    // pharmacy stocks it under a brand name a supplier doesn't use.
-    // Linking both sides to the same catalog_id makes that match exact.
-    //
-    // This is an additive, backward-compatible migration: catalog_id is
-    // nullable everywhere and existing rows are left unlinked. Matching
-    // logic (see /api/marketplace/reorder-suggestions) prefers an exact
-    // catalog_id match when present and falls back to the old text
-    // match when it isn't — nothing breaks for unlinked data, and
-    // every new listing/drug added through the typeahead gets exact
-    // matching from day one.
-    // =========================================================
-    `CREATE TABLE IF NOT EXISTS drug_catalog (
-      id              SERIAL PRIMARY KEY,
-      generic_name    VARCHAR(255) NOT NULL,
-      brand_name      VARCHAR(255),
-      category        VARCHAR(100) NOT NULL DEFAULT 'General',
-      strength        VARCHAR(50),
-      form            VARCHAR(50),
-      unit            VARCHAR(50)  NOT NULL DEFAULT 'Pack',
-      requires_rx     BOOLEAN      NOT NULL DEFAULT false,
-      normalized_key  VARCHAR(400) NOT NULL,
-      created_by_type VARCHAR(20),
-      created_by_id   INTEGER,
-      created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-      updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
-    )`,
-    `CREATE UNIQUE INDEX IF NOT EXISTS idx_drug_catalog_normkey ON drug_catalog(normalized_key)`,
-    `CREATE INDEX IF NOT EXISTS idx_drug_catalog_generic ON drug_catalog(generic_name)`,
-    `CREATE INDEX IF NOT EXISTS idx_drug_catalog_brand ON drug_catalog(brand_name)`,
-
-    `ALTER TABLE drugs ADD COLUMN IF NOT EXISTS catalog_id INTEGER REFERENCES drug_catalog(id) ON DELETE SET NULL`,
-    `ALTER TABLE marketplace_products ADD COLUMN IF NOT EXISTS catalog_id INTEGER REFERENCES drug_catalog(id) ON DELETE SET NULL`,
-    `CREATE INDEX IF NOT EXISTS idx_drugs_catalog ON drugs(catalog_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_mkt_products_catalog ON marketplace_products(catalog_id)`
+    `ALTER TABLE sale_items ADD COLUMN IF NOT EXISTS unit_label VARCHAR(30) NOT NULL DEFAULT 'unit'`
 
   ];
 

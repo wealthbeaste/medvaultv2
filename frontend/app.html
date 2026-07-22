@@ -1251,6 +1251,17 @@ img,svg,video{max-width:100%;}
 @media(max-width:480px){
   .reorder-card{flex-basis:82vw;}
 }
+
+/* ══════════════ SHARED DRUG CATALOG TYPEAHEAD ══════════════ */
+.catalog-results{
+  position:absolute;top:100%;left:0;right:0;z-index:30;margin-top:4px;
+  background:var(--s2,var(--surface2));border:1px solid var(--border);border-radius:10px;
+  max-height:220px;overflow-y:auto;box-shadow:0 10px 28px rgba(0,0,0,0.35);
+}
+.catalog-result-item{padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);}
+.catalog-result-item:last-child{border-bottom:none;}
+.catalog-result-item:hover,.catalog-result-item:focus-visible{background:var(--surface2,var(--s2));outline:none;}
+.catalog-result-empty{padding:10px 12px;font-size:12px;color:var(--muted);}
 </style>
 </head>
 <body>
@@ -4911,6 +4922,7 @@ function openAddDrugModal() {
   } catch(e) {}
   const btn = document.getElementById('addDrugBtn');
   if (btn) btn.textContent = '✅ Add Drug';
+  resetCatalogMatchUI('adCatalogSearch','adCatalogId','adCatalogResults','adCatalogChip');
   document.getElementById('addDrugOverlay').classList.add('open');
   updateQtyLabel();
 }
@@ -4955,6 +4967,14 @@ function openEditDrugModal(id) {
   document.getElementById('adPackSize').value = d.pack_size ?? 1;
   updateQtyLabel();
 
+  // Restore catalog-link state so editing doesn't silently unlink it
+  resetCatalogMatchUI('adCatalogSearch','adCatalogId','adCatalogResults','adCatalogChip');
+  if (d.catalog_id) {
+    document.getElementById('adCatalogId').value = d.catalog_id;
+    const chip = document.getElementById('adCatalogChip');
+    if (chip) { chip.style.display = 'block'; chip.textContent = '✓ Linked to supplier catalog'; }
+  }
+
   const btn = document.getElementById('addDrugBtn');
   if (btn) btn.textContent = '✅ Save Changes';
   document.getElementById('addDrugOverlay').classList.add('open');
@@ -4996,7 +5016,8 @@ async function submitAddDrug() {
       unit_price: parseFloat(unit_price), cost_price: parseFloat(cost_price||0),
       expiry_date: expiry_date||null, supplier, threshold: parseInt(threshold||20),
       barcode: barcode||null, sku: sku||null, batch_number: finalBatch,
-      requires_rx, tax_type, unit_label, pack_size: parseInt(pack_size) || 1 };
+      requires_rx, tax_type, unit_label, pack_size: parseInt(pack_size) || 1,
+      catalog_id: document.getElementById('adCatalogId')?.value || null };
     console.log('Frontend: Sending drugData:', drugData);
 
     // Always save locally first (works offline)
@@ -8675,6 +8696,9 @@ function renderReorderWidget(data) {
     const scoreTxt = best.fulfillment_rate !== null
       ? `✓ ${best.fulfillment_rate}% fulfilled${best.avg_fulfillment_days !== null ? ` · ~${best.avg_fulfillment_days}d` : ''}`
       : '🆕 New supplier';
+    const matchTxt = best.match_type === 'catalog'
+      ? `<span style="color:var(--accent)">🎯 Exact catalog match</span>`
+      : `<span style="color:var(--muted)">~ Possible match (name-based)</span>`;
     const outOf = s.current_stock === 0 ? 'Out of stock' : `${s.current_stock} left (reorder at ${s.threshold})`;
     const moreCount = s.matches.length - 1;
     return `
@@ -8683,6 +8707,7 @@ function renderReorderWidget(data) {
         <div style="font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(s.drug_name||'').replace(/"/g,'&quot;')}">${s.drug_name}</div>
       </div>
       <div style="font-size:11px;color:${s.current_stock===0?'var(--danger)':'#f59e0b'};font-weight:600">${outOf}</div>
+      <div style="font-size:10px;font-weight:600">${matchTxt}</div>
       <div style="border-top:1px solid var(--border);margin:2px 0;padding-top:8px">
         <div style="font-size:11px;color:var(--muted);margin-bottom:2px">Best match</div>
         <div style="font-weight:700;font-size:13px">${best.supplier_name}</div>
@@ -8707,6 +8732,79 @@ async function quickReorderFromSuggestion(supplierId, supplierName, drugName, qt
   if (container) container.innerHTML = '';
   addSupOrderItem({ name: drugName, qty, price });
   calcSupOrderTotal();
+}
+
+// ── SHARED DRUG CATALOG TYPEAHEAD ──────────────────────────────
+// Used by the pharmacy "Add Drug" form (and mirrored in the supplier
+// portal's "Add Product" form) to optionally link to a canonical
+// drug_catalog entry instead of leaving the match to free text. Linking
+// both sides to the same catalog_id is what lets Smart Reorder
+// Suggestions match exactly instead of guessing from drug names.
+let _catalogDebounce = {};
+
+function onCatalogTypeahead(inputId, hiddenId, resultsId, chipId) {
+  const input = document.getElementById(inputId);
+  if (input && !input._catalogBlurBound) {
+    input._catalogBlurBound = true;
+    // Delay hiding on blur so a click on a result item still registers first
+    input.addEventListener('blur', () => {
+      setTimeout(() => { const el = document.getElementById(resultsId); if (el) el.style.display = 'none'; }, 150);
+    });
+  }
+  const hidden = document.getElementById(hiddenId);
+  if (hidden) hidden.value = ''; // typing invalidates any previously linked entry
+  if (chipId) { const chip = document.getElementById(chipId); if (chip) chip.style.display = 'none'; }
+
+  clearTimeout(_catalogDebounce[inputId]);
+  const q = input.value.trim();
+  if (q.length < 2) { const el = document.getElementById(resultsId); if (el) el.style.display = 'none'; return; }
+
+  _catalogDebounce[inputId] = setTimeout(async () => {
+    try {
+      const res  = await fetch(API() + '/api/drug-catalog/search?q=' + encodeURIComponent(q));
+      const data = res.ok ? await res.json() : { results: [] };
+      renderCatalogResults(resultsId, data.results || [], inputId, hiddenId, chipId, q);
+    } catch (e) {
+      renderCatalogResults(resultsId, [], inputId, hiddenId, chipId, q);
+    }
+  }, 250);
+}
+
+function renderCatalogResults(resultsId, results, inputId, hiddenId, chipId, q) {
+  const el = document.getElementById(resultsId);
+  if (!el) return;
+  el.style.display = 'block';
+  if (!results.length) {
+    el.innerHTML = `<div class="catalog-result-empty">No catalog matches${q ? ` for "${q.replace(/</g,'&lt;')}"` : ''} — you can still save without linking.</div>`;
+    return;
+  }
+  el.innerHTML = results.map(r => {
+    const label = [r.brand_name, r.generic_name, r.strength, r.form].filter(Boolean).join(' · ');
+    const safe  = label.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    return `<div class="catalog-result-item" tabindex="0" role="option"
+              onclick="selectCatalogEntry('${inputId}','${hiddenId}','${resultsId}','${chipId}',${r.id},'${safe}')"
+              onkeydown="if(event.key==='Enter')selectCatalogEntry('${inputId}','${hiddenId}','${resultsId}','${chipId}',${r.id},'${safe}')">${label}</div>`;
+  }).join('');
+}
+
+function selectCatalogEntry(inputId, hiddenId, resultsId, chipId, id, label) {
+  const hidden = document.getElementById(hiddenId);
+  if (hidden) hidden.value = id;
+  const results = document.getElementById(resultsId);
+  if (results) { results.style.display = 'none'; results.innerHTML = ''; }
+  const chip = document.getElementById(chipId);
+  if (chip) { chip.style.display = 'block'; chip.textContent = `✓ Linked: ${label}`; }
+}
+
+function resetCatalogMatchUI(inputId, hiddenId, resultsId, chipId) {
+  const input = document.getElementById(inputId);
+  if (input) input.value = '';
+  const hidden = document.getElementById(hiddenId);
+  if (hidden) hidden.value = '';
+  const results = document.getElementById(resultsId);
+  if (results) { results.style.display = 'none'; results.innerHTML = ''; }
+  const chip = document.getElementById(chipId);
+  if (chip) { chip.style.display = 'none'; chip.textContent = ''; }
 }
 
 // ── SUPPLIER SCORECARD BADGE ──────────────────────────────────
@@ -11832,6 +11930,13 @@ async function submitDept() {
         <div style="grid-column:1/-1;display:flex;flex-direction:column;gap:5px">
           <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Drug Name *</label>
           <input id="adName" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Paracetamol 500mg" required/>
+        </div>
+        <div style="grid-column:1/-1;display:flex;flex-direction:column;gap:5px;position:relative">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Match to Supplier Catalog <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional — makes marketplace reorder matching exact)</span></label>
+          <input id="adCatalogSearch" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="Search generic name, e.g. Amoxicillin…" autocomplete="off" oninput="onCatalogTypeahead('adCatalogSearch','adCatalogId','adCatalogResults','adCatalogChip')"/>
+          <input type="hidden" id="adCatalogId" value="">
+          <div id="adCatalogResults" class="catalog-results" style="display:none"></div>
+          <div id="adCatalogChip" style="display:none;font-size:11px;color:var(--accent);font-weight:600"></div>
         </div>
         <div style="display:flex;flex-direction:column;gap:5px">
           <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Category</label>

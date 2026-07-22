@@ -191,10 +191,14 @@ module.exports = function registerMarketplaceRoutes(app, { query, hash, compare,
     try {
       const limit = Math.min(Math.max(parseInt(req.query.limit) || 20, 1), 50);
 
-      // Top 3 cheapest active, in-stock marketplace matches per low-stock drug
+      // Top 3 matches per low-stock drug, active + in-stock only. An exact
+      // catalog_id match (both sides linked to the same drug_catalog row)
+      // always outranks a fuzzy text match — see the drug_catalog migration
+      // note in db.js for why free-text matching alone isn't reliable enough
+      // for drug identity.
       const matchesRes = await query(
         `WITH low_stock AS (
-           SELECT id, name, generic_name, quantity, threshold
+           SELECT id, name, generic_name, quantity, threshold, catalog_id
            FROM drugs
            WHERE pharmacy_id = $1 AND quantity <= threshold
            ORDER BY quantity ASC
@@ -206,12 +210,23 @@ module.exports = function registerMarketplaceRoutes(app, { query, hash, compare,
              mp.id AS product_id, mp.name AS product_name, mp.wholesale_price, mp.stock_qty,
              mp.min_order_qty, mp.unit, mp.pack_size,
              ms.id AS supplier_id, ms.business_name AS supplier_name,
-             ROW_NUMBER() OVER (PARTITION BY ls.id ORDER BY mp.wholesale_price ASC) AS rn
+             CASE WHEN ls.catalog_id IS NOT NULL AND mp.catalog_id IS NOT NULL
+                       AND ls.catalog_id = mp.catalog_id
+                  THEN 'catalog' ELSE 'text' END AS match_type,
+             ROW_NUMBER() OVER (
+               PARTITION BY ls.id
+               ORDER BY (CASE WHEN ls.catalog_id IS NOT NULL AND mp.catalog_id IS NOT NULL
+                                   AND ls.catalog_id = mp.catalog_id THEN 0 ELSE 1 END),
+                        mp.wholesale_price ASC
+             ) AS rn
            FROM low_stock ls
            JOIN marketplace_products mp
              ON mp.is_active = true AND mp.stock_qty > 0
-            AND (mp.name ILIKE '%' || ls.name || '%' OR ls.name ILIKE '%' || mp.name || '%'
-                 OR (ls.generic_name IS NOT NULL AND ls.generic_name <> '' AND mp.generic_name ILIKE '%' || ls.generic_name || '%'))
+            AND (
+              (ls.catalog_id IS NOT NULL AND mp.catalog_id IS NOT NULL AND ls.catalog_id = mp.catalog_id)
+              OR mp.name ILIKE '%' || ls.name || '%' OR ls.name ILIKE '%' || mp.name || '%'
+              OR (ls.generic_name IS NOT NULL AND ls.generic_name <> '' AND mp.generic_name ILIKE '%' || ls.generic_name || '%')
+            )
            JOIN marketplace_suppliers ms ON ms.id = mp.supplier_id AND ms.status = 'approved'
          )
          SELECT * FROM ranked WHERE rn <= 3 ORDER BY drug_id, rn`,
@@ -275,6 +290,7 @@ module.exports = function registerMarketplaceRoutes(app, { query, hash, compare,
           min_order_qty:   r.min_order_qty,
           unit:            r.unit,
           pack_size:       r.pack_size,
+          match_type:      r.match_type, // 'catalog' (exact) or 'text' (fuzzy fallback)
           ...(scoreBySupplier[r.supplier_id] || { fulfillment_rate: null, avg_fulfillment_days: null }),
         });
       }
@@ -499,7 +515,7 @@ module.exports = function registerMarketplaceRoutes(app, { query, hash, compare,
     try {
       const result = await query(
         `SELECT id, name, generic_name, category, unit, pack_size, wholesale_price,
-                min_order_qty, stock_qty, description, requires_rx, is_active, created_at, updated_at
+                min_order_qty, stock_qty, description, requires_rx, is_active, catalog_id, created_at, updated_at
          FROM marketplace_products
          WHERE supplier_id = $1
          ORDER BY name ASC`,
@@ -517,7 +533,7 @@ module.exports = function registerMarketplaceRoutes(app, { query, hash, compare,
   // ──────────────────────────────────────────────────────────
   app.post('/api/marketplace/supplier/products', supplierAuth, async (req, res) => {
     const { name, generic_name, category, unit, pack_size, wholesale_price,
-            min_order_qty, stock_qty, description, requires_rx } = req.body;
+            min_order_qty, stock_qty, description, requires_rx, catalog_id } = req.body;
 
     if (!name)            return err(res, 400, 'VALIDATION_REQUIRED', 'Product name is required', 'name');
     if (!wholesale_price) return err(res, 400, 'VALIDATION_REQUIRED', 'Wholesale price is required', 'wholesale_price');
@@ -531,8 +547,8 @@ module.exports = function registerMarketplaceRoutes(app, { query, hash, compare,
       const result = await query(
         `INSERT INTO marketplace_products
            (supplier_id, name, generic_name, category, unit, pack_size, wholesale_price,
-            min_order_qty, stock_qty, description, requires_rx)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+            min_order_qty, stock_qty, description, requires_rx, catalog_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
          RETURNING *`,
         [
           req.supplier.supplierId,
@@ -546,6 +562,7 @@ module.exports = function registerMarketplaceRoutes(app, { query, hash, compare,
           parseInt(stock_qty)     || 0,
           description   || null,
           requires_rx === true || requires_rx === 'true',
+          catalog_id ? parseInt(catalog_id) : null,
         ]
       );
       res.status(201).json({ success: true, product: result.rows[0] });
@@ -560,7 +577,7 @@ module.exports = function registerMarketplaceRoutes(app, { query, hash, compare,
   // ──────────────────────────────────────────────────────────
   app.put('/api/marketplace/supplier/products/:id', supplierAuth, async (req, res) => {
     const { name, generic_name, category, unit, pack_size, wholesale_price,
-            min_order_qty, stock_qty, description, requires_rx, is_active } = req.body;
+            min_order_qty, stock_qty, description, requires_rx, is_active, catalog_id } = req.body;
 
     if (!name)            return err(res, 400, 'VALIDATION_REQUIRED', 'Product name is required', 'name');
     if (!wholesale_price) return err(res, 400, 'VALIDATION_REQUIRED', 'Wholesale price is required', 'wholesale_price');
@@ -570,7 +587,7 @@ module.exports = function registerMarketplaceRoutes(app, { query, hash, compare,
         `UPDATE marketplace_products SET
            name=$1, generic_name=$2, category=$3, unit=$4, pack_size=$5,
            wholesale_price=$6, min_order_qty=$7, stock_qty=$8, description=$9,
-           requires_rx=$10, is_active=$11, updated_at=NOW()
+           requires_rx=$10, is_active=$11, catalog_id=COALESCE($14, catalog_id), updated_at=NOW()
          WHERE id=$12 AND supplier_id=$13
          RETURNING *`,
         [
@@ -581,6 +598,7 @@ module.exports = function registerMarketplaceRoutes(app, { query, hash, compare,
           requires_rx === true || requires_rx === 'true',
           is_active !== false,
           req.params.id, req.supplier.supplierId,
+          catalog_id ? parseInt(catalog_id) : null,
         ]
       );
       if (!result.rows.length) return err(res, 404, 'NOT_FOUND_PRODUCT', 'Product not found or not yours');

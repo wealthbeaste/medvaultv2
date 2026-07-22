@@ -30,6 +30,7 @@ module.exports = function registerRoutes(app) {
   require('./loyalty')(app, deps);       // loyalty programme
   require('./warehouses')(app, deps);   // warehouse locations
   require('./marketplace')(app, deps);  // supplier portal + marketplace admin
+  require('./drug-catalog')(app, deps); // shared drug catalog (search + create)
   require('./ai')(app);                 // AI proxy (no shared deps needed)
 
   // Phase 3 — Clinic & Medical Center
