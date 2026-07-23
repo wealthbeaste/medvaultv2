@@ -1954,6 +1954,8 @@ function renderMktTable(list) {
             <button onclick="mktApprove(${s.id},'${esc(s.business_name)}')"
               style="font-size:11px;padding:5px 10px;border-radius:7px;border:none;background:rgba(0,229,176,0.15);color:var(--accent);cursor:pointer;font-weight:700">↩️ Approve</button>
           ` : ''}
+          <button onclick="mktResetPassword(${s.id},'${esc(s.business_name)}')"
+            style="font-size:11px;padding:5px 10px;border-radius:7px;border:1px solid var(--border2);background:var(--s1);color:var(--text);cursor:pointer">🔑 Reset Password</button>
         </div>
       </td>
     </tr>`).join('');
@@ -2009,6 +2011,26 @@ async function mktEditCommission(id, current, name) {
   if (!r || !r.ok) { toast(r?.data?.error || 'Failed', 'err'); return; }
   toast(`✅ Commission updated to ${rate}%`);
   renderMarketplace();
+}
+
+// Manual reset for a supplier who's locked out and can't use the
+// self-service email flow (no inbox access, email not delivering, etc).
+// The server generates the new password — never a value the admin
+// chooses — and returns it once, here, for the admin to relay to the
+// supplier out-of-band (phone call), same convention as the pharmacy
+// user reset. It is never emailed or logged anywhere in plaintext.
+async function mktResetPassword(id, name) {
+  if (!confirm(`Reset the password for "${name}"?\n\nThis immediately invalidates their current password and any pending email reset links. You'll need to relay the new password to them directly (phone call) — it won't be emailed.`)) return;
+  const r = await api(`/api/admin/marketplace/suppliers/${id}/reset-password`, { method: 'POST' });
+  if (!r || !r.ok) { toast(r?.data?.error || 'Failed to reset password', 'err'); return; }
+  // Pre-filled + selected prompt() text doubles as a copyable box — the
+  // admin can Ctrl+C straight out of it without it appearing anywhere
+  // in the page's own history/DOM after this dialog closes.
+  prompt(
+    `Password reset for "${name}".\n\nNew password (copy this now — it will not be shown again):`,
+    r.data.new_password
+  );
+  toast(`🔑 Password reset for ${name}`);
 }
 
 (function init() {

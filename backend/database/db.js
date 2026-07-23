@@ -1561,6 +1561,24 @@ async function runMigrations() {
     // fast even after months of accumulation.
     `CREATE INDEX IF NOT EXISTS idx_password_resets_expiry ON password_resets(expires_at)`,
 
+    // Marketplace suppliers are NOT rows in `users` — they authenticate
+    // via their own email + password_hash on marketplace_suppliers — so
+    // they need their own reset-token table rather than sharing
+    // password_resets, which hard-FKs to users(id). Same design: only a
+    // hash of the token is stored, single-use, time-limited.
+    `CREATE TABLE IF NOT EXISTS supplier_password_resets (
+      id           SERIAL PRIMARY KEY,
+      supplier_id  INTEGER NOT NULL REFERENCES marketplace_suppliers(id) ON DELETE CASCADE,
+      token_hash   VARCHAR(128) NOT NULL,
+      expires_at   TIMESTAMPTZ NOT NULL,
+      used_at      TIMESTAMPTZ,
+      requested_ip VARCHAR(50),
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_supplier_password_resets_supplier ON supplier_password_resets(supplier_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_supplier_password_resets_token    ON supplier_password_resets(token_hash)`,
+    `CREATE INDEX IF NOT EXISTS idx_supplier_password_resets_expiry   ON supplier_password_resets(expires_at)`,
+
     // =========================================================
     // POS checkout enhancements — customer credit limit
     // Lets the checkout screen show "Credit: UGX X used of Y

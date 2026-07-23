@@ -1,5 +1,7 @@
 'use strict';
 const err = require('./_err');
+const crypto = require('crypto');
+const { sendEmail, passwordResetEmailHtml } = require('../core/email');
 
 // ============================================================
 // MedVault Marketplace — Supplier Portal API
@@ -14,6 +16,8 @@ const err = require('./_err');
 // Routes:
 //   POST /api/marketplace/supplier/register
 //   POST /api/marketplace/supplier/login
+//   POST /api/marketplace/supplier/forgot-password
+//   POST /api/marketplace/supplier/reset-password
 //   GET  /api/marketplace/supplier/me          (supplier auth)
 //   GET  /api/marketplace/supplier/products    (supplier auth)
 //   POST /api/marketplace/supplier/products    (supplier auth)
@@ -29,11 +33,12 @@ const err = require('./_err');
 //   POST /api/admin/marketplace/suppliers/:id/approve  (super_admin)
 //   POST /api/admin/marketplace/suppliers/:id/reject   (super_admin)
 //   POST /api/admin/marketplace/suppliers/:id/suspend  (super_admin)
+//   POST /api/admin/marketplace/suppliers/:id/reset-password (super_admin)
 //   GET  /api/admin/marketplace/products       (super_admin)
 //   GET  /api/admin/marketplace/orders         (super_admin)
 // ============================================================
 
-module.exports = function registerMarketplaceRoutes(app, { query, hash, compare, sign, auth, can, rateLimit }) {
+module.exports = function registerMarketplaceRoutes(app, { query, hash, compare, sign, auth, can, rateLimit, audit }) {
 
   const adminOnly    = can('admin:platform');
   const supplierAuth = _supplierAuth(sign);  // separate middleware
@@ -478,6 +483,144 @@ module.exports = function registerMarketplaceRoutes(app, { query, hash, compare,
       }
     }
   );
+
+  // ──────────────────────────────────────────────────────────
+  // SUPPLIER: Self-service password reset (email-based)
+  // Mirrors /api/auth/forgot-password and /api/auth/reset-password —
+  // same generic-response (no email enumeration), rate limiting, and
+  // single-use hashed-token design, just pointed at
+  // marketplace_suppliers / supplier_password_resets instead of
+  // users / password_resets.
+  // ──────────────────────────────────────────────────────────
+
+  // POST /api/marketplace/supplier/forgot-password
+  app.post('/api/marketplace/supplier/forgot-password',
+    rateLimit({ max: 3, windowMs: 15 * 60 * 1000, message: 'Too many reset requests from this device. Try again in 15 minutes.' }),
+    async (req, res) => {
+      const { email } = req.body;
+      if (!email) return err(res, 400, 'VALIDATION_REQUIRED', 'Email is required', 'email');
+      const generic = { message: 'If a supplier account exists with that email, a password reset link has been sent.' };
+      try {
+        const s = await query(
+          `SELECT id, contact_name, business_name, email FROM marketplace_suppliers WHERE email = $1`,
+          [email.toLowerCase().trim()]
+        );
+        if (!s.rows.length) return res.json(generic); // don't reveal non-existence
+        const supplier = s.rows[0];
+
+        const rawToken  = crypto.randomBytes(32).toString('hex');
+        const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+        const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket?.remoteAddress || null;
+
+        // Invalidate any earlier unused tokens first, so only the most
+        // recently requested link can ever be used.
+        await query(`UPDATE supplier_password_resets SET used_at=NOW() WHERE supplier_id=$1 AND used_at IS NULL`, [supplier.id]);
+        await query(
+          `INSERT INTO supplier_password_resets (supplier_id, token_hash, expires_at, requested_ip) VALUES ($1,$2,$3,$4)`,
+          [supplier.id, tokenHash, expiresAt, ip]
+        );
+
+        const appUrl   = process.env.SUPPLIER_APP_URL || process.env.APP_URL || 'https://medvaultv3.vercel.app';
+        const resetUrl = `${appUrl}/supplier-portal.html?resetToken=${rawToken}`;
+        const emailResult = await sendEmail({
+          to: supplier.email,
+          subject: 'Reset your MedVault Supplier Portal password',
+          html: passwordResetEmailHtml({ name: supplier.contact_name || supplier.business_name, resetUrl }),
+          text: `Hi ${supplier.contact_name || supplier.business_name}, reset your MedVault Supplier Portal password here (expires in 1 hour, single use): ${resetUrl}\n\nIf you didn't request this, you can ignore this email.`,
+        });
+        if (!emailResult.sent) {
+          // Not fatal to the response (still generic success — see above),
+          // but must be visible in logs so support can catch a broken
+          // email key. The admin manual reset below is the fallback path.
+          console.error(`[marketplace] Supplier password reset email failed for supplier ${supplier.id} (${supplier.email}):`, emailResult.reason);
+        }
+
+        if (audit) {
+          await audit(query, {
+            req, action: 'supplier.password_reset_requested', entity: 'marketplace_supplier', entityId: supplier.id,
+            payload: { email: supplier.email, email_sent: emailResult.sent, email_fail_reason: emailResult.sent ? null : emailResult.reason },
+          });
+        }
+
+        return res.json(generic);
+      } catch (e) {
+        return err(res, 500, 'SERVER_ERROR', e.message);
+      }
+    }
+  );
+
+  // POST /api/marketplace/supplier/reset-password
+  app.post('/api/marketplace/supplier/reset-password',
+    rateLimit({ max: 8, windowMs: 15 * 60 * 1000, message: 'Too many attempts. Try again in 15 minutes.' }),
+    async (req, res) => {
+      const { token, password } = req.body;
+      if (!token)    return err(res, 400, 'VALIDATION_REQUIRED', 'Reset token is required', 'token');
+      if (!password || password.length < 6)
+        return err(res, 400, 'VALIDATION_REQUIRED', 'Password must be at least 6 characters', 'password');
+      try {
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+        const r = await query(
+          `SELECT spr.id, spr.supplier_id, ms.email
+           FROM supplier_password_resets spr JOIN marketplace_suppliers ms ON ms.id = spr.supplier_id
+           WHERE spr.token_hash=$1 AND spr.used_at IS NULL AND spr.expires_at > NOW()`,
+          [tokenHash]
+        );
+        if (!r.rows.length)
+          return err(res, 400, 'AUTH_RESET_INVALID', 'This reset link is invalid or has expired. Please request a new one.');
+        const resetRow = r.rows[0];
+
+        const pwHash = await hash(password);
+        await query(`UPDATE marketplace_suppliers SET password_hash=$1, updated_at=NOW() WHERE id=$2`, [pwHash, resetRow.supplier_id]);
+        await query(`UPDATE supplier_password_resets SET used_at=NOW() WHERE supplier_id=$1 AND used_at IS NULL`, [resetRow.supplier_id]);
+
+        if (audit) {
+          await audit(query, {
+            req, action: 'supplier.password_reset_completed', entity: 'marketplace_supplier', entityId: resetRow.supplier_id,
+            payload: { email: resetRow.email },
+          });
+        }
+
+        res.json({ message: '✅ Password reset successfully. You can now log in with your new password.' });
+      } catch (e) {
+        return err(res, 500, 'SERVER_ERROR', e.message);
+      }
+    }
+  );
+
+  // ──────────────────────────────────────────────────────────
+  // ADMIN: Manual supplier password reset (fallback for when
+  // self-service email reset isn't usable — no email service
+  // configured, supplier lost access to their inbox, etc). Mirrors
+  // POST /api/admin/users/:id/reset-password. Generates a strong
+  // random password; the platform admin relays it to the supplier
+  // out-of-band (phone call), not over email/SMS here.
+  // POST /api/admin/marketplace/suppliers/:id/reset-password
+  // ──────────────────────────────────────────────────────────
+  app.post('/api/admin/marketplace/suppliers/:id/reset-password', auth, adminOnly, async (req, res) => {
+    try {
+      const s = await query(`SELECT id, email, business_name FROM marketplace_suppliers WHERE id=$1`, [req.params.id]);
+      if (!s.rows.length) return err(res, 404, 'NOT_FOUND_SUPPLIER', 'Supplier not found', 'id');
+      const target = s.rows[0];
+
+      const newPw  = crypto.randomBytes(9).toString('base64').replace(/\+/g, '8').replace(/\//g, '9');
+      const pwHash = await hash(newPw);
+      await query(`UPDATE marketplace_suppliers SET password_hash=$1, updated_at=NOW() WHERE id=$2`, [pwHash, req.params.id]);
+
+      // Also invalidate any outstanding self-service reset links for this
+      // supplier, so an old emailed link can't later collide with this.
+      await query(`UPDATE supplier_password_resets SET used_at=NOW() WHERE supplier_id=$1 AND used_at IS NULL`, [req.params.id]);
+
+      if (audit) {
+        await audit(query, {
+          req, action: 'supplier.password_reset_by_admin', entity: 'marketplace_supplier', entityId: target.id,
+          payload: { target_email: target.email, target_business_name: target.business_name },
+        });
+      }
+
+      res.json({ success: true, new_password: newPw });
+    } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
+  });
 
   // ──────────────────────────────────────────────────────────
   // SUPPLIER: Get own profile
