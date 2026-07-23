@@ -3778,17 +3778,139 @@ function resolveApiBase() {
   return '';
 }
 
+// ── IndexedDB-backed key/value store ───────────────────────────
+// Backs MedVaultOffline's storage. IndexedDB has no realistic size
+// ceiling (localStorage caps out around 5-10MB, too small for a
+// pharmacy's full sales history) and all writes here are async, so
+// saving a large table never blocks the UI thread the way a
+// synchronous localStorage.setItem(JSON.stringify(everything)) does.
+// If IndexedDB isn't available (very old/locked-down browsers),
+// MedVaultOffline below falls back to the exact original
+// localStorage-only behavior — nothing regresses.
+const MVStore = {
+  _dbPromise: null,
+  hasIDB(){ return typeof indexedDB !== 'undefined'; },
+  open(){
+    if (this._dbPromise) return this._dbPromise;
+    this._dbPromise = new Promise(resolve => {
+      if (!this.hasIDB()) { resolve(null); return; }
+      try {
+        const req = indexedDB.open('medvault_offline', 1);
+        req.onupgradeneeded = () => { req.result.createObjectStore('kv'); };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror   = () => resolve(null);
+      } catch(e) { resolve(null); }
+    });
+    return this._dbPromise;
+  },
+  async get(key){
+    const db = await this.open();
+    if (!db) return undefined;
+    return new Promise(resolve => {
+      try {
+        const req = db.transaction('kv','readonly').objectStore('kv').get(key);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror   = () => resolve(undefined);
+      } catch(e) { resolve(undefined); }
+    });
+  },
+  set(key, value){
+    // Fire-and-forget: callers don't await this, so a slow write never
+    // blocks the UI. Any failure just means the in-memory cache (and,
+    // on non-IndexedDB browsers, localStorage) remain the source of truth.
+    this.open().then(db => {
+      if (!db) return;
+      try { db.transaction('kv','readwrite').objectStore('kv').put(value, key); } catch(e) {}
+    });
+  },
+};
+
 const MedVaultOffline = {
   DB_KEY:'mv_offline_db', QUEUE_KEY:'mv_sync_queue', META_KEY:'mv_sync_meta',
   API_BASE:resolveApiBase(),
-  getDB(){ try{return JSON.parse(localStorage.getItem(this.DB_KEY)||'{}')}catch{return{}} },
-  saveDB(db){ localStorage.setItem(this.DB_KEY,JSON.stringify(db)); },
+
+  // In-memory caches so getDB()/getQueue()/getMeta() stay perfectly
+  // synchronous for the ~100 call sites elsewhere in this file that
+  // expect an instant return value. Each is seeded synchronously from
+  // localStorage (or empty) on first access so first paint never blocks,
+  // then upgraded in the background once IndexedDB (the real store on
+  // capable browsers) finishes reading. A generation counter on each
+  // cache stops a slow hydration from clobbering a write that happened
+  // after hydration started.
+  _dbCache:null, _dbGen:0,
+  _queueCache:null, _queueGen:0,
+  _metaCache:null, _metaGen:0,
+
+  _seedAndHydrate(cacheProp, genProp, idbKey, lsKey, parseFallback){
+    if (this[cacheProp] === null) {
+      try { this[cacheProp] = JSON.parse(localStorage.getItem(lsKey) || parseFallback); }
+      catch { this[cacheProp] = JSON.parse(parseFallback); }
+      if (MVStore.hasIDB()) {
+        const genAtStart = this[genProp];
+        MVStore.get(idbKey).then(v => {
+          if (v !== undefined && this[genProp] === genAtStart) this[cacheProp] = v;
+        });
+      }
+    }
+    return this[cacheProp];
+  },
+
+  getDB(){ return this._seedAndHydrate('_dbCache','_dbGen','db',this.DB_KEY,'{}'); },
+  saveDB(db){
+    this._dbCache = db; this._dbGen++;
+    if (MVStore.hasIDB()) MVStore.set('db', db);
+    else { try { localStorage.setItem(this.DB_KEY, JSON.stringify(db)); } catch(e) {} }
+  },
   getTable(t){ return this.getDB()[t]||[]; },
   saveTable(t,rows){ const db=this.getDB(); db[t]=rows; this.saveDB(db); },
-  getQueue(){ return JSON.parse(localStorage.getItem(this.QUEUE_KEY)||'[]'); },
-  getMeta(){ try{return JSON.parse(localStorage.getItem(this.META_KEY)||'{}')}catch{return{}} },
-  saveMeta(m){ localStorage.setItem(this.META_KEY,JSON.stringify({...this.getMeta(),...m})); },
+
+  getQueue(){ return this._seedAndHydrate('_queueCache','_queueGen','queue',this.QUEUE_KEY,'[]'); },
+  saveQueue(q){
+    this._queueCache = q; this._queueGen++;
+    if (MVStore.hasIDB()) MVStore.set('queue', q);
+    else { try { localStorage.setItem(this.QUEUE_KEY, JSON.stringify(q)); } catch(e) {} }
+  },
+
+  getMeta(){ return this._seedAndHydrate('_metaCache','_metaGen','meta',this.META_KEY,'{}'); },
+  saveMeta(m){
+    const merged = {...this.getMeta(), ...m};
+    this._metaCache = merged; this._metaGen++;
+    if (MVStore.hasIDB()) MVStore.set('meta', merged);
+    else { try { localStorage.setItem(this.META_KEY, JSON.stringify(merged)); } catch(e) {} }
+  },
+
   isOnline(){ return navigator.onLine; },
+
+  // Wipes every layer of the offline cache: legacy localStorage keys (for
+  // browsers without IndexedDB), the IndexedDB store, and the in-memory
+  // mirror. Must be called on login/logout — otherwise a shared terminal
+  // keeps showing the previous pharmacy's cached drugs, sales, and
+  // customers to whoever logs in next, since the in-memory cache only
+  // re-hydrates when it's null.
+  async clearAll(){
+    localStorage.removeItem(this.DB_KEY);
+    localStorage.removeItem(this.QUEUE_KEY);
+    localStorage.removeItem(this.META_KEY);
+    this._dbCache = null; this._dbGen++;
+    this._queueCache = null; this._queueGen++;
+    this._metaCache = null; this._metaGen++;
+    if (MVStore.hasIDB()) {
+      try {
+        const db = await MVStore.open();
+        if (db) {
+          await new Promise(resolve => {
+            try {
+              const tx = db.transaction('kv','readwrite');
+              tx.objectStore('kv').clear();
+              tx.oncomplete = () => resolve();
+              tx.onerror = () => resolve();
+            } catch(e) { resolve(); }
+          });
+        }
+      } catch(e) {}
+    }
+  },
+
   async requestJSON(path, options = {}){
     const method = options.method || 'GET';
     const token = options.token;
@@ -3823,7 +3945,7 @@ const MedVaultOffline = {
   queueAction(action){
     const q=this.getQueue();
     q.push({...action,id:Date.now()+Math.random(),timestamp:new Date().toISOString(),synced:false});
-    localStorage.setItem(this.QUEUE_KEY,JSON.stringify(q));
+    this.saveQueue(q);
     this.updateSyncUI();
   },
 
@@ -3921,7 +4043,7 @@ const MedVaultOffline = {
       }catch(e){}
     }
     const remaining=queue.filter(a=>!a.synced);
-    localStorage.setItem(this.QUEUE_KEY,JSON.stringify(remaining));
+    this.saveQueue(remaining);
     this.saveMeta({lastPush:new Date().toISOString()});
     this.updateSyncUI();
     return {success:true,pushed,results};
@@ -4059,8 +4181,8 @@ const MedVaultOffline = {
   },
 
   getStorageInfo(){
-    const db=localStorage.getItem(this.DB_KEY)||'';
-    const kbUsed=Math.round(db.length/1024);
+    let kbUsed = 0;
+    try { kbUsed = Math.round(JSON.stringify(this.getDB()).length / 1024); } catch(e) {}
     const q=this.getQueue().filter(a=>!a.synced);
     return {kbUsed,queueLength:q.length,lastSync:this.getMeta().lastSync||'Never',drugsStored:this.getTable('drugs').length,salesStored:this.getTable('sales').length};
   },
@@ -4347,9 +4469,7 @@ async function doLogin() {
     if (data.token) {
       // Success — clear any stale cached data from a previous pharmacy session
       // before saving the new user, so we never show the wrong pharmacy's data
-      localStorage.removeItem('mv_offline_db');
-      localStorage.removeItem('mv_sync_queue');
-      localStorage.removeItem('mv_sync_meta');
+      await MedVaultOffline.clearAll();
       localStorage.removeItem('mv_till');
       localStorage.removeItem('mv_purchase_orders');
 
@@ -7237,17 +7357,15 @@ setInterval(wrapTablesForMobile, 2000);
 // ════════════════════════════════════════════════════════════
 // LOGOUT
 // ════════════════════════════════════════════════════════════
-function doLogout() {
+async function doLogout() {
   if (!confirm('Log out of MedVault?')) return;
   // Clear ALL pharmacy-specific cached data so the next login starts fresh
   localStorage.removeItem('mv_token');
   localStorage.removeItem('mv_user');
   localStorage.removeItem('mv_pharmacy');
-  localStorage.removeItem('mv_offline_db');
-  localStorage.removeItem('mv_sync_queue');
-  localStorage.removeItem('mv_sync_meta');
   localStorage.removeItem('mv_till');
   localStorage.removeItem('mv_purchase_orders');
+  await MedVaultOffline.clearAll();
   window.location.href = 'index.html';
 }
 
