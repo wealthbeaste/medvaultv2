@@ -1168,6 +1168,100 @@ img,svg,video{max-width:100%;}
   .kcol{min-width:88vw;}
   .rmodal{width:100%;}
 }
+
+/* ══════════════ MARKETPLACE: responsive card action buttons ══════════════ */
+.mkt-card-actions{display:flex;gap:7px;flex-wrap:wrap;}
+.mkt-btn{
+  flex:1 1 100px;
+  min-width:0;
+  min-height:38px;
+  padding:clamp(8px,2vw,10px) clamp(8px,3vw,14px);
+  border-radius:8px;
+  font-size:clamp(11px,3vw,12px);
+  font-weight:700;
+  font-family:'DM Sans',sans-serif;
+  cursor:pointer;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  border:none;
+  transition:filter .15s ease, transform .1s ease;
+  box-sizing:border-box;
+}
+.mkt-btn-primary{background:var(--accent);color:#000;}
+.mkt-btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+.mkt-btn:hover{filter:brightness(1.08);}
+.mkt-btn:active{transform:translateY(1px);filter:brightness(0.95);}
+.mkt-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+@media(max-width:400px){
+  .mkt-card-actions{flex-direction:column;}
+  .mkt-btn{width:100%;}
+}
+
+/* ══════════════ SUPPLIER BRAND BROWSE MODAL ══════════════ */
+.brand-grid{
+  display:grid;
+  grid-template-columns:repeat(1,1fr);
+  gap:12px;
+}
+@media(min-width:420px){ .brand-grid{grid-template-columns:repeat(2,1fr);} }
+@media(min-width:700px){ .brand-grid{grid-template-columns:repeat(3,1fr);} }
+@media(min-width:980px){ .brand-grid{grid-template-columns:repeat(4,1fr);} }
+@media(min-width:1280px){ .brand-grid{grid-template-columns:repeat(5,1fr);} }
+@media(min-width:1600px){ .brand-grid{grid-template-columns:repeat(6,1fr);} }
+
+.brand-card{
+  background:var(--surface2);
+  border:1px solid var(--border);
+  border-radius:12px;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  transition:border-color .15s ease, transform .15s ease;
+}
+.brand-card:hover,.brand-card:focus-visible{border-color:var(--accent);transform:translateY(-2px);}
+.brand-card:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.brand-card-img{width:100%;aspect-ratio:1/1;background:var(--surface3,#212d42);display:flex;align-items:center;justify-content:center;font-size:28px;overflow:hidden;}
+.brand-card-img img{width:100%;height:100%;object-fit:cover;display:block;}
+.brand-card-body{padding:10px 12px;display:flex;flex-direction:column;gap:5px;flex:1;}
+.brand-card-name{font-weight:700;font-size:13px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+.brand-card-meta{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.brand-stock{font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;display:inline-block;width:fit-content;}
+.brand-stock.in{background:rgba(0,212,170,0.15);color:var(--accent);}
+.brand-stock.low{background:rgba(245,166,35,0.15);color:#f59e0b;}
+.brand-stock.out{background:rgba(239,68,68,0.15);color:var(--danger);}
+.brand-price{font-weight:800;font-size:13px;color:var(--accent);margin-top:auto;}
+.brand-skel{background:linear-gradient(90deg,var(--surface2) 25%,var(--surface3,#2b3a55) 50%,var(--surface2) 75%);background-size:200% 100%;animation:brandSkel 1.2s ease-in-out infinite;}
+@keyframes brandSkel{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* ══════════════ SMART REORDER SUGGESTION CARDS ══════════════ */
+.reorder-card{
+  flex:0 0 260px;
+  scroll-snap-align:start;
+  background:var(--surface2);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:14px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.reorder-card:hover{border-color:var(--accent);}
+#reorderCardsRow{scroll-snap-type:x proximity;}
+@media(max-width:480px){
+  .reorder-card{flex-basis:82vw;}
+}
+
+/* ══════════════ SHARED DRUG CATALOG TYPEAHEAD ══════════════ */
+.catalog-results{
+  position:absolute;top:100%;left:0;right:0;z-index:30;margin-top:4px;
+  background:var(--s2,var(--surface2));border:1px solid var(--border);border-radius:10px;
+  max-height:220px;overflow-y:auto;box-shadow:0 10px 28px rgba(0,0,0,0.35);
+}
+.catalog-result-item{padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);}
+.catalog-result-item:last-child{border-bottom:none;}
+.catalog-result-item:hover,.catalog-result-item:focus-visible{background:var(--surface2,var(--s2));outline:none;}
+.catalog-result-empty{padding:10px 12px;font-size:12px;color:var(--muted);}
 </style>
 </head>
 <body>
@@ -1581,6 +1675,24 @@ img,svg,video{max-width:100%;}
             <div id="loyaltyEarnPreview" style="font-size:11px;color:var(--muted);margin-top:6px"></div>
           </div>
 
+          <!-- CREDIT ACCOUNT WIDGET -->
+          <div id="creditWidget" style="display:none;background:rgba(255,159,10,0.06);border:1px solid rgba(255,159,10,0.25);border-radius:10px;padding:12px 14px;margin-bottom:12px">
+            <div style="font-size:12px;font-weight:700;color:var(--warn);margin-bottom:8px">💳 Credit Account</div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:4px">
+              <span>Outstanding balance</span>
+              <span id="creditOutstanding" style="font-weight:700;color:var(--text)">UGX 0</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:4px">
+              <span>Credit limit</span>
+              <span id="creditLimitVal" style="font-weight:700;color:var(--text)">UGX 0</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted)">
+              <span>Available credit</span>
+              <span id="creditAvailable" style="font-weight:800;color:var(--accent)">UGX 0</span>
+            </div>
+            <div id="creditOverLimitWarn" style="display:none;font-size:11px;color:var(--danger);margin-top:6px;font-weight:600">⚠️ This customer is over their credit limit</div>
+          </div>
+
           <!-- TOTALS -->
           <div class="totbox">
 
@@ -1611,6 +1723,11 @@ img,svg,video{max-width:100%;}
             <div class="trow" id="loyaltyDiscountRow" style="display:none">
               <span class="tl" style="color:var(--accent)">⭐ Points Redeem</span>
               <span class="tv" id="tLoyaltyDisc" style="color:var(--accent)">- UGX 0</span>
+            </div>
+
+            <div class="trow" id="vatRow" style="display:none">
+              <span class="tl" style="color:var(--muted);font-size:11px">Incl. VAT (<span id="vatRateLabel">18</span>%)</span>
+              <span class="tv" id="tVat" style="color:var(--muted);font-size:11px;font-weight:600">UGX 0</span>
             </div>
 
             <div class="trow grand">
@@ -1852,6 +1969,10 @@ img,svg,video{max-width:100%;}
           <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Notes</label>
           <input id="custNotes" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Diabetic patient, prefers generics"/>
         </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Credit Limit (UGX)</label>
+          <input id="custCreditLimit" type="number" min="0" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="0 = no credit account"/>
+        </div>
       </div>
       <div style="display:flex;gap:10px;margin-top:20px">
         <button onclick="closeAddCustomer()" style="flex:1;padding:11px;border-radius:10px;background:var(--s2);color:var(--text);border:1px solid var(--border);font-size:13px;font-weight:600;cursor:pointer">Cancel</button>
@@ -2007,6 +2128,15 @@ Or open: https://app.medvault.ug</div>
       <span><strong style="color:var(--text)">How it works:</strong> MedVault negotiates bulk deals with verified suppliers. You order through MedVault, save 15–30% per drug, and we take a small 3–8% commission.</span>
     </div>
 
+    <!-- Smart Reorder Suggestions -->
+    <div id="reorderWidget" style="display:none;margin-bottom:22px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:15px">🔁 Smart Reorder Suggestions</div>
+        <div id="reorderSubtitle" style="font-size:12px;color:var(--muted)"></div>
+      </div>
+      <div id="reorderCardsRow" style="display:flex;gap:12px;overflow-x:auto;padding-bottom:6px"></div>
+    </div>
+
     <!-- Search & Filter -->
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap">
       <div style="flex:1;min-width:200px;display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px 14px">
@@ -2149,6 +2279,37 @@ Or open: https://app.medvault.ug</div>
       <div style="display:flex;gap:10px;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
         <button onclick="closeSupplierOrderModal()" style="flex:1;padding:11px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer">Cancel</button>
         <button onclick="submitSupplierOrder()" style="flex:2;padding:11px;border-radius:10px;background:var(--accent);border:none;color:#000;font-family:'Syne',sans-serif;font-weight:800;font-size:14px;cursor:pointer">Place Order</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── SUPPLIER BROWSE (ALL BRANDS) MODAL ─── -->
+  <div id="supBrowseOverlay" onclick="if(event.target===this)closeSupplierBrowseModal()" role="dialog" aria-modal="true" aria-labelledby="brandModalSupplierName" aria-hidden="true" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);z-index:200;align-items:center;justify-content:center;padding:16px">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:0;width:980px;max-width:100%;max-height:90vh;display:flex;flex-direction:column;animation:modalIn 0.2s ease;overflow:hidden">
+
+      <!-- Header -->
+      <div style="padding:20px 22px 14px;border-bottom:1px solid var(--border);flex-shrink:0">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+          <div style="min-width:0">
+            <div id="brandModalSupplierName" style="font-family:'Syne',sans-serif;font-weight:800;font-size:19px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Supplier</div>
+            <div id="brandModalCount" style="font-size:12px;color:var(--muted);margin-top:3px" aria-live="polite">Loading…</div>
+          </div>
+          <button onclick="closeSupplierBrowseModal()" aria-label="Close brand browser" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;width:34px;height:34px;flex-shrink:0;cursor:pointer;color:var(--muted);font-size:18px;display:flex;align-items:center;justify-content:center">×</button>
+        </div>
+        <div id="brandModalScorecard" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px"></div>
+        <div style="margin-top:14px;position:relative">
+          <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;pointer-events:none" aria-hidden="true">🔍</span>
+          <input id="brandSearchInput" type="search" oninput="onBrandSearchInput()" placeholder="Search brands by name…" aria-label="Search brands by name"
+            style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 14px 10px 36px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;box-sizing:border-box">
+        </div>
+      </div>
+
+      <!-- Scrollable body -->
+      <div id="brandModalBody" style="overflow-y:auto;padding:18px 22px;flex:1">
+        <div id="brandGrid" class="brand-grid" aria-live="polite"></div>
+        <div id="brandLoadMoreWrap" style="display:none;justify-content:center;padding:18px 0 4px">
+          <button id="brandLoadMoreBtn" onclick="loadMoreBrands()" class="mkt-btn mkt-btn-secondary" style="max-width:220px;flex:none" aria-label="Load more brands">Load More Brands</button>
+        </div>
       </div>
     </div>
   </div>
@@ -3581,6 +3742,7 @@ Or open: https://app.medvault.ug</div>
       <div style="margin-top:10px">
         <div class="rtr"><span>Subtotal</span><span id="rSub"></span></div>
         <div class="rtr"><span>Discount</span><span id="rDisc"></span></div>
+        <div class="rtr" id="rVatRow" style="display:none"><span>Incl. VAT (<span id="rVatRate"></span>%)</span><span id="rVat"></span></div>
         <div class="rtr rgrand"><span>TOTAL</span><span id="rTot"></span></div>
         <div class="rtr" style="margin-top:5px"><span>Payment</span><span id="rPay"></span></div>
         <div class="rtr" style="margin-top:5px"><span>Dispensed by</span><span id="rDisp" style="color:var(--muted)"></span></div>
@@ -3616,17 +3778,139 @@ function resolveApiBase() {
   return '';
 }
 
+// ── IndexedDB-backed key/value store ───────────────────────────
+// Backs MedVaultOffline's storage. IndexedDB has no realistic size
+// ceiling (localStorage caps out around 5-10MB, too small for a
+// pharmacy's full sales history) and all writes here are async, so
+// saving a large table never blocks the UI thread the way a
+// synchronous localStorage.setItem(JSON.stringify(everything)) does.
+// If IndexedDB isn't available (very old/locked-down browsers),
+// MedVaultOffline below falls back to the exact original
+// localStorage-only behavior — nothing regresses.
+const MVStore = {
+  _dbPromise: null,
+  hasIDB(){ return typeof indexedDB !== 'undefined'; },
+  open(){
+    if (this._dbPromise) return this._dbPromise;
+    this._dbPromise = new Promise(resolve => {
+      if (!this.hasIDB()) { resolve(null); return; }
+      try {
+        const req = indexedDB.open('medvault_offline', 1);
+        req.onupgradeneeded = () => { req.result.createObjectStore('kv'); };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror   = () => resolve(null);
+      } catch(e) { resolve(null); }
+    });
+    return this._dbPromise;
+  },
+  async get(key){
+    const db = await this.open();
+    if (!db) return undefined;
+    return new Promise(resolve => {
+      try {
+        const req = db.transaction('kv','readonly').objectStore('kv').get(key);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror   = () => resolve(undefined);
+      } catch(e) { resolve(undefined); }
+    });
+  },
+  set(key, value){
+    // Fire-and-forget: callers don't await this, so a slow write never
+    // blocks the UI. Any failure just means the in-memory cache (and,
+    // on non-IndexedDB browsers, localStorage) remain the source of truth.
+    this.open().then(db => {
+      if (!db) return;
+      try { db.transaction('kv','readwrite').objectStore('kv').put(value, key); } catch(e) {}
+    });
+  },
+};
+
 const MedVaultOffline = {
   DB_KEY:'mv_offline_db', QUEUE_KEY:'mv_sync_queue', META_KEY:'mv_sync_meta',
   API_BASE:resolveApiBase(),
-  getDB(){ try{return JSON.parse(localStorage.getItem(this.DB_KEY)||'{}')}catch{return{}} },
-  saveDB(db){ localStorage.setItem(this.DB_KEY,JSON.stringify(db)); },
+
+  // In-memory caches so getDB()/getQueue()/getMeta() stay perfectly
+  // synchronous for the ~100 call sites elsewhere in this file that
+  // expect an instant return value. Each is seeded synchronously from
+  // localStorage (or empty) on first access so first paint never blocks,
+  // then upgraded in the background once IndexedDB (the real store on
+  // capable browsers) finishes reading. A generation counter on each
+  // cache stops a slow hydration from clobbering a write that happened
+  // after hydration started.
+  _dbCache:null, _dbGen:0,
+  _queueCache:null, _queueGen:0,
+  _metaCache:null, _metaGen:0,
+
+  _seedAndHydrate(cacheProp, genProp, idbKey, lsKey, parseFallback){
+    if (this[cacheProp] === null) {
+      try { this[cacheProp] = JSON.parse(localStorage.getItem(lsKey) || parseFallback); }
+      catch { this[cacheProp] = JSON.parse(parseFallback); }
+      if (MVStore.hasIDB()) {
+        const genAtStart = this[genProp];
+        MVStore.get(idbKey).then(v => {
+          if (v !== undefined && this[genProp] === genAtStart) this[cacheProp] = v;
+        });
+      }
+    }
+    return this[cacheProp];
+  },
+
+  getDB(){ return this._seedAndHydrate('_dbCache','_dbGen','db',this.DB_KEY,'{}'); },
+  saveDB(db){
+    this._dbCache = db; this._dbGen++;
+    if (MVStore.hasIDB()) MVStore.set('db', db);
+    else { try { localStorage.setItem(this.DB_KEY, JSON.stringify(db)); } catch(e) {} }
+  },
   getTable(t){ return this.getDB()[t]||[]; },
   saveTable(t,rows){ const db=this.getDB(); db[t]=rows; this.saveDB(db); },
-  getQueue(){ return JSON.parse(localStorage.getItem(this.QUEUE_KEY)||'[]'); },
-  getMeta(){ try{return JSON.parse(localStorage.getItem(this.META_KEY)||'{}')}catch{return{}} },
-  saveMeta(m){ localStorage.setItem(this.META_KEY,JSON.stringify({...this.getMeta(),...m})); },
+
+  getQueue(){ return this._seedAndHydrate('_queueCache','_queueGen','queue',this.QUEUE_KEY,'[]'); },
+  saveQueue(q){
+    this._queueCache = q; this._queueGen++;
+    if (MVStore.hasIDB()) MVStore.set('queue', q);
+    else { try { localStorage.setItem(this.QUEUE_KEY, JSON.stringify(q)); } catch(e) {} }
+  },
+
+  getMeta(){ return this._seedAndHydrate('_metaCache','_metaGen','meta',this.META_KEY,'{}'); },
+  saveMeta(m){
+    const merged = {...this.getMeta(), ...m};
+    this._metaCache = merged; this._metaGen++;
+    if (MVStore.hasIDB()) MVStore.set('meta', merged);
+    else { try { localStorage.setItem(this.META_KEY, JSON.stringify(merged)); } catch(e) {} }
+  },
+
   isOnline(){ return navigator.onLine; },
+
+  // Wipes every layer of the offline cache: legacy localStorage keys (for
+  // browsers without IndexedDB), the IndexedDB store, and the in-memory
+  // mirror. Must be called on login/logout — otherwise a shared terminal
+  // keeps showing the previous pharmacy's cached drugs, sales, and
+  // customers to whoever logs in next, since the in-memory cache only
+  // re-hydrates when it's null.
+  async clearAll(){
+    localStorage.removeItem(this.DB_KEY);
+    localStorage.removeItem(this.QUEUE_KEY);
+    localStorage.removeItem(this.META_KEY);
+    this._dbCache = null; this._dbGen++;
+    this._queueCache = null; this._queueGen++;
+    this._metaCache = null; this._metaGen++;
+    if (MVStore.hasIDB()) {
+      try {
+        const db = await MVStore.open();
+        if (db) {
+          await new Promise(resolve => {
+            try {
+              const tx = db.transaction('kv','readwrite');
+              tx.objectStore('kv').clear();
+              tx.oncomplete = () => resolve();
+              tx.onerror = () => resolve();
+            } catch(e) { resolve(); }
+          });
+        }
+      } catch(e) {}
+    }
+  },
+
   async requestJSON(path, options = {}){
     const method = options.method || 'GET';
     const token = options.token;
@@ -3661,7 +3945,7 @@ const MedVaultOffline = {
   queueAction(action){
     const q=this.getQueue();
     q.push({...action,id:Date.now()+Math.random(),timestamp:new Date().toISOString(),synced:false});
-    localStorage.setItem(this.QUEUE_KEY,JSON.stringify(q));
+    this.saveQueue(q);
     this.updateSyncUI();
   },
 
@@ -3759,7 +4043,7 @@ const MedVaultOffline = {
       }catch(e){}
     }
     const remaining=queue.filter(a=>!a.synced);
-    localStorage.setItem(this.QUEUE_KEY,JSON.stringify(remaining));
+    this.saveQueue(remaining);
     this.saveMeta({lastPush:new Date().toISOString()});
     this.updateSyncUI();
     return {success:true,pushed,results};
@@ -3897,8 +4181,8 @@ const MedVaultOffline = {
   },
 
   getStorageInfo(){
-    const db=localStorage.getItem(this.DB_KEY)||'';
-    const kbUsed=Math.round(db.length/1024);
+    let kbUsed = 0;
+    try { kbUsed = Math.round(JSON.stringify(this.getDB()).length / 1024); } catch(e) {}
     const q=this.getQueue().filter(a=>!a.synced);
     return {kbUsed,queueLength:q.length,lastSync:this.getMeta().lastSync||'Never',drugsStored:this.getTable('drugs').length,salesStored:this.getTable('sales').length};
   },
@@ -4185,9 +4469,7 @@ async function doLogin() {
     if (data.token) {
       // Success — clear any stale cached data from a previous pharmacy session
       // before saving the new user, so we never show the wrong pharmacy's data
-      localStorage.removeItem('mv_offline_db');
-      localStorage.removeItem('mv_sync_queue');
-      localStorage.removeItem('mv_sync_meta');
+      await MedVaultOffline.clearAll();
       localStorage.removeItem('mv_till');
       localStorage.removeItem('mv_purchase_orders');
 
@@ -4760,7 +5042,19 @@ function openAddDrugModal() {
   } catch(e) {}
   const btn = document.getElementById('addDrugBtn');
   if (btn) btn.textContent = '✅ Add Drug';
+  resetCatalogMatchUI('adCatalogSearch','adCatalogId','adCatalogResults','adCatalogChip');
   document.getElementById('addDrugOverlay').classList.add('open');
+  updateQtyLabel();
+}
+
+// Keeps the "Quantity in Stock (___)" hint in sync with the chosen Unit,
+// so it's always clear what the number staff type actually counts.
+function updateQtyLabel() {
+  const sel  = document.getElementById('adUnitLabel');
+  const hint = document.getElementById('adQtyUnitHint');
+  if (!sel || !hint) return;
+  const label = sel.options[sel.selectedIndex]?.text || 'units';
+  hint.textContent = `(${label.toLowerCase()}s)`;
 }
 
 function closeAddDrug() {
@@ -4788,6 +5082,18 @@ function openEditDrugModal(id) {
   document.getElementById('adSupplier').value = d.supplier || '';
   document.getElementById('adThreshold').value = d.threshold ?? 20;
   document.getElementById('adRx').checked = !!d.requires_rx;
+  document.getElementById('adTaxType').value = d.tax_type || 'zero_rated';
+  document.getElementById('adUnitLabel').value = d.unit_label || 'unit';
+  document.getElementById('adPackSize').value = d.pack_size ?? 1;
+  updateQtyLabel();
+
+  // Restore catalog-link state so editing doesn't silently unlink it
+  resetCatalogMatchUI('adCatalogSearch','adCatalogId','adCatalogResults','adCatalogChip');
+  if (d.catalog_id) {
+    document.getElementById('adCatalogId').value = d.catalog_id;
+    const chip = document.getElementById('adCatalogChip');
+    if (chip) { chip.style.display = 'block'; chip.textContent = '✓ Linked to supplier catalog'; }
+  }
 
   const btn = document.getElementById('addDrugBtn');
   if (btn) btn.textContent = '✅ Save Changes';
@@ -4807,6 +5113,9 @@ async function submitAddDrug() {
   const batch_number   = document.getElementById('batch_number').value.trim();
   const sku        = document.getElementById('drugSku').value.trim();
   const requires_rx= document.getElementById('adRx').checked;
+  const tax_type   = document.getElementById('adTaxType').value;
+  const unit_label = document.getElementById('adUnitLabel').value;
+  const pack_size  = document.getElementById('adPackSize').value;
   const btn        = document.getElementById('addDrugBtn');
 
   if (!name)       { showToast('Drug name is required','warn'); return; }
@@ -4827,7 +5136,8 @@ async function submitAddDrug() {
       unit_price: parseFloat(unit_price), cost_price: parseFloat(cost_price||0),
       expiry_date: expiry_date||null, supplier, threshold: parseInt(threshold||20),
       barcode: barcode||null, sku: sku||null, batch_number: finalBatch,
-      requires_rx };
+      requires_rx, tax_type, unit_label, pack_size: parseInt(pack_size) || 1,
+      catalog_id: document.getElementById('adCatalogId')?.value || null };
     console.log('Frontend: Sending drugData:', drugData);
 
     // Always save locally first (works offline)
@@ -5021,13 +5331,13 @@ function loadInventory(resetPage = false) {
     return `<tr>
       <td><strong>${d.name}</strong>${d._offline?'<span class="offline-tag">📴</span>':''}<div style="font-size:11px;color:var(--muted)">${d.supplier||'—'}</div></td>
       <td><span style="background:rgba(59,130,246,0.12);color:#93c5fd;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600">${d.category||'—'}</span></td>
-      <td><strong>${d.quantity}</strong><span style="color:var(--muted);font-size:11px"> / ${d.max_quantity||'—'}</span></td>
+      <td><strong>${d.quantity}</strong> <span style="color:var(--muted);font-size:11px">${(d.unit_label||'unit')}${d.quantity===1?'':'s'}</span><span style="color:var(--muted);font-size:11px"> / ${d.max_quantity||'—'}</span></td>
       <td><div class="sb"><div class="sf ${fc}" style="width:${pct}%;height:100%"></div></div></td>
       <td>UGX ${parseInt(d.unit_price||0).toLocaleString()}</td>
       <td style="${ec}">${exp?exp.toLocaleDateString('en-UG',{month:'short',year:'numeric'}):'—'}</td>
       <td><span class="pill ${d.stock_status}">${sl}</span></td>
       <td>${canEdit
-        ? `<button class="ab" onclick="openEditDrugModal('${String(d.id).replace(/'/g, '&apos;')}')">✏️</button><button class="ab" title="Adjust Stock" onclick="openStockAdjModal('${String(d.id).replace(/'/g, '&apos;')}','${d.name.replace(/'/g,'&apos;')}',${d.quantity})">📦</button>`
+        ? `<button class="ab" onclick="openEditDrugModal('${String(d.id).replace(/'/g, '&apos;')}')">✏️</button><button class="ab" title="Adjust Stock" onclick="openStockAdjModal('${String(d.id).replace(/'/g, '&apos;')}','${d.name.replace(/'/g,'&apos;')}',${d.quantity},'${(d.unit_label||'unit').replace(/'/g,'&apos;')}')">📦</button>`
         : `<span style="color:var(--muted);font-size:12px">—</span>`}
       </td>
     </tr>`;
@@ -5072,32 +5382,50 @@ function searchDrug() {
   if (!q) { dd.classList.remove('open'); return; }
   const m = allDrugs.filter(d => d.name.toLowerCase().includes(q)).slice(0, 8);
   if (!m.length) { dd.classList.remove('open'); return; }
-  dd.innerHTML = m.map(d => `<div class="ddi" onclick="addToCart(${d.id},'${d.name.replace(/'/g,"\x27")}',${d.unit_price})">
+  dd.innerHTML = m.map(d => `<div class="ddi" onclick="addToCart(${d.id})">
     <div><div style="font-weight:500">${d.name}</div><div style="font-size:11px;color:var(--muted)">${d.category}</div></div>
     <div style="text-align:right"><div style="color:var(--accent);font-weight:600">UGX ${parseInt(d.unit_price).toLocaleString()}</div>
-    <div style="font-size:11px;color:var(--muted)">${d.quantity} in stock</div></div>
+    <div style="font-size:11px;color:var(--muted)">${d.quantity} ${(d.unit_label||'unit')}${d.quantity===1?'':'s'} in stock</div></div>
   </div>`).join('');
   dd.classList.add('open');
 }
 document.addEventListener('click', e => { if (!e.target.closest('.dsrch')) document.getElementById('drugDrop')?.classList.remove('open'); });
 
-function addToCart(id, name, price) {
+function addToCart(id) {
+  const d = (allDrugs || MedVaultOffline.getDrugs()).find(x => x.id === id);
+  if (!d) return;
   const ex = cart.find(x => x.drug_id === id);
-  if (ex) ex.quantity++; else cart.push({ drug_id: id, drug_name: name, unit_price: price, quantity: 1 });
+  if (ex) ex.quantity++;
+  else cart.push({
+    drug_id: id, drug_name: d.name, unit_price: d.unit_price, quantity: 1,
+    batch_number: d.batch_number || null, expiry_date: d.expiry_date || null,
+    tax_type: d.tax_type || 'zero_rated', unit_label: d.unit_label || 'unit',
+  });
   document.getElementById('drugSrch').value = '';
   document.getElementById('drugDrop').classList.remove('open');
-  renderCart(); updTotals(); showToast('Added: ' + name);
+  renderCart(); updTotals(); showToast('Added: ' + d.name);
 }
 function renderCart() {
   const el = document.getElementById('cartEl');
   document.getElementById('cartCount').textContent = cart.reduce((s,c)=>s+c.quantity,0);
   if (!cart.length) { el.innerHTML='<div class="cempty">💊 No items. Search above to add drugs.</div>'; document.getElementById('chargeBtn').disabled=true; const db=document.getElementById('dispatchBtn'); if(db) db.disabled=true; return; }
-  el.innerHTML = cart.map((c,i) => `<div class="citem">
-    <div><div class="cinm">${c.drug_name}</div><div class="ciup">UGX ${parseInt(c.unit_price).toLocaleString()} each</div></div>
+  el.innerHTML = cart.map((c,i) => {
+    const meta = [];
+    if (c.batch_number) meta.push(`Batch ${c.batch_number}`);
+    if (c.expiry_date) {
+      const days = Math.ceil((new Date(c.expiry_date) - new Date()) / 86400000);
+      const soon = days <= 30;
+      meta.push(`<span style="${soon ? 'color:var(--danger);font-weight:600' : ''}">Exp ${new Date(c.expiry_date).toLocaleDateString('en-UG',{month:'short',year:'numeric'})}</span>`);
+    }
+    const taxLabel = { vatable: 'VATABLE', zero_rated: 'ZERO-RATED', exempt: 'EXEMPT' }[c.tax_type] || 'ZERO-RATED';
+    meta.push(`<span style="opacity:0.7">${taxLabel}</span>`);
+    return `<div class="citem">
+    <div><div class="cinm">${c.drug_name}</div><div class="ciup">UGX ${parseInt(c.unit_price).toLocaleString()} per ${c.unit_label||'unit'}${meta.length ? ' · ' + meta.join(' · ') : ''}</div></div>
     <div class="qctrl"><button class="qbtn" onclick="cq(${i},-1)">−</button><div class="qnum">${c.quantity}</div><button class="qbtn" onclick="cq(${i},1)">+</button></div>
     <div class="citot">UGX ${(c.unit_price*c.quantity).toLocaleString()}</div>
     <div class="cirm" onclick="cr(${i})">✕</div>
-  </div>`).join('');
+  </div>`;
+  }).join('');
   document.getElementById('chargeBtn').disabled = false;
   const _db=document.getElementById('dispatchBtn'); if(_db) _db.disabled=false;
 }
@@ -5149,7 +5477,7 @@ function completeSale() {
   document.getElementById('rTot').textContent  = 'UGX '+tot.toLocaleString();
   document.getElementById('rPay').textContent  = payMethod;
   document.getElementById('rDisp').textContent = (getCurrentUser()?.name) || currentUser?.name || '—';
-  document.getElementById('rItems').innerHTML  = cart.map(c=>`<div class="ri"><span>${c.drug_name}</span><span style="text-align:center">${c.quantity}</span><span style="text-align:right">UGX ${(c.unit_price*c.quantity).toLocaleString()}</span></div>`).join('');
+  document.getElementById('rItems').innerHTML  = cart.map(c=>`<div class="ri"><span>${c.drug_name}</span><span style="text-align:center">${fmtQty(c.quantity,c.unit_label)}</span><span style="text-align:right">UGX ${(c.unit_price*c.quantity).toLocaleString()}</span></div>`).join('');
   document.getElementById('overlay').classList.add('open');
 
   // Stop any dispatch polling since we completed sale directly
@@ -5257,7 +5585,7 @@ document.getElementById('rTot').textContent   = 'UGX ' + dispatchTot.toLocaleStr
 document.getElementById('rPay').textContent   = '⏳ Proceed to Cashier';
 document.getElementById('rDisp').textContent  = (getCurrentUser()?.name) || currentUser?.name || '—';
 document.getElementById('rItems').innerHTML   = dispatchCart.map(c =>
-  `<div class="ri"><span>${c.drug_name}</span><span style="text-align:center">${c.quantity}</span><span style="text-align:right">UGX ${(c.unit_price * c.quantity).toLocaleString()}</span></div>`
+  `<div class="ri"><span>${c.drug_name}</span><span style="text-align:center">${fmtQty(c.quantity,c.unit_label)}</span><span style="text-align:right">UGX ${(c.unit_price * c.quantity).toLocaleString()}</span></div>`
 ).join('');
 document.getElementById('overlay').classList.add('open');
 
@@ -5570,7 +5898,7 @@ function openAddCustomer() {
   editingCustomerId = null;
   document.getElementById('addCustTitle').textContent = '👤 Add Customer';
   document.getElementById('addCustBtn').textContent = '✅ Save Customer';
-  ['custName','custPhone','custEmail','custNotes'].forEach(id => document.getElementById(id).value = '');
+  ['custName','custPhone','custEmail','custNotes','custCreditLimit'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('addCustomerOverlay').style.display = 'flex';
 }
 
@@ -5582,6 +5910,7 @@ function editCustomer(c) {
   document.getElementById('custPhone').value = c.phone || '';
   document.getElementById('custEmail').value = c.email || '';
   document.getElementById('custNotes').value = c.notes || '';
+  document.getElementById('custCreditLimit').value = c.credit_limit || '';
   document.getElementById('addCustomerOverlay').style.display = 'flex';
 }
 
@@ -5595,6 +5924,7 @@ async function submitAddCustomer() {
   const phone = document.getElementById('custPhone').value.trim();
   const email = document.getElementById('custEmail').value.trim();
   const notes = document.getElementById('custNotes').value.trim();
+  const credit_limit = parseFloat(document.getElementById('custCreditLimit').value) || 0;
   if (!name) { showToast('Customer name is required','warn'); return; }
   const btn = document.getElementById('addCustBtn');
   btn.disabled = true; btn.textContent = '⏳ Saving…';
@@ -5609,7 +5939,7 @@ async function submitAddCustomer() {
     const method = editingCustomerId ? 'PUT' : 'POST';
     const res = await fetch(url, {
       method, headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, phone, email, notes }),
+      body: JSON.stringify({ name, phone, email, notes, credit_limit }),
     });
     const data = await res.json();
     if (data.error) { showToast('❌ ' + data.error, 'error'); return; }
@@ -6565,11 +6895,13 @@ function openStockCountModal() {
 }
 
 // ── Stock Adjustment ────────────────────────────────────────
-function openStockAdjModal(id, name, currentQty) {
+function openStockAdjModal(id, name, currentQty, unitLabel) {
   if (!canManageDrugs()) { showToast('⛔ Not allowed', 'warn'); return; }
   adjDrugId = id;
+  window._adjUnitLabel = unitLabel || 'unit';
+  window._adjCurrentQty = currentQty;
   document.getElementById('adjDrugName').textContent = name;
-  document.getElementById('adjCurrentQty').textContent = currentQty;
+  document.getElementById('adjCurrentQty').textContent = fmtQty(currentQty, window._adjUnitLabel);
   document.getElementById('adjQtyInput').value = '';
   document.getElementById('adjReason').value = '';
   document.getElementById('adjPreview').style.display = 'none';
@@ -6583,7 +6915,7 @@ function closeStockAdj() {
 }
 
 function updateAdjPreview() {
-  const current = parseInt(document.getElementById('adjCurrentQty').textContent) || 0;
+  const current = window._adjCurrentQty ?? (parseInt(document.getElementById('adjCurrentQty').textContent) || 0);
   const qty = parseInt(document.getElementById('adjQtyInput').value) || 0;
   const type = document.querySelector('input[name="adjType"]:checked')?.value || 'add';
   let newVal;
@@ -6594,7 +6926,7 @@ function updateAdjPreview() {
   const previewVal = document.getElementById('adjPreviewVal');
   if (qty > 0 || type === 'set') {
     preview.style.display = 'block';
-    previewVal.textContent = newVal;
+    previewVal.textContent = fmtQty(newVal, window._adjUnitLabel);
     previewVal.style.color = newVal < 10 ? 'var(--danger)' : newVal < 30 ? 'var(--warn)' : 'var(--accent)';
   } else {
     preview.style.display = 'none';
@@ -7025,17 +7357,15 @@ setInterval(wrapTablesForMobile, 2000);
 // ════════════════════════════════════════════════════════════
 // LOGOUT
 // ════════════════════════════════════════════════════════════
-function doLogout() {
+async function doLogout() {
   if (!confirm('Log out of MedVault?')) return;
   // Clear ALL pharmacy-specific cached data so the next login starts fresh
   localStorage.removeItem('mv_token');
   localStorage.removeItem('mv_user');
   localStorage.removeItem('mv_pharmacy');
-  localStorage.removeItem('mv_offline_db');
-  localStorage.removeItem('mv_sync_queue');
-  localStorage.removeItem('mv_sync_meta');
   localStorage.removeItem('mv_till');
   localStorage.removeItem('mv_purchase_orders');
+  await MedVaultOffline.clearAll();
   window.location.href = 'index.html';
 }
 
@@ -7212,7 +7542,7 @@ async function confirmCollectPayment() {
       document.getElementById('rPay').textContent   = snapshotPayMethod.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
       document.getElementById('rDisp').textContent  = collectedUser?.name || '—';
       document.getElementById('rItems').innerHTML   = its.length
-        ? its.map(i => `<div class="ri"><span>${i.drug_name||i.name||'Item'}</span><span style="text-align:center">${i.quantity}</span><span style="text-align:right">UGX ${Number((i.unit_price||0)*i.quantity).toLocaleString()}</span></div>`).join('')
+        ? its.map(i => `<div class="ri"><span>${i.drug_name||i.name||'Item'}</span><span style="text-align:center">${fmtQty(i.quantity,i.unit_label)}</span><span style="text-align:right">UGX ${Number((i.unit_price||0)*i.quantity).toLocaleString()}</span></div>`).join('')
         : `<div class="ri"><span>Sale items</span><span style="text-align:center">—</span><span style="text-align:right">UGX ${saleTot.toLocaleString()}</span></div>`;
       document.getElementById('overlay').classList.add('open');
     } catch(receiptErr) {
@@ -8140,9 +8470,9 @@ function renderWarehouseTable(filtered) {
       <td style="font-family:monospace;font-size:11px;color:var(--muted)">#${d.id}</td>
       <td><strong>${d.name}</strong>${d.generic_name?`<div style="font-size:11px;color:var(--muted)">${d.generic_name}</div>`:''}</td>
       <td style="font-size:12px;color:var(--muted)">${d.category||'—'}</td>
-      <td style="font-weight:700;text-align:center;color:var(--accent)">${d.quantity}</td>
+      <td style="font-weight:700;text-align:center;color:var(--accent)">${d.quantity}<div style="font-size:10px;font-weight:400;color:var(--muted)">${d.unit_label||'unit'}${d.quantity===1?'':'s'}</div></td>
       <td>
-        <input type="number" min="0" id="wcount_${d.id}" placeholder="Count..."
+        <input type="number" min="0" id="wcount_${d.id}" placeholder="Count in ${d.unit_label||'unit'}s..."
           style="background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text);width:90px;text-align:center;font-size:13px;font-weight:700;outline:none"
           oninput="highlightVariance(${d.id}, ${d.quantity})"/>
       </td>
@@ -8223,8 +8553,8 @@ function exportCountSheet() {
   table{width:100%;border-collapse:collapse}th{background:#f5f5f5;padding:8px;border:1px solid #ddd;text-align:left}
   td{padding:8px;border:1px solid #ddd}.count-box{width:80px;border:1px solid #999;height:24px}</style></head>
   <body><h2>📦 Stock Count Sheet — ${new Date().toLocaleDateString()}</h2>
-  <table><thead><tr><th>#ID</th><th>Drug Name</th><th>Category</th><th>System Qty</th><th>Counted Qty</th><th>Variance</th><th>Notes</th></tr></thead>
-  <tbody>${warehouseDrugs.map(d=>`<tr><td>#${d.id}</td><td>${d.name}</td><td>${d.category||'—'}</td><td style="text-align:center;font-weight:700">${d.quantity}</td><td><div class="count-box"></div></td><td><div class="count-box"></div></td><td><div style="width:120px;border-bottom:1px solid #999;height:20px"></div></td></tr>`).join('')}</tbody>
+  <table><thead><tr><th>#ID</th><th>Drug Name</th><th>Category</th><th>Unit</th><th>System Qty</th><th>Counted Qty</th><th>Variance</th><th>Notes</th></tr></thead>
+  <tbody>${warehouseDrugs.map(d=>`<tr><td>#${d.id}</td><td>${d.name}</td><td>${d.category||'—'}</td><td style="text-align:center">${d.unit_label||'unit'}${d.quantity===1?'':'s'}</td><td style="text-align:center;font-weight:700">${d.quantity}</td><td><div class="count-box"></div></td><td><div class="count-box"></div></td><td><div style="width:120px;border-bottom:1px solid #999;height:20px"></div></td></tr>`).join('')}</tbody>
   </table><br><p>Counted by: _____________________ &nbsp;&nbsp; Date: ___________</p>
   <p>Approved by: _____________________ &nbsp;&nbsp; Date: ___________</p>
   <script>window.onload=()=>window.print()<\/script>
@@ -8377,7 +8707,7 @@ function supTab(tab, el) {
   });
   if (el) { el.style.background = 'var(--accent)'; el.style.color = '#000'; }
   if (tab === 'orders')      loadMktOrders();
-  if (tab === 'marketplace') renderSupplierCards();
+  if (tab === 'marketplace') { renderSupplierCards(); loadReorderSuggestions(); }
   if (tab === 'markup')      renderSupMarkup();
 }
 
@@ -8404,8 +8734,9 @@ async function loadSuppliersPage() {
         emoji:      typeEmoji[s.supplier_type] || '🏢',
         tags:       (s.product_categories || 'General').split(',').map(t => t.trim()),
         products:   parseInt(s.product_count) || 0,
-        rating:     s.rating || 4.5,
-        commission: s.commission_rate || 5,
+        fulfillmentRate:   s.fulfillment_rate,       // null until 5+ scored orders exist
+        avgFulfillDays:    s.avg_fulfillment_days,    // null until at least one delivered order
+        scoredOrders:      s.scored_orders || 0,
         verified:   true,
         featured:   false,
         location:   s.address || 'Uganda',
@@ -8424,6 +8755,7 @@ async function loadSuppliersPage() {
     console.warn('Could not load live suppliers:', e.message);
   }
   renderSupplierCards();
+  loadReorderSuggestions();
 }
 
 // ── MARKETPLACE ───────────────────────────────────────────────
@@ -8435,6 +8767,178 @@ function setSupMktFilter(btn, val) {
   });
   btn.style.background = 'var(--accent)'; btn.style.color = '#000'; btn.style.border = 'none';
   renderSupplierCards();
+}
+
+// ── SMART REORDER SUGGESTIONS ──────────────────────────────────
+// Cross-references the pharmacy's own low/out-of-stock drugs against
+// live marketplace stock across ALL approved suppliers, so reordering
+// is a suggestion pushed to the pharmacist instead of a catalog they
+// have to go search themselves. Cached for the session so switching
+// tabs doesn't re-hit the API every time.
+let _reorderCache = null;
+
+async function loadReorderSuggestions({ force = false } = {}) {
+  const widget = document.getElementById('reorderWidget');
+  if (!widget) return;
+
+  if (_reorderCache && !force) { renderReorderWidget(_reorderCache); return; }
+
+  try {
+    const res  = await fetch(API() + '/api/marketplace/reorder-suggestions?limit=20', { headers: H() });
+    const data = res.ok ? await res.json() : { suggestions: [], total_low_stock: 0 };
+    _reorderCache = data;
+    renderReorderWidget(data);
+  } catch (e) {
+    console.warn('Could not load reorder suggestions:', e.message);
+    widget.style.display = 'none';
+  }
+}
+
+function renderReorderWidget(data) {
+  const widget  = document.getElementById('reorderWidget');
+  const row     = document.getElementById('reorderCardsRow');
+  const subtitle = document.getElementById('reorderSubtitle');
+  if (!widget || !row) return;
+
+  const suggestions = data.suggestions || [];
+  if (!suggestions.length) { widget.style.display = 'none'; return; }
+
+  widget.style.display = '';
+  const unmatched = (data.total_low_stock || 0) - suggestions.length;
+  subtitle.textContent = `${suggestions.length} low-stock drug${suggestions.length===1?'':'s'} matched to suppliers` +
+    (unmatched > 0 ? ` · ${unmatched} more low on stock with no marketplace match yet` : '');
+
+  row.innerHTML = suggestions.map(s => {
+    const best = s.matches[0];
+    if (!best) return '';
+    const scoreTxt = best.fulfillment_rate !== null
+      ? `✓ ${best.fulfillment_rate}% fulfilled${best.avg_fulfillment_days !== null ? ` · ~${best.avg_fulfillment_days}d` : ''}`
+      : '🆕 New supplier';
+    const matchTxt = best.match_type === 'catalog'
+      ? `<span style="color:var(--accent)">🎯 Exact catalog match</span>`
+      : `<span style="color:var(--muted)">~ Possible match (name-based)</span>`;
+    const outOf = s.current_stock === 0 ? 'Out of stock' : `${s.current_stock} left (reorder at ${s.threshold})`;
+    const moreCount = s.matches.length - 1;
+    return `
+    <div class="reorder-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px">
+        <div style="font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(s.drug_name||'').replace(/"/g,'&quot;')}">${s.drug_name}</div>
+      </div>
+      <div style="font-size:11px;color:${s.current_stock===0?'var(--danger)':'#f59e0b'};font-weight:600">${outOf}</div>
+      <div style="font-size:10px;font-weight:600">${matchTxt}</div>
+      <div style="border-top:1px solid var(--border);margin:2px 0;padding-top:8px">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:2px">Best match</div>
+        <div style="font-weight:700;font-size:13px">${best.supplier_name}</div>
+        <div style="font-size:11px;color:var(--muted);margin:3px 0">${scoreTxt}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">
+          <span style="font-weight:800;color:var(--accent);font-size:13px">UGX ${best.wholesale_price.toLocaleString()}</span>
+          <span style="font-size:11px;color:var(--muted)">Suggest: ${s.suggested_qty} ${best.unit || 'units'}</span>
+        </div>
+      </div>
+      <button class="mkt-btn mkt-btn-primary" style="margin-top:2px" onclick="quickReorderFromSuggestion(${best.supplier_id}, '${(best.supplier_name||'').replace(/'/g,"\\'")}', '${(s.drug_name||'').replace(/'/g,"\\'")}', ${s.suggested_qty}, ${best.wholesale_price})" aria-label="Reorder ${(s.drug_name||'').replace(/"/g,'&quot;')} from ${(best.supplier_name||'').replace(/"/g,'&quot;')}">Reorder Now</button>
+      ${moreCount > 0 ? `<button class="mkt-btn mkt-btn-secondary" onclick="openSupplierBrowseModal(${best.supplier_id}, '${(best.supplier_name||'').replace(/'/g,"\\'")}')">+${moreCount} other supplier${moreCount===1?'':'s'} have it</button>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// Pre-fills the existing "New Order" modal with the suggested supplier,
+// drug, quantity and price so the pharmacist just has to confirm and
+// place the order — no manual re-typing of what MedVault already knows.
+async function quickReorderFromSuggestion(supplierId, supplierName, drugName, qty, price) {
+  await openSupplierOrderModal(supplierName);
+  const container = document.getElementById('supNewOrderItems');
+  if (container) container.innerHTML = '';
+  addSupOrderItem({ name: drugName, qty, price });
+  calcSupOrderTotal();
+}
+
+// ── SHARED DRUG CATALOG TYPEAHEAD ──────────────────────────────
+// Used by the pharmacy "Add Drug" form (and mirrored in the supplier
+// portal's "Add Product" form) to optionally link to a canonical
+// drug_catalog entry instead of leaving the match to free text. Linking
+// both sides to the same catalog_id is what lets Smart Reorder
+// Suggestions match exactly instead of guessing from drug names.
+let _catalogDebounce = {};
+
+function onCatalogTypeahead(inputId, hiddenId, resultsId, chipId) {
+  const input = document.getElementById(inputId);
+  if (input && !input._catalogBlurBound) {
+    input._catalogBlurBound = true;
+    // Delay hiding on blur so a click on a result item still registers first
+    input.addEventListener('blur', () => {
+      setTimeout(() => { const el = document.getElementById(resultsId); if (el) el.style.display = 'none'; }, 150);
+    });
+  }
+  const hidden = document.getElementById(hiddenId);
+  if (hidden) hidden.value = ''; // typing invalidates any previously linked entry
+  if (chipId) { const chip = document.getElementById(chipId); if (chip) chip.style.display = 'none'; }
+
+  clearTimeout(_catalogDebounce[inputId]);
+  const q = input.value.trim();
+  if (q.length < 2) { const el = document.getElementById(resultsId); if (el) el.style.display = 'none'; return; }
+
+  _catalogDebounce[inputId] = setTimeout(async () => {
+    try {
+      const res  = await fetch(API() + '/api/drug-catalog/search?q=' + encodeURIComponent(q));
+      const data = res.ok ? await res.json() : { results: [] };
+      renderCatalogResults(resultsId, data.results || [], inputId, hiddenId, chipId, q);
+    } catch (e) {
+      renderCatalogResults(resultsId, [], inputId, hiddenId, chipId, q);
+    }
+  }, 250);
+}
+
+function renderCatalogResults(resultsId, results, inputId, hiddenId, chipId, q) {
+  const el = document.getElementById(resultsId);
+  if (!el) return;
+  el.style.display = 'block';
+  if (!results.length) {
+    el.innerHTML = `<div class="catalog-result-empty">No catalog matches${q ? ` for "${q.replace(/</g,'&lt;')}"` : ''} — you can still save without linking.</div>`;
+    return;
+  }
+  el.innerHTML = results.map(r => {
+    const label = [r.brand_name, r.generic_name, r.strength, r.form].filter(Boolean).join(' · ');
+    const safe  = label.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    return `<div class="catalog-result-item" tabindex="0" role="option"
+              onclick="selectCatalogEntry('${inputId}','${hiddenId}','${resultsId}','${chipId}',${r.id},'${safe}')"
+              onkeydown="if(event.key==='Enter')selectCatalogEntry('${inputId}','${hiddenId}','${resultsId}','${chipId}',${r.id},'${safe}')">${label}</div>`;
+  }).join('');
+}
+
+function selectCatalogEntry(inputId, hiddenId, resultsId, chipId, id, label) {
+  const hidden = document.getElementById(hiddenId);
+  if (hidden) hidden.value = id;
+  const results = document.getElementById(resultsId);
+  if (results) { results.style.display = 'none'; results.innerHTML = ''; }
+  const chip = document.getElementById(chipId);
+  if (chip) { chip.style.display = 'block'; chip.textContent = `✓ Linked: ${label}`; }
+}
+
+function resetCatalogMatchUI(inputId, hiddenId, resultsId, chipId) {
+  const input = document.getElementById(inputId);
+  if (input) input.value = '';
+  const hidden = document.getElementById(hiddenId);
+  if (hidden) hidden.value = '';
+  const results = document.getElementById(resultsId);
+  if (results) { results.style.display = 'none'; results.innerHTML = ''; }
+  const chip = document.getElementById(chipId);
+  if (chip) { chip.style.display = 'none'; chip.textContent = ''; }
+}
+
+// ── SUPPLIER SCORECARD BADGE ──────────────────────────────────
+// Built entirely from real order timestamps (see /public/suppliers and
+// /public/suppliers/:id/scorecard) — never a self-reported star rating,
+// so it can't be inflated by review-stuffing. Suppliers with fewer than
+// 5 scored (delivered+cancelled) orders show "New supplier" instead of
+// a misleadingly precise percentage.
+function renderScoreBadge(s) {
+  if (s.fulfillmentRate === null || s.fulfillmentRate === undefined) {
+    return `<span style="font-size:11px;font-weight:600;color:var(--muted)">🆕 New supplier</span>`;
+  }
+  const rate = s.fulfillmentRate;
+  const color = rate >= 90 ? 'var(--accent)' : rate >= 75 ? '#f59e0b' : 'var(--danger)';
+  const days  = s.avgFulfillDays !== null && s.avgFulfillDays !== undefined ? ` · ~${s.avgFulfillDays}d delivery` : '';
+  return `<span style="font-size:11px;font-weight:700;color:${color}" title="${s.scoredOrders} completed orders on MedVault">✓ ${rate}% fulfilled${days}</span>`;
 }
 
 function renderSupplierCards() {
@@ -8468,16 +8972,197 @@ function renderSupplierCards() {
         <div style="font-size:11px;color:var(--muted);margin-bottom:10px">${s.type==='mfg'?'Manufacturer':s.type==='dist'?'Distributor':'Importer'} · ${s.location}</div>
         <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:11px">${s.tags.map(t=>`<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:5px;background:var(--surface2);color:var(--muted)">${t}</span>`).join('')}</div>
         <div style="display:flex;align-items:center;justify-content:space-between;font-size:12px">
-          <span style="color:#f59e0b">${'★'.repeat(Math.floor(s.rating))}<span style="color:var(--muted)"> ${s.rating}</span></span>
+          ${renderScoreBadge(s)}
           <span style="color:var(--muted)">${s.products} products</span>
-          <span style="font-weight:600;color:var(--accent)">${s.commission}% fee</span>
         </div>
       </div>
-      <div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;gap:7px">
-        <button onclick="openSupplierOrderModal('${s.name}')" style="flex:1;padding:8px;border-radius:8px;background:var(--accent);color:#000;border:none;font-size:12px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">Order Now</button>
-        <button onclick="showToast('Browsing ${s.name}…')" style="flex:1;padding:8px;border-radius:8px;background:var(--surface2);color:var(--text);border:1px solid var(--border);font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">Browse</button>
+      <div class="mkt-card-actions" style="padding:10px 14px;border-top:1px solid var(--border)">
+        <button class="mkt-btn mkt-btn-primary" onclick="openSupplierOrderModal('${s.name.replace(/'/g,"\\'")}')" aria-label="Order now from ${s.name.replace(/"/g,'&quot;')}">Order Now</button>
+        <button class="mkt-btn mkt-btn-secondary" onclick="openSupplierBrowseModal(${s.id}, '${s.name.replace(/'/g,"\\'")}')" aria-label="Browse all brands from ${s.name.replace(/"/g,'&quot;')}">Browse</button>
       </div>
     </div>`).join('');
+}
+
+// ── SUPPLIER BROWSE (ALL BRANDS) MODAL ──────────────────────────
+// Shows every active brand/product a supplier has listed, with
+// search + pagination so large catalogues stay fast. Responses are
+// cached per supplier+search+page so re-opening or paging back
+// doesn't re-hit the API.
+const _brandCache = {};   // { [supplierId]: { [cacheKey]: apiResponse } }
+let _brandModalState = { supplierId:null, supplierName:'', page:1, limit:24, total:0, totalPages:1, search:'', loading:false, items:[] };
+let _brandSearchDebounce = null;
+
+function _brandModalEscHandler(e) { if (e.key === 'Escape') closeSupplierBrowseModal(); }
+
+function openSupplierBrowseModal(supplierId, supplierName) {
+  const overlay = document.getElementById('supBrowseOverlay');
+  if (!overlay) return;
+  _brandModalState = { supplierId, supplierName, page:1, limit:24, total:0, totalPages:1, search:'', loading:false, items:[] };
+  document.getElementById('brandModalSupplierName').textContent = supplierName || 'Supplier';
+  document.getElementById('brandSearchInput').value = '';
+  document.getElementById('brandModalCount').textContent = 'Loading…';
+  document.getElementById('brandGrid').innerHTML = '';
+  document.getElementById('brandModalScorecard').innerHTML = '';
+  overlay.style.display = 'flex';
+  overlay.setAttribute('aria-hidden', 'false');
+  document.addEventListener('keydown', _brandModalEscHandler);
+  loadSupplierBrands({ reset: true });
+  loadSupplierScorecard(supplierId);
+  setTimeout(() => document.getElementById('brandSearchInput')?.focus(), 60);
+}
+
+async function loadSupplierScorecard(supplierId) {
+  const el = document.getElementById('brandModalScorecard');
+  if (!el) return;
+  try {
+    const res = await fetch(API() + `/api/marketplace/public/suppliers/${supplierId}/scorecard`);
+    const d   = res.ok ? await res.json() : null;
+    if (!d) { el.innerHTML = ''; return; }
+
+    const chip = (label, bg, color) =>
+      `<span style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;background:${bg};color:${color}">${label}</span>`;
+
+    if (!d.has_enough_data) {
+      el.innerHTML = chip(`🆕 New supplier · ${d.total_orders} order${d.total_orders===1?'':'s'} so far`, 'var(--surface2)', 'var(--muted)');
+      return;
+    }
+
+    const rateBg    = d.fulfillment_rate >= 90 ? 'rgba(0,212,170,0.15)' : d.fulfillment_rate >= 75 ? 'rgba(245,166,35,0.15)' : 'rgba(239,68,68,0.15)';
+    const rateColor = d.fulfillment_rate >= 90 ? 'var(--accent)' : d.fulfillment_rate >= 75 ? '#f59e0b' : 'var(--danger)';
+    const parts = [chip(`✓ ${d.fulfillment_rate}% fulfilled`, rateBg, rateColor)];
+    if (d.avg_fulfillment_days !== null) parts.push(chip(`🚚 ~${d.avg_fulfillment_days}d avg delivery`, 'var(--surface2)', 'var(--text)'));
+    if (d.avg_confirmation_hours !== null) parts.push(chip(`⚡ ~${d.avg_confirmation_hours}h to confirm`, 'var(--surface2)', 'var(--text)'));
+    parts.push(chip(`📦 ${d.total_orders} total orders on MedVault`, 'var(--surface2)', 'var(--muted)'));
+    el.innerHTML = parts.join('');
+  } catch (e) {
+    console.warn('Could not load supplier scorecard:', e.message);
+    el.innerHTML = '';
+  }
+}
+
+function closeSupplierBrowseModal() {
+  const overlay = document.getElementById('supBrowseOverlay');
+  if (overlay) { overlay.style.display = 'none'; overlay.setAttribute('aria-hidden', 'true'); }
+  document.removeEventListener('keydown', _brandModalEscHandler);
+}
+
+function onBrandSearchInput() {
+  clearTimeout(_brandSearchDebounce);
+  const val = document.getElementById('brandSearchInput').value;
+  _brandSearchDebounce = setTimeout(() => {
+    _brandModalState.search = val.trim();
+    loadSupplierBrands({ reset: true });
+  }, 300);
+}
+
+async function loadSupplierBrands({ reset = false } = {}) {
+  const st = _brandModalState;
+  if (reset) { st.page = 1; st.items = []; }
+  if (st.loading) return;
+  st.loading = true;
+  renderBrandGrid();
+
+  const cacheKey = `${st.search.toLowerCase()}::${st.page}`;
+  _brandCache[st.supplierId] = _brandCache[st.supplierId] || {};
+  let data = _brandCache[st.supplierId][cacheKey];
+
+  if (!data) {
+    try {
+      const params = new URLSearchParams({ page: st.page, limit: st.limit });
+      if (st.search) params.set('search', st.search);
+      const res = await fetch(API() + `/api/marketplace/public/suppliers/${st.supplierId}/products?` + params.toString());
+      data = res.ok ? await res.json() : { products: [], total: 0, totalPages: 1 };
+      _brandCache[st.supplierId][cacheKey] = data;
+    } catch (e) {
+      console.warn('Could not load supplier brands:', e.message);
+      data = { products: [], total: 0, totalPages: 1 };
+    }
+  }
+
+  st.items      = reset ? (data.products || []) : st.items.concat(data.products || []);
+  st.total      = data.total || 0;
+  st.totalPages = data.totalPages || 1;
+  st.loading    = false;
+  renderBrandGrid();
+}
+
+function loadMoreBrands() {
+  const st = _brandModalState;
+  if (st.loading || st.page >= st.totalPages) return;
+  st.page += 1;
+  loadSupplierBrands({ reset: false });
+}
+
+function renderBrandGrid() {
+  const st       = _brandModalState;
+  const grid     = document.getElementById('brandGrid');
+  const countEl  = document.getElementById('brandModalCount');
+  const moreWrap = document.getElementById('brandLoadMoreWrap');
+  if (!grid) return;
+
+  if (countEl) {
+    if (st.total) countEl.textContent = `${st.total} brand${st.total === 1 ? '' : 's'} available` + (st.search ? ` for "${st.search}"` : '');
+    else if (!st.loading) countEl.textContent = '0 brands available';
+  }
+
+  // Initial loading skeleton
+  if (st.loading && !st.items.length) {
+    grid.innerHTML = Array.from({ length: 8 }).map(() =>
+      `<div class="brand-card" aria-hidden="true"><div class="brand-card-img brand-skel"></div><div class="brand-card-body">
+        <div class="brand-skel" style="height:12px;border-radius:4px;width:85%"></div>
+        <div class="brand-skel" style="height:10px;border-radius:4px;width:55%"></div>
+        <div class="brand-skel" style="height:16px;border-radius:4px;width:40%;margin-top:6px"></div>
+      </div></div>`
+    ).join('');
+    if (moreWrap) moreWrap.style.display = 'none';
+    return;
+  }
+
+  if (!st.items.length) {
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px 16px;color:var(--muted)">
+      <div style="font-size:34px;margin-bottom:10px">🔍</div>
+      <div style="font-weight:600;color:var(--text);margin-bottom:4px">No brands found</div>
+      <div style="font-size:13px">${st.search ? 'Try a different search term' : 'This supplier has not listed any brands yet'}</div>
+    </div>`;
+    if (moreWrap) moreWrap.style.display = 'none';
+    return;
+  }
+
+  grid.innerHTML = st.items.map(p => {
+    const qty       = parseInt(p.stock_qty) || 0;
+    const stockCls  = qty > 10 ? 'in' : qty > 0 ? 'low' : 'out';
+    const stockText = qty > 10 ? 'In Stock' : qty > 0 ? `Low Stock (${qty})` : 'Out of Stock';
+    const safeName  = (p.name || 'Unnamed brand').replace(/</g, '&lt;');
+    const img = p.image_url
+      ? `<img src="${p.image_url}" alt="${safeName.replace(/"/g,'&quot;')}" loading="lazy" onerror="this.parentElement.innerHTML='💊'">`
+      : '💊';
+    return `
+    <div class="brand-card" tabindex="0" role="group" aria-label="${safeName.replace(/"/g,'&quot;')}, ${stockText}, UGX ${Number(p.wholesale_price||0).toLocaleString()}">
+      <div class="brand-card-img">${img}</div>
+      <div class="brand-card-body">
+        <div class="brand-card-name" title="${safeName.replace(/"/g,'&quot;')}">${safeName}</div>
+        ${p.generic_name ? `<div class="brand-card-meta">${(p.generic_name).replace(/</g,'&lt;')}</div>` : ''}
+        <span class="brand-stock ${stockCls}">${stockText}</span>
+        <div class="brand-price">UGX ${Number(p.wholesale_price || 0).toLocaleString()}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  if (moreWrap) {
+    moreWrap.style.display = st.page < st.totalPages ? 'flex' : 'none';
+    const btn = document.getElementById('brandLoadMoreBtn');
+    if (btn) btn.textContent = st.loading ? 'Loading…' : 'Load More Brands';
+  }
+
+  // Lazy-load more as the user nears the bottom of the scroll area (in addition
+  // to the explicit "Load More" button, which stays for keyboard/a11y users).
+  const body = document.getElementById('brandModalBody');
+  if (body && !body._brandScrollBound) {
+    body._brandScrollBound = true;
+    body.addEventListener('scroll', () => {
+      if (body.scrollTop + body.clientHeight > body.scrollHeight - 200) loadMoreBrands();
+    });
+  }
 }
 
 // ── MARKUP ────────────────────────────────────────────────────
@@ -8988,15 +9673,18 @@ async function submitReceiveFromOrder() {
   }
 }
 
-function addSupOrderItem() {
+function addSupOrderItem(prefill) {
   const container = document.getElementById('supNewOrderItems');
   if (!container) return;
   const row = document.createElement('div');
   row.style.cssText = 'display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;align-items:end;margin-bottom:8px';
+  const nameVal  = prefill?.name  ? String(prefill.name).replace(/"/g,'&quot;') : '';
+  const qtyVal   = prefill?.qty   ? Number(prefill.qty)   : '';
+  const priceVal = prefill?.price ? Number(prefill.price) : '';
   row.innerHTML = `
-    <input placeholder="Drug name" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none">
-    <input type="number" placeholder="Qty" oninput="calcSupOrderTotal()" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none">
-    <input type="number" placeholder="Unit price" oninput="calcSupOrderTotal()" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none">
+    <input placeholder="Drug name" value="${nameVal}" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none">
+    <input type="number" placeholder="Qty" value="${qtyVal}" oninput="calcSupOrderTotal()" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none">
+    <input type="number" placeholder="Unit price" value="${priceVal}" oninput="calcSupOrderTotal()" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none">
     <button onclick="this.closest('div').remove();calcSupOrderTotal()" style="padding:10px 12px;border-radius:9px;background:rgba(239,68,68,0.1);color:var(--danger);border:none;cursor:pointer">✕</button>`;
   container.appendChild(row);
 }
@@ -9191,6 +9879,8 @@ let _activePriceLevelId = null;
 let _loyaltyCustomerId  = null;
 let _loyaltyBalance     = 0;
 
+let _pharmacyVatRate = 18;
+
 /** Called when sales page loads — fetch price levels once */
 async function initSalesPriceLevels() {
   const base  = MedVaultOffline?.API_BASE || '';
@@ -9209,6 +9899,11 @@ async function initSalesPriceLevels() {
       sel.innerHTML = '<option value="">— Retail (default) —</option>' +
         extras.map(p => `<option value="${p.id}">${p.name}${p.discount_pct > 0 ? ' (-' + p.discount_pct + '%)' : ''}</option>`).join('');
     }
+  } catch (_) {}
+  try {
+    const r2 = await fetch(base + '/api/pharmacy/settings', { headers: { 'Authorization': 'Bearer ' + t } });
+    const d2 = await r2.json();
+    if (d2.vat_rate != null) _pharmacyVatRate = parseFloat(d2.vat_rate);
   } catch (_) {}
 }
 
@@ -9237,9 +9932,10 @@ async function checkLoyaltyOnCustomer(phone) {
     });
     const custData = await custRes.json();
     const cust = custData.customers?.find(c => c.phone === phone);
-    if (!cust) { hideLoyaltyWidget(); return; }
+    if (!cust) { hideLoyaltyWidget(); hideCreditWidget(); return; }
 
     _loyaltyCustomerId = cust.id;
+    checkCreditOnCustomer(cust.id);
 
     const loyRes = await fetch(`${base}/api/loyalty/${cust.id}`, {
       headers: { 'Authorization': 'Bearer ' + t },
@@ -9254,6 +9950,34 @@ async function checkLoyaltyOnCustomer(phone) {
       showLoyaltyEnrollPrompt(cust);
     }
   } catch (_) { hideLoyaltyWidget(); }
+}
+
+/** Called once a registered customer is matched — shows the Vitaria-style
+ *  "Credit: UGX X used of Y limit" strip using the ar_ledger balance. Only
+ *  renders anything if the customer actually has a credit_limit set, so
+ *  walk-in/cash customers never see an empty box. */
+async function checkCreditOnCustomer(customerId) {
+  if (!customerId) { hideCreditWidget(); return; }
+  const base = MedVaultOffline?.API_BASE || '';
+  const t    = localStorage.getItem('mv_token');
+  if (!t) return;
+  try {
+    const r = await fetch(`${base}/api/customers/${customerId}/credit-summary`, {
+      headers: { 'Authorization': 'Bearer ' + t },
+    });
+    if (!r.ok) { hideCreditWidget(); return; }
+    const d = await r.json();
+    if (!d.credit_limit || d.credit_limit <= 0) { hideCreditWidget(); return; }
+    document.getElementById('creditOutstanding').textContent = 'UGX ' + Math.round(d.outstanding_balance).toLocaleString();
+    document.getElementById('creditLimitVal').textContent    = 'UGX ' + Math.round(d.credit_limit).toLocaleString();
+    document.getElementById('creditAvailable').textContent   = 'UGX ' + Math.round(d.available_credit).toLocaleString();
+    document.getElementById('creditOverLimitWarn').style.display = d.over_limit ? '' : 'none';
+    document.getElementById('creditWidget').style.display = '';
+  } catch (_) { hideCreditWidget(); }
+}
+function hideCreditWidget() {
+  const w = document.getElementById('creditWidget');
+  if (w) w.style.display = 'none';
 }
 
 function showLoyaltyWidget(loyData) {
@@ -9347,6 +10071,23 @@ function updTotals() {
   document.getElementById('tSub').textContent  = 'UGX ' + sub.toLocaleString();
   document.getElementById('tDisc').textContent = '- UGX ' + da.toLocaleString();
   document.getElementById('tTot').textContent  = 'UGX ' + tot.toLocaleString();
+
+  // VAT breakdown — informational only, prices are VAT-inclusive so this
+  // doesn't change the total, it just shows how much of it is tax (for
+  // items marked 'vatable' on the drug record).
+  const vatRow = document.getElementById('vatRow');
+  const vatable = cart.filter(c => c.tax_type === 'vatable');
+  if (vatable.length) {
+    const vatSum = vatable.reduce((s, c) => {
+      const lineTotal = c.unit_price * c.quantity;
+      return s + (lineTotal - lineTotal / (1 + _pharmacyVatRate / 100));
+    }, 0);
+    document.getElementById('vatRateLabel').textContent = _pharmacyVatRate;
+    document.getElementById('tVat').textContent = 'UGX ' + Math.round(vatSum).toLocaleString();
+    if (vatRow) vatRow.style.display = '';
+  } else if (vatRow) {
+    vatRow.style.display = 'none';
+  }
 }
 
 // Patch custPh input to trigger loyalty lookup on blur
@@ -9399,10 +10140,23 @@ function completeSale() {
   document.getElementById('rSub').textContent  = 'UGX ' + sub.toLocaleString();
   document.getElementById('rDisc').textContent = disc || redeemPts ? `- UGX ${(da + redeemDisc).toLocaleString()}` : 'None';
   document.getElementById('rTot').textContent  = 'UGX ' + tot.toLocaleString();
+  const vatableItems = cart.filter(c => c.tax_type === 'vatable');
+  const rVatRow = document.getElementById('rVatRow');
+  if (vatableItems.length && rVatRow) {
+    const vatSum = vatableItems.reduce((s, c) => {
+      const lineTotal = c.unit_price * c.quantity;
+      return s + (lineTotal - lineTotal / (1 + _pharmacyVatRate / 100));
+    }, 0);
+    document.getElementById('rVatRate').textContent = _pharmacyVatRate;
+    document.getElementById('rVat').textContent = 'UGX ' + Math.round(vatSum).toLocaleString();
+    rVatRow.style.display = '';
+  } else if (rVatRow) {
+    rVatRow.style.display = 'none';
+  }
   document.getElementById('rPay').textContent  = payMethod;
   document.getElementById('rDisp').textContent = getCurrentUser()?.name || currentUser?.name || '—';
   document.getElementById('rItems').innerHTML  = cart.map(c =>
-    `<div class="ri"><span>${c.drug_name}</span><span style="text-align:center">${c.quantity}</span><span style="text-align:right">UGX ${(c.unit_price*c.quantity).toLocaleString()}</span></div>`
+    `<div class="ri"><span>${c.drug_name}</span><span style="text-align:center">${fmtQty(c.quantity,c.unit_label)}</span><span style="text-align:right">UGX ${(c.unit_price*c.quantity).toLocaleString()}</span></div>`
   ).join('');
   document.getElementById('overlay').classList.add('open');
 
@@ -9416,6 +10170,7 @@ function completeSale() {
   document.getElementById('discInp').value = '';
   if (document.getElementById('loyaltyRedeemInput')) document.getElementById('loyaltyRedeemInput').value = '';
   hideLoyaltyWidget();
+  hideCreditWidget();
   _activePriceLevelId = null;
   const psel = document.getElementById('priceLevelSel');
   if (psel) psel.value = '';
@@ -11294,6 +12049,13 @@ async function submitDept() {
           <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Drug Name *</label>
           <input id="adName" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. Paracetamol 500mg" required/>
         </div>
+        <div style="grid-column:1/-1;display:flex;flex-direction:column;gap:5px;position:relative">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Match to Supplier Catalog <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional — makes marketplace reorder matching exact)</span></label>
+          <input id="adCatalogSearch" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="Search generic name, e.g. Amoxicillin…" autocomplete="off" oninput="onCatalogTypeahead('adCatalogSearch','adCatalogId','adCatalogResults','adCatalogChip')"/>
+          <input type="hidden" id="adCatalogId" value="">
+          <div id="adCatalogResults" class="catalog-results" style="display:none"></div>
+          <div id="adCatalogChip" style="display:none;font-size:11px;color:var(--accent);font-weight:600"></div>
+        </div>
         <div style="display:flex;flex-direction:column;gap:5px">
           <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Category</label>
           <select id="adCategory" style="background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:var(--font);font-size:13px;outline:none">
@@ -11304,7 +12066,28 @@ async function submitDept() {
           </select>
         </div>
         <div style="display:flex;flex-direction:column;gap:5px">
-          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Quantity in Stock *</label>
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Unit <span style="font-weight:400;text-transform:none;letter-spacing:0">(what quantity counts)</span></label>
+          <select id="adUnitLabel" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" onchange="updateQtyLabel()">
+            <option value="unit">Unit (generic)</option>
+            <option value="tablet">Tablet</option>
+            <option value="capsule">Capsule</option>
+            <option value="bottle">Bottle</option>
+            <option value="vial">Vial</option>
+            <option value="ampoule">Ampoule</option>
+            <option value="sachet">Sachet</option>
+            <option value="tube">Tube</option>
+            <option value="box">Box</option>
+            <option value="piece">Piece</option>
+            <option value="ml">ml</option>
+            <option value="pack">Pack</option>
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Units per Pack <span style="font-weight:400;text-transform:none;letter-spacing:0">(for receiving stock)</span></label>
+          <input id="adPackSize" type="number" min="1" value="1" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. 100 (leave 1 if none)"/>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Quantity in Stock * <span id="adQtyUnitHint" style="font-weight:400;text-transform:none;letter-spacing:0">(units)</span></label>
           <input id="adQty" type="number" min="0" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. 200" required/>
         </div>
         <div style="display:flex;flex-direction:column;gap:5px">
@@ -11337,6 +12120,15 @@ async function submitDept() {
         <div style="display:flex;flex-direction:column;gap:5px">
           <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Batch Number <span style="font-weight:400;text-transform:none;letter-spacing:0">(auto if blank)</span></label>
           <input id="batch_number" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px" placeholder="e.g. BN-2025-001 (auto-generated if empty)"/>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px">Tax Type</label>
+          <select id="adTaxType" class="chat-input" style="min-height:auto;padding:10px 14px;border-radius:10px">
+            <option value="zero_rated">Zero-rated</option>
+            <option value="vatable">VATable</option>
+            <option value="exempt">Exempt</option>
+          </select>
         </div>
 
         <div style="display:flex;flex-direction:column;gap:5px">
@@ -11469,7 +12261,7 @@ async function submitDept() {
     <div style="background:var(--s2);border-radius:12px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between">
       <div>
         <div id="adjDrugName" style="font-weight:700;font-size:15px">—</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:2px">Current stock: <strong id="adjCurrentQty" style="color:var(--accent)">—</strong> units</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px">Current stock: <strong id="adjCurrentQty" style="color:var(--accent)">—</strong></div>
       </div>
       <div style="font-size:28px">💊</div>
     </div>
@@ -11514,7 +12306,7 @@ async function submitDept() {
 
       <!-- Live preview -->
       <div id="adjPreview" style="background:rgba(0,212,170,0.06);border:1px solid rgba(0,212,170,0.2);border-radius:10px;padding:12px 16px;font-size:13px;display:none">
-        <span style="color:var(--muted)">New stock will be: </span><strong id="adjPreviewVal" style="color:var(--accent);font-size:16px">—</strong> units
+        <span style="color:var(--muted)">New stock will be: </span><strong id="adjPreviewVal" style="color:var(--accent);font-size:16px">—</strong>
       </div>
     </div>
 
@@ -12230,6 +13022,7 @@ async function _submitCSVImport() {
 
 // ── Helpers ───────────────────────────────────────────────
 function fmt(n) { return Number(n||0).toLocaleString('en-UG'); }
+function fmtQty(qty, unit) { unit = unit || 'unit'; return `${qty} ${unit}${qty === 1 ? '' : 's'}`; }
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString('en-UG',{day:'numeric',month:'short',year:'numeric'}) : '—'; }
 
 function statusPill(s) {
@@ -12458,24 +13251,62 @@ function addGRNItemRow(name='', qty='', cost='') {
   const c = document.getElementById('grnItemsContainer');
   if (!c) return;
   const row = document.createElement('div');
-  row.style.cssText = 'display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:6px;align-items:end;margin-bottom:6px';
+  row.style.cssText = 'display:grid;grid-template-columns:1.6fr 0.8fr 1fr 1fr 1fr auto;gap:6px;align-items:end;margin-bottom:2px';
   row.innerHTML = `
-    <input class="chat-input" style="min-height:auto;padding:8px 12px;border-radius:8px" placeholder="Drug name" value="${name}" list="drugNamesDatalist"/>
-    <input type="number" class="chat-input" style="min-height:auto;padding:8px 12px;border-radius:8px" placeholder="Qty" value="${qty}" oninput="calcGRNTotal()"/>
-    <input type="number" class="chat-input" style="min-height:auto;padding:8px 12px;border-radius:8px" placeholder="Unit cost" value="${cost}" oninput="calcGRNTotal()"/>
-    <input class="chat-input" style="min-height:auto;padding:8px 12px;border-radius:8px;font-size:11px" placeholder="Batch / expiry"/>
-    <button onclick="this.parentElement.remove();calcGRNTotal()" style="padding:8px 10px;border-radius:8px;background:rgba(239,68,68,0.1);color:var(--danger);border:none;cursor:pointer">✕</button>`;
-  c.appendChild(row);
+    <input class="chat-input grn-name" style="min-height:auto;padding:8px 12px;border-radius:8px" placeholder="Drug name" value="${name}" list="drugNamesDatalist" oninput="onGRNNameChange(this)"/>
+    <input type="number" min="0" class="chat-input grn-packs" style="min-height:auto;padding:8px 12px;border-radius:8px;font-size:12px" placeholder="Packs" title="Optional: packs received — auto-fills Qty using this drug's pack size" oninput="onGRNPacksChange(this)"/>
+    <input type="number" class="chat-input grn-qty" style="min-height:auto;padding:8px 12px;border-radius:8px" placeholder="Qty (units)" value="${qty}" oninput="calcGRNTotal()"/>
+    <input type="number" class="chat-input grn-cost" style="min-height:auto;padding:8px 12px;border-radius:8px" placeholder="Unit cost" value="${cost}" oninput="calcGRNTotal()"/>
+    <input class="chat-input grn-batch" style="min-height:auto;padding:8px 12px;border-radius:8px;font-size:11px" placeholder="Batch / expiry"/>
+    <button onclick="this.parentElement.parentElement.remove();calcGRNTotal()" style="padding:8px 10px;border-radius:8px;background:rgba(239,68,68,0.1);color:var(--danger);border:none;cursor:pointer">✕</button>`;
+  const wrap = document.createElement('div');
+  wrap.appendChild(row);
+  const hint = document.createElement('div');
+  hint.className = 'grn-unit-hint';
+  hint.style.cssText = 'font-size:10.5px;color:var(--muted);margin:-4px 0 8px 2px';
+  wrap.appendChild(hint);
+  c.appendChild(wrap);
+}
+
+// When the drug name matches a known drug, show its unit/pack size so
+// staff know what "Packs" will multiply against (e.g. "1 pack = 100 tablets").
+function onGRNNameChange(input) {
+  const wrap = input.closest('div').parentElement;
+  const hint = wrap.querySelector('.grn-unit-hint');
+  const packsInput = wrap.querySelector('.grn-packs');
+  const matched = (typeof allDrugs !== 'undefined' ? allDrugs : [])
+    .find(d => d.name.toLowerCase() === input.value.trim().toLowerCase());
+  if (matched && hint) {
+    const packSize = matched.pack_size || 1;
+    const unit = matched.unit_label || 'unit';
+    hint.textContent = packSize > 1
+      ? `1 pack = ${packSize} ${unit}s — enter Packs to auto-fill Qty, or type Qty (${unit}s) directly`
+      : `Stocked in ${unit}s — enter Qty directly`;
+    packsInput.disabled = packSize <= 1;
+    packsInput.dataset.packSize = packSize;
+  } else if (hint) {
+    hint.textContent = '';
+    packsInput.disabled = false;
+    delete packsInput.dataset.packSize;
+  }
+}
+
+function onGRNPacksChange(input) {
+  const packSize = parseFloat(input.dataset.packSize || 1);
+  const packs = parseFloat(input.value || 0);
+  const row = input.closest('div');
+  const qtyInput = row.querySelector('.grn-qty');
+  if (qtyInput && packs > 0) qtyInput.value = Math.round(packs * packSize);
+  calcGRNTotal();
 }
 
 function calcGRNTotal() {
-  const rows = document.querySelectorAll('#grnItemsContainer > div');
+  const rows = document.querySelectorAll('#grnItemsContainer .grn-qty');
   let total = 0;
-  rows.forEach(row => {
-    const inputs = row.querySelectorAll('input');
-    const qty  = parseFloat(inputs[1]?.value||0);
-    const cost = parseFloat(inputs[2]?.value||0);
-    total += qty * cost;
+  rows.forEach(qtyInput => {
+    const row  = qtyInput.closest('div');
+    const cost = parseFloat(row.querySelector('.grn-cost')?.value || 0);
+    total += parseFloat(qtyInput.value || 0) * cost;
   });
   document.getElementById('grnTotalDisplay').textContent = 'Total: UGX '+fmt(total);
 }
@@ -12488,14 +13319,14 @@ async function submitGRN() {
 
   if (!poId && !supId) { showToast('Please select a supplier','warn'); return; }
 
-  const rows = document.querySelectorAll('#grnItemsContainer > div');
+  const rows = document.querySelectorAll('#grnItemsContainer .grn-qty');
   const items = [];
-  for (const row of rows) {
-    const inputs = row.querySelectorAll('input');
-    const name  = inputs[0]?.value.trim();
-    const qty   = parseInt(inputs[1]?.value||0);
-    const cost  = parseFloat(inputs[2]?.value||0);
-    const batch = inputs[3]?.value.trim();
+  for (const qtyInput of rows) {
+    const row   = qtyInput.closest('div');
+    const name  = row.querySelector('.grn-name')?.value.trim();
+    const qty   = parseInt(qtyInput.value || 0);
+    const cost  = parseFloat(row.querySelector('.grn-cost')?.value || 0);
+    const batch = row.querySelector('.grn-batch')?.value.trim();
     if (!name || qty < 1) continue;
     // Resolve drug_id from in-memory cache so cost_price writeback works
     const matched = (typeof allDrugs !== 'undefined' ? allDrugs : [])

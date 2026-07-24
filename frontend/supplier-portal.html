@@ -182,6 +182,17 @@ img,svg,video{max-width:100%;}
   .tb-title{font-size:15px;}
   .sidebar{width:86vw;}
 }
+
+/* ══════════════ SHARED DRUG CATALOG TYPEAHEAD ══════════════ */
+.catalog-results{
+  position:absolute;top:100%;left:0;right:0;z-index:30;margin-top:4px;
+  background:var(--surface2,var(--s2));border:1px solid var(--border);border-radius:10px;
+  max-height:220px;overflow-y:auto;box-shadow:0 10px 28px rgba(0,0,0,0.35);
+}
+.catalog-result-item{padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);}
+.catalog-result-item:last-child{border-bottom:none;}
+.catalog-result-item:hover,.catalog-result-item:focus-visible{background:var(--surface2,var(--s2));outline:none;}
+.catalog-result-empty{padding:10px 12px;font-size:12px;color:var(--muted);}
 </style>
 </head>
 <body>
@@ -205,6 +216,30 @@ img,svg,video{max-width:100%;}
       <div class="fg"><label class="fl">Password</label><input class="fi" id="lgPass" type="password" placeholder="Your password"/></div>
       <div id="lgErr" style="color:var(--danger);font-size:12px;margin-bottom:10px;display:none"></div>
       <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="doLogin()">Login →</button>
+      <div style="text-align:center;margin-top:12px">
+        <a href="#" onclick="showForgotForm();return false" style="color:var(--muted);font-size:12.5px;text-decoration:underline">Forgot password?</a>
+      </div>
+    </div>
+
+    <!-- Forgot password form -->
+    <div id="forgotForm" style="display:none">
+      <div class="fg">
+        <label class="fl" style="margin-bottom:8px;display:block">Enter the email on your supplier account and we'll send you a link to reset your password.</label>
+        <input class="fi" id="fgEmail" type="email" placeholder="supplier@company.com" onkeydown="if(event.key==='Enter')submitSupplierForgotPassword()"/>
+      </div>
+      <div id="fgMsg" style="font-size:12.5px;color:var(--muted);margin-bottom:14px;display:none"></div>
+      <button class="btn btn-primary" id="fgBtn" style="width:100%;justify-content:center" onclick="submitSupplierForgotPassword()">📧 Send reset link</button>
+      <div style="text-align:center;margin-top:12px">
+        <a href="#" onclick="showLoginForm();return false" style="color:var(--muted);font-size:12.5px;text-decoration:underline">← Back to sign in</a>
+      </div>
+    </div>
+
+    <!-- Reset password form (shown when arriving via ?resetToken=...) -->
+    <div id="resetForm" style="display:none">
+      <div class="fg"><label class="fl">New password</label><input class="fi" id="rsPass1" type="password" placeholder="At least 6 characters" autocomplete="new-password"/></div>
+      <div class="fg"><label class="fl">Confirm new password</label><input class="fi" id="rsPass2" type="password" placeholder="Retype your new password" autocomplete="new-password" onkeydown="if(event.key==='Enter')submitSupplierResetPassword()"/></div>
+      <div id="rsMsg" style="font-size:12.5px;color:var(--muted);margin-bottom:14px;display:none"></div>
+      <button class="btn btn-primary" id="rsBtn" style="width:100%;justify-content:center" onclick="submitSupplierResetPassword()">🔑 Set new password</button>
     </div>
 
     <!-- Registration form -->
@@ -382,6 +417,13 @@ img,svg,video{max-width:100%;}
     <div class="modal-title" id="prodModalTitle">Add Product</div>
     <div class="modal-sub">List a new product on the MedVault marketplace</div>
     <div class="fg"><label class="fl">Product Name *</label><input class="fi" id="pdName" placeholder="e.g. Paracetamol 500mg"/></div>
+    <div class="fg" style="position:relative">
+      <label class="fl">Match to Drug Catalog <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional — makes pharmacy reorder matching exact)</span></label>
+      <input class="fi" id="pdCatalogSearch" placeholder="Search generic name, e.g. Amoxicillin…" autocomplete="off" oninput="onCatalogTypeahead('pdCatalogSearch','pdCatalogId','pdCatalogResults','pdCatalogChip')"/>
+      <input type="hidden" id="pdCatalogId" value="">
+      <div id="pdCatalogResults" class="catalog-results" style="display:none"></div>
+      <div id="pdCatalogChip" style="display:none;font-size:11px;color:var(--accent);font-weight:600;margin-top:4px"></div>
+    </div>
     <div class="form-row">
       <div class="fg"><label class="fl">Generic Name</label><input class="fi" id="pdGeneric" placeholder="Generic / INN name"/></div>
       <div class="fg"><label class="fl">Category *</label>
@@ -483,6 +525,78 @@ async function api(path, opts = {}) {
   return { ok: res.ok, status: res.status, data };
 }
 
+// ── SHARED DRUG CATALOG TYPEAHEAD ──────────────────────────────
+// Lets a supplier optionally link a listing to the same canonical
+// drug_catalog entry a pharmacy links their inventory to (see the
+// mirrored version in app.html's Add Drug form). Linking both sides
+// is what makes a pharmacy's Smart Reorder Suggestions match this
+// exact product instead of guessing from the listing name.
+let _catalogDebounce = {};
+
+function onCatalogTypeahead(inputId, hiddenId, resultsId, chipId) {
+  const input = document.getElementById(inputId);
+  if (input && !input._catalogBlurBound) {
+    input._catalogBlurBound = true;
+    input.addEventListener('blur', () => {
+      setTimeout(() => { const el = document.getElementById(resultsId); if (el) el.style.display = 'none'; }, 150);
+    });
+  }
+  const hidden = document.getElementById(hiddenId);
+  if (hidden) hidden.value = ''; // typing invalidates any previously linked entry
+  if (chipId) { const chip = document.getElementById(chipId); if (chip) chip.style.display = 'none'; }
+
+  clearTimeout(_catalogDebounce[inputId]);
+  const q = input.value.trim();
+  if (q.length < 2) { const el = document.getElementById(resultsId); if (el) el.style.display = 'none'; return; }
+
+  _catalogDebounce[inputId] = setTimeout(async () => {
+    try {
+      const res  = await fetch(API_BASE + '/api/drug-catalog/search?q=' + encodeURIComponent(q));
+      const data = res.ok ? await res.json() : { results: [] };
+      renderCatalogResults(resultsId, data.results || [], inputId, hiddenId, chipId, q);
+    } catch (e) {
+      renderCatalogResults(resultsId, [], inputId, hiddenId, chipId, q);
+    }
+  }, 250);
+}
+
+function renderCatalogResults(resultsId, results, inputId, hiddenId, chipId, q) {
+  const el = document.getElementById(resultsId);
+  if (!el) return;
+  el.style.display = 'block';
+  if (!results.length) {
+    el.innerHTML = `<div class="catalog-result-empty">No catalog matches${q ? ` for "${q.replace(/</g,'&lt;')}"` : ''} — you can still save without linking.</div>`;
+    return;
+  }
+  el.innerHTML = results.map(r => {
+    const label = [r.brand_name, r.generic_name, r.strength, r.form].filter(Boolean).join(' · ');
+    const safe  = label.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    return `<div class="catalog-result-item" tabindex="0" role="option"
+              onclick="selectCatalogEntry('${inputId}','${hiddenId}','${resultsId}','${chipId}',${r.id},'${safe}')"
+              onkeydown="if(event.key==='Enter')selectCatalogEntry('${inputId}','${hiddenId}','${resultsId}','${chipId}',${r.id},'${safe}')">${label}</div>`;
+  }).join('');
+}
+
+function selectCatalogEntry(inputId, hiddenId, resultsId, chipId, id, label) {
+  const hidden = document.getElementById(hiddenId);
+  if (hidden) hidden.value = id;
+  const results = document.getElementById(resultsId);
+  if (results) { results.style.display = 'none'; results.innerHTML = ''; }
+  const chip = document.getElementById(chipId);
+  if (chip) { chip.style.display = 'block'; chip.textContent = `✓ Linked: ${label}`; }
+}
+
+function resetCatalogMatchUI(inputId, hiddenId, resultsId, chipId) {
+  const input = document.getElementById(inputId);
+  if (input) input.value = '';
+  const hidden = document.getElementById(hiddenId);
+  if (hidden) hidden.value = '';
+  const results = document.getElementById(resultsId);
+  if (results) { results.style.display = 'none'; results.innerHTML = ''; }
+  const chip = document.getElementById(chipId);
+  if (chip) { chip.style.display = 'none'; chip.textContent = ''; }
+}
+
 // ════════════════════════════════════════════════════════════
 // AUTH
 // ════════════════════════════════════════════════════════════
@@ -491,7 +605,106 @@ function switchAuthTab(tab) {
   document.getElementById('tabRegister').classList.toggle('active', tab === 'register');
   document.getElementById('loginForm').style.display    = tab === 'login'    ? '' : 'none';
   document.getElementById('registerForm').style.display = tab === 'register' ? '' : 'none';
+  document.getElementById('forgotForm').style.display    = 'none';
+  document.getElementById('resetForm').style.display     = 'none';
 }
+
+function showForgotForm() {
+  document.querySelector('.auth-tabs').style.display = 'none';
+  document.getElementById('loginForm').style.display    = 'none';
+  document.getElementById('registerForm').style.display = 'none';
+  document.getElementById('resetForm').style.display    = 'none';
+  document.getElementById('forgotForm').style.display   = '';
+  document.getElementById('fgEmail').focus();
+}
+
+function showLoginForm() {
+  document.querySelector('.auth-tabs').style.display = '';
+  document.getElementById('forgotForm').style.display = 'none';
+  document.getElementById('resetForm').style.display   = 'none';
+  switchAuthTab('login');
+}
+
+async function submitSupplierForgotPassword() {
+  const email = document.getElementById('fgEmail').value.trim();
+  const msgEl = document.getElementById('fgMsg');
+  msgEl.style.display = 'none';
+  if (!email) { msgEl.textContent = 'Please enter your email address.'; msgEl.style.color = '#ef4444'; msgEl.style.display = ''; return; }
+  const btn = document.getElementById('fgBtn');
+  btn.disabled = true; btn.textContent = '⏳ Sending…';
+  try {
+    const r = await fetch(API_BASE + '/api/marketplace/supplier/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const data = await r.json().catch(() => ({}));
+    // Backend always returns a generic message here (no account
+    // enumeration), so it's shown as success either way.
+    msgEl.textContent = data.message || 'If a supplier account exists with that email, a reset link has been sent. Check your inbox (and spam folder).';
+    msgEl.style.color = 'var(--muted)';
+    msgEl.style.display = '';
+    btn.textContent = '✅ Link sent';
+  } catch (e) {
+    msgEl.textContent = 'Network error — please try again, or contact support@medvault.ug for a manual reset.';
+    msgEl.style.color = '#ef4444';
+    msgEl.style.display = '';
+    btn.disabled = false; btn.textContent = '📧 Send reset link';
+  }
+}
+
+async function submitSupplierResetPassword() {
+  const p1 = document.getElementById('rsPass1').value;
+  const p2 = document.getElementById('rsPass2').value;
+  const msgEl = document.getElementById('rsMsg');
+  msgEl.style.display = 'none';
+  if (!p1 || p1.length < 6) { msgEl.textContent = 'Password must be at least 6 characters.'; msgEl.style.color = '#ef4444'; msgEl.style.display = ''; return; }
+  if (p1 !== p2) { msgEl.textContent = 'Passwords do not match.'; msgEl.style.color = '#ef4444'; msgEl.style.display = ''; return; }
+  const btn = document.getElementById('rsBtn');
+  btn.disabled = true; btn.textContent = '⏳ Saving…';
+  try {
+    const r = await fetch(API_BASE + '/api/marketplace/supplier/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: window._supplierResetToken, password: p1 }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      msgEl.textContent = data.error || 'This link is invalid or has expired. Please request a new one.';
+      msgEl.style.color = '#ef4444';
+      msgEl.style.display = '';
+      btn.disabled = false; btn.textContent = '🔑 Set new password';
+      return;
+    }
+    msgEl.textContent = '✅ Password updated! Redirecting to sign in…';
+    msgEl.style.color = 'var(--muted)';
+    msgEl.style.display = '';
+    setTimeout(() => {
+      window.history.replaceState({}, '', 'supplier-portal.html');
+      showLoginForm();
+      btn.disabled = false; btn.textContent = '🔑 Set new password';
+    }, 1500);
+  } catch (e) {
+    msgEl.textContent = 'Network error — please try again.';
+    msgEl.style.color = '#ef4444';
+    msgEl.style.display = '';
+    btn.disabled = false; btn.textContent = '🔑 Set new password';
+  }
+}
+
+// Arriving from the emailed reset link? Jump straight to the reset form.
+(function checkForSupplierResetToken() {
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('resetToken');
+  if (token) {
+    window._supplierResetToken = token;
+    document.querySelector('.auth-tabs').style.display = 'none';
+    document.getElementById('loginForm').style.display    = 'none';
+    document.getElementById('registerForm').style.display = 'none';
+    document.getElementById('forgotForm').style.display   = 'none';
+    document.getElementById('resetForm').style.display    = '';
+  }
+})();
 
 async function doLogin() {
   const email    = document.getElementById('lgEmail').value.trim();
@@ -713,6 +926,7 @@ function openProductModal() {
   document.getElementById('pdPrice').value   = '';
   document.getElementById('pdMinQty').value  = '';
   document.getElementById('pdStock').value   = '';
+  resetCatalogMatchUI('pdCatalogSearch','pdCatalogId','pdCatalogResults','pdCatalogChip');
   document.getElementById('pdRx').checked    = false;
   document.getElementById('productOverlay').classList.add('open');
 }
@@ -733,6 +947,12 @@ function editProduct(id) {
   document.getElementById('pdStock').value    = p.stock_qty;
   document.getElementById('pdDesc').value     = p.description || '';
   document.getElementById('pdRx').checked     = p.requires_rx;
+  resetCatalogMatchUI('pdCatalogSearch','pdCatalogId','pdCatalogResults','pdCatalogChip');
+  if (p.catalog_id) {
+    document.getElementById('pdCatalogId').value = p.catalog_id;
+    const chip = document.getElementById('pdCatalogChip');
+    if (chip) { chip.style.display = 'block'; chip.textContent = '✓ Linked to drug catalog'; }
+  }
   document.getElementById('productOverlay').classList.add('open');
 }
 
@@ -761,6 +981,7 @@ async function saveProduct() {
     stock_qty:      parseInt(document.getElementById('pdStock').value) || 0,
     description:    document.getElementById('pdDesc').value.trim() || null,
     requires_rx:    document.getElementById('pdRx').checked,
+    catalog_id:     document.getElementById('pdCatalogId')?.value || null,
   };
 
   try {

@@ -4,20 +4,24 @@ const err = require('./_err');
 module.exports = function registerSalesRoutes(app, { query, pool, getNextReceiptNumber, auth, validate, schemas, audit }) {
 
   // GET /api/sales
+  // By default only "live" (non-voided) sales are returned — pass
+  // ?include_voided=1 for an audit view that also shows voided ones.
   app.get('/api/sales', auth, async (req, res) => {
     const { pharmacyId } = req.user;
     try {
       const page   = Math.max(1, parseInt(req.query.page)  || 1);
-      const limit  = Math.min(100, parseInt(req.query.limit) || 50);
+      const limit  = Math.min(500, parseInt(req.query.limit) || 50);
       const offset = (page - 1) * limit;
+      const includeVoided = req.query.include_voided === '1';
+      const voidClause = includeVoided ? '' : 'AND s.voided_at IS NULL';
       const [rows, countRes] = await Promise.all([
         query(
-          `SELECT s.*,json_agg(json_build_object('drug_name',si.drug_name,'quantity',si.quantity,'unit_price',si.unit_price,'total_price',si.total_price)) as items
+          `SELECT s.*,json_agg(json_build_object('drug_name',si.drug_name,'quantity',si.quantity,'unit_price',si.unit_price,'total_price',si.total_price,'tax_type',si.tax_type,'tax_amount',si.tax_amount,'unit_label',si.unit_label)) as items
            FROM sales s LEFT JOIN sale_items si ON si.sale_id=s.id
-           WHERE s.pharmacy_id=$1 GROUP BY s.id ORDER BY s.created_at DESC LIMIT $2 OFFSET $3`,
+           WHERE s.pharmacy_id=$1 ${voidClause} GROUP BY s.id ORDER BY s.created_at DESC LIMIT $2 OFFSET $3`,
           [pharmacyId, limit, offset]
         ),
-        query(`SELECT COUNT(*) as total FROM sales WHERE pharmacy_id=$1`, [pharmacyId]),
+        query(`SELECT COUNT(*) as total FROM sales s WHERE s.pharmacy_id=$1 ${voidClause}`, [pharmacyId]),
       ]);
       const total = parseInt(countRes.rows[0].total);
       res.json({ sales: rows.rows, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
@@ -168,12 +172,45 @@ module.exports = function registerSalesRoutes(app, { query, pool, getNextReceipt
       }
       const sale = saleRes.rows[0];
 
+      // ── VAT / tax type per item ────────────────────────────────
+      // Snapshot tax_type + computed tax_amount onto each sale_item now,
+      // using the pharmacy's current vat_rate and each drug's current
+      // tax_type — so later changes to either don't retroactively alter
+      // a receipt that's already been issued.
+      const vatRateRes = await client.query(`SELECT vat_rate FROM pharmacies WHERE id=$1`, [pharmacyId]);
+      const vatRate = parseFloat(vatRateRes.rows[0]?.vat_rate ?? 18);
+
+      const drugIds = items.map(i => i.drug_id).filter(Boolean);
+      let taxTypeByDrug = {};
+      let unitLabelByDrug = {};
+      if (drugIds.length) {
+        const taxRes = await client.query(
+          `SELECT id, tax_type, unit_label FROM drugs WHERE id = ANY($1::int[]) AND pharmacy_id=$2`,
+          [drugIds, pharmacyId]
+        );
+        taxTypeByDrug   = Object.fromEntries(taxRes.rows.map(r => [r.id, r.tax_type]));
+        unitLabelByDrug = Object.fromEntries(taxRes.rows.map(r => [r.id, r.unit_label]));
+      }
+
+      let vatCollected = 0;
       for (const item of items) {
+        const lineTotal = item.unit_price * item.quantity;
+        // Prices are VAT-inclusive: the customer-facing price doesn't
+        // change based on tax_type, we just work out how much of it is
+        // VAT for reporting/receipt purposes. tax_amount = 0 for
+        // zero_rated/exempt items or items with no linked drug.
+        const taxType = (item.drug_id && taxTypeByDrug[item.drug_id]) || 'zero_rated';
+        const taxAmount = taxType === 'vatable'
+          ? Math.round(lineTotal - lineTotal / (1 + vatRate / 100))
+          : 0;
+        vatCollected += taxAmount;
+        const unitLabel = (item.drug_id && unitLabelByDrug[item.drug_id]) || item.unit_label || 'unit';
+
         await client.query(
-          `INSERT INTO sale_items (sale_id,drug_id,drug_name,quantity,unit_price,total_price)
-           VALUES ($1,$2,$3,$4,$5,$6)`,
+          `INSERT INTO sale_items (sale_id,drug_id,drug_name,quantity,unit_price,total_price,tax_type,tax_amount,unit_label)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
           [sale.id, item.drug_id || null, item.drug_name,
-           item.quantity, item.unit_price, item.unit_price * item.quantity]
+           item.quantity, item.unit_price, lineTotal, taxType, taxAmount, unitLabel]
         );
         if (item.drug_id) {
           await client.query(
@@ -272,6 +309,7 @@ module.exports = function registerSalesRoutes(app, { query, pool, getNextReceipt
         message: '✅ Sale recorded!',
         sale,
         receipt_number: receiptNum,
+        vat: { rate: vatRate, collected: vatCollected },
         loyalty: customer_id ? {
           points_earned:  pointsEarned,
           points_redeemed: redeemPoints,
@@ -351,7 +389,7 @@ module.exports = function registerSalesRoutes(app, { query, pool, getNextReceipt
     const { pharmacyId } = req.user;
     try {
       const result = await query(
-        `SELECT s.*, json_agg(json_build_object('drug_id',si.drug_id,'drug_name',si.drug_name,'quantity',si.quantity,'unit_price',si.unit_price,'total_price',si.total_price)) as items
+        `SELECT s.*, json_agg(json_build_object('drug_id',si.drug_id,'drug_name',si.drug_name,'quantity',si.quantity,'unit_price',si.unit_price,'total_price',si.total_price,'tax_type',si.tax_type,'tax_amount',si.tax_amount,'unit_label',si.unit_label)) as items
          FROM sales s LEFT JOIN sale_items si ON si.sale_id=s.id
          WHERE s.pharmacy_id=$1 GROUP BY s.id ORDER BY s.created_at ASC`,
         [pharmacyId]
@@ -367,7 +405,7 @@ module.exports = function registerSalesRoutes(app, { query, pool, getNextReceipt
     const { pharmacyId } = req.user;
     const { from, to, limit = 500 } = req.query;
     try {
-      let whereExtra = '';
+      let whereExtra = ' AND s.voided_at IS NULL';
       const params = [pharmacyId];
       if (from) { params.push(from); whereExtra += ` AND DATE(s.created_at) >= $${params.length}`; }
       if (to)   { params.push(to);   whereExtra += ` AND DATE(s.created_at) <= $${params.length}`; }

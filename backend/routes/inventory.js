@@ -137,8 +137,11 @@ module.exports = function registerInventoryRoutes(app, { query, pool, auth, can,
 
   // POST /api/inventory  (add new drug + initial batch)
   app.post('/api/inventory', auth, can('inventory:write'), validate(schemas.drug), async (req, res) => {
-    const { name, generic_name, category, quantity, unit_price, cost_price, threshold, expiry_date, supplier, barcode, sku, batch_number } = req.body;
+    const { name, generic_name, category, quantity, unit_price, cost_price, threshold, expiry_date, supplier, barcode, sku, batch_number, tax_type, unit_label, pack_size, catalog_id } = req.body;
     if (!name) return err(res, 400, 'VALIDATION_REQUIRED', 'Drug name is required', 'name');
+    const finalTaxType = ['vatable', 'zero_rated', 'exempt'].includes(tax_type) ? tax_type : 'zero_rated';
+    const finalUnitLabel = (typeof unit_label === 'string' && unit_label.trim()) ? unit_label.trim().slice(0, 30) : 'unit';
+    const finalPackSize  = Math.max(1, parseInt(pack_size) || 1);
 
     const finalBatchNumber = (batch_number && typeof batch_number === 'string' && batch_number.trim())
       ? batch_number.trim()
@@ -162,11 +165,12 @@ module.exports = function registerInventoryRoutes(app, { query, pool, auth, can,
     try {
       await client.query('BEGIN');
       const drugResult = await client.query(
-        `INSERT INTO drugs (pharmacy_id,name,generic_name,category,quantity,unit_price,cost_price,threshold,barcode,sku,supplier,expiry_date)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`,
+        `INSERT INTO drugs (pharmacy_id,name,generic_name,category,quantity,unit_price,cost_price,threshold,barcode,sku,supplier,expiry_date,tax_type,unit_label,pack_size,catalog_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id`,
         [req.user.pharmacyId, name.trim(), generic_name || null, category || 'General',
          parseInt(quantity) || 0, parseFloat(unit_price) || 0, parseFloat(cost_price || 0),
-         parseInt(threshold || 20), barcode || null, sku || null, supplier || null, expiry_date || null]
+         parseInt(threshold || 20), barcode || null, sku || null, supplier || null, expiry_date || null, finalTaxType,
+         finalUnitLabel, finalPackSize, catalog_id ? parseInt(catalog_id) : null]
       );
       const drugId = drugResult.rows[0].id;
       const safeExpiry = expiry_date || '2099-12-31';
@@ -189,17 +193,27 @@ module.exports = function registerInventoryRoutes(app, { query, pool, auth, can,
   // PUT /api/inventory/:id
   app.put('/api/inventory/:id', auth, can('inventory:write'), validate(schemas.drug), async (req, res) => {
     const { pharmacyId } = req.user;
-    const { name, generic_name, category, quantity, unit_price, cost_price, expiry_date, supplier, threshold, requires_rx } = req.body;
+    const { name, generic_name, category, quantity, unit_price, cost_price, expiry_date, supplier, threshold, requires_rx, tax_type, unit_label, pack_size, catalog_id } = req.body;
     try {
       const result = await query(
         `UPDATE drugs
          SET name=$1, generic_name=$2, category=$3, quantity=$4, unit_price=$5,
-             cost_price=$6, expiry_date=$7, supplier=$8, threshold=$9, requires_rx=$10, updated_at=NOW()
-         WHERE id=$11 AND pharmacy_id=$12
+             cost_price=$6, expiry_date=$7, supplier=$8, threshold=$9, requires_rx=$10,
+             tax_type=COALESCE($11, tax_type),
+             unit_label=COALESCE(NULLIF($14, ''), unit_label),
+             pack_size=COALESCE($15, pack_size),
+             catalog_id=COALESCE($16, catalog_id),
+             updated_at=NOW()
+         WHERE id=$12 AND pharmacy_id=$13
          RETURNING *`,
         [name, generic_name, category, parseInt(quantity), parseFloat(unit_price),
          parseFloat(cost_price || 0), expiry_date || null, supplier,
-         parseInt(threshold || 20), Boolean(requires_rx), req.params.id, pharmacyId]
+         parseInt(threshold || 20), Boolean(requires_rx),
+         ['vatable', 'zero_rated', 'exempt'].includes(tax_type) ? tax_type : null,
+         req.params.id, pharmacyId,
+         typeof unit_label === 'string' ? unit_label.trim().slice(0, 30) : null,
+         pack_size != null ? Math.max(1, parseInt(pack_size) || 1) : null,
+         catalog_id ? parseInt(catalog_id) : null]
       );
       if (!result.rows.length) return err(res, 404, 'NOT_FOUND_DRUG', 'Drug not found', 'id');
       await audit(query, { req, action: 'drug.update', entity: 'drug', entityId: req.params.id, payload: { name, quantity, unit_price, category } });
@@ -312,6 +326,35 @@ module.exports = function registerInventoryRoutes(app, { query, pool, auth, can,
         query(`SELECT * FROM drug_batches WHERE drug_id=$1 AND pharmacy_id=$2 ORDER BY created_at DESC`, [req.params.id, pharmacyId]),
       ]);
       res.json({ grn_history: grns.rows, po_history: pos.rows, batches: batches.rows });
+    } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
+  });
+
+  // GET /api/pharmacy/settings — currently just the VAT rate, kept
+  // separate from the main pharmacies row so it's easy to grow later
+  // (receipt header text, currency, etc.) without touching every other
+  // query that already does SELECT * FROM pharmacies.
+  app.get('/api/pharmacy/settings', auth, async (req, res) => {
+    try {
+      const r = await query(`SELECT vat_rate FROM pharmacies WHERE id=$1`, [req.user.pharmacyId]);
+      if (!r.rows.length) return err(res, 404, 'NOT_FOUND', 'Pharmacy not found');
+      res.json({ vat_rate: parseFloat(r.rows[0].vat_rate) });
+    } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
+  });
+
+  // PUT /api/pharmacy/settings — owner/manager only, since it changes
+  // how every future sale's VAT is calculated.
+  app.put('/api/pharmacy/settings', auth, can('settings:write'), async (req, res) => {
+    const { vat_rate } = req.body;
+    if (vat_rate == null || isNaN(parseFloat(vat_rate)) || parseFloat(vat_rate) < 0 || parseFloat(vat_rate) > 100)
+      return err(res, 400, 'VALIDATION_INVALID', 'vat_rate must be a number between 0 and 100', 'vat_rate');
+    try {
+      const r = await query(
+        `UPDATE pharmacies SET vat_rate=$1 WHERE id=$2 RETURNING vat_rate`,
+        [parseFloat(vat_rate), req.user.pharmacyId]
+      );
+      if (!r.rows.length) return err(res, 404, 'NOT_FOUND', 'Pharmacy not found');
+      await audit(query, { req, action: 'pharmacy.settings.update', entity: 'pharmacy', entityId: req.user.pharmacyId, payload: { vat_rate: parseFloat(vat_rate) } });
+      res.json({ message: '✅ VAT rate updated', vat_rate: parseFloat(r.rows[0].vat_rate) });
     } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
   });
 };

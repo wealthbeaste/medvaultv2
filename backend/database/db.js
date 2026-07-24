@@ -309,19 +309,39 @@ async function runMigrations() {
 
     // Back-fill: find the highest sequential number already embedded in any
     // existing receipt_number for this pharmacy (pattern RCP-YYYY-NNNN).
-    // Using MAX of the numeric suffix means the next increment is always 1
-    // higher than any receipt that was ever issued — no collisions possible.
+    // Uses a strict anchored regex match instead of a blind REGEXP_REPLACE:
+    // the old version threw a Postgres error (and so was silently skipped,
+    // via the per-statement try/catch below) for ANY historical receipt
+    // number that didn't end in a plain digit suffix — e.g. the old
+    // offline-placeholder format 'RCP-2026-0007-OFF' — which meant
+    // receipt_counter never actually got backfilled for pharmacies that
+    // had any such rows, leaving their counter stuck near 0.
     `UPDATE pharmacies p
        SET receipt_counter = COALESCE((
-         SELECT MAX(
-           CAST(
-             NULLIF(REGEXP_REPLACE(s.receipt_number, '.*-', ''), '') AS INTEGER
-           )
-         )
+         SELECT MAX((regexp_match(s.receipt_number, '^RCP-\\d{4}-(\\d+)(-OFF)?$'))[1]::int)
          FROM sales s
          WHERE s.pharmacy_id = p.id
        ), 0)
        WHERE receipt_counter = 0`,
+
+    // ── CRITICAL FIX: receipt_number uniqueness must be PER PHARMACY ──────
+    // The original schema declared `receipt_number VARCHAR(50) UNIQUE`,
+    // which Postgres enforces as a single GLOBAL constraint named
+    // `sales_receipt_number_key` across the ENTIRE sales table — i.e.
+    // across every pharmacy on the platform. Meanwhile receipt numbers
+    // are generated from a PER-PHARMACY counter (pharmacies.receipt_counter),
+    // so two different pharmacies both legitimately produce "RCP-2026-0001"
+    // as their very first receipt. The global constraint then rejects the
+    // second pharmacy's insert with "duplicate key value violates unique
+    // constraint sales_receipt_number_key" — this is what was showing up
+    // repeatedly in production and blocking sale/dispatch-collect entirely
+    // for any pharmacy whose counter landed on a number already used by
+    // some other pharmacy. Fix: drop the global constraint, replace it
+    // with a composite unique index scoped to (pharmacy_id, receipt_number)
+    // — which is what "receipt numbers are unique" actually means here.
+    `ALTER TABLE sales DROP CONSTRAINT IF EXISTS sales_receipt_number_key`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_sales_receipt_number_per_pharmacy
+       ON sales(pharmacy_id, receipt_number)`,
 
     // =========================================================
     // NOTIFICATIONS
@@ -364,6 +384,21 @@ async function runMigrations() {
 
     `CREATE INDEX IF NOT EXISTS idx_audit_pharmacy
        ON audit_logs(pharmacy_id, created_at DESC)`,
+
+    // CREATE TABLE IF NOT EXISTS is a no-op if audit_logs already existed
+    // from an earlier schema version — which is exactly what happened here:
+    // the table was created before `org_id` was added above, so on this
+    // database it silently never gained the column, and every audit()
+    // call has been failing with "column org_id does not exist" ever
+    // since (visible in production logs as "[audit] write failed"). These
+    // idempotent ALTERs bring any pre-existing audit_logs table up to date.
+    `ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS org_id INTEGER`,
+    `ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS pharmacy_id INTEGER`,
+    `ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS user_id INTEGER`,
+    `ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS entity VARCHAR(100)`,
+    `ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS entity_id VARCHAR(100)`,
+    `ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS payload JSONB`,
+    `ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS ip_address VARCHAR(50)`,
 
     // =========================================================
     // SUPPLIERS
@@ -1478,7 +1513,177 @@ async function runMigrations() {
       snapshot       JSONB NOT NULL,
       created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE(pharmacy_id, backup_date)
-    )`
+    )`,
+
+    // ── Repair: resync receipt_counter to actual data ─────────
+    // Earlier bugs (counter incrementing *inside* a transaction that
+    // could roll back, plus a frontend double-submit bug) let
+    // pharmacies.receipt_counter drift BEHIND the highest receipt number
+    // actually committed in `sales`. When that happens, even the fixed
+    // "increment outside the transaction" code can still hand out a
+    // number that's already taken by an existing row, because the
+    // counter itself is starting from a stale/low value. This statement
+    // is idempotent and runs on every boot: it bumps each pharmacy's
+    // counter up to the highest numeric suffix actually found in its
+    // receipt numbers, if that's higher than what's currently stored.
+    // It only ever raises the counter, never lowers it, so it's always
+    // safe to re-run.
+    `UPDATE pharmacies p
+     SET receipt_counter = GREATEST(
+       p.receipt_counter,
+       COALESCE((
+         SELECT MAX((regexp_match(s.receipt_number, '^RCP-\\d{4}-(\\d+)(-OFF)?$'))[1]::int)
+         FROM sales s
+         WHERE s.pharmacy_id = p.id
+       ), 0)
+     )`,
+
+    // =========================================================
+    // PASSWORD RESET (self-service, email-based)
+    // Only a SHA-256 hash of the reset token is ever stored — the raw
+    // token exists only in the emailed link, never in the database, so
+    // a database leak alone can't be used to hijack an account (same
+    // principle as never storing plaintext passwords).
+    // =========================================================
+    `CREATE TABLE IF NOT EXISTS password_resets (
+      id           SERIAL PRIMARY KEY,
+      user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token_hash   VARCHAR(128) NOT NULL,
+      expires_at   TIMESTAMPTZ NOT NULL,
+      used_at      TIMESTAMPTZ,
+      requested_ip VARCHAR(50),
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_password_resets_user  ON password_resets(user_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_password_resets_token ON password_resets(token_hash)`,
+    // Housekeeping: old expired/used tokens are harmless to keep (they're
+    // useless without the raw token anyway) but this index keeps lookups
+    // fast even after months of accumulation.
+    `CREATE INDEX IF NOT EXISTS idx_password_resets_expiry ON password_resets(expires_at)`,
+
+    // Marketplace suppliers are NOT rows in `users` — they authenticate
+    // via their own email + password_hash on marketplace_suppliers — so
+    // they need their own reset-token table rather than sharing
+    // password_resets, which hard-FKs to users(id). Same design: only a
+    // hash of the token is stored, single-use, time-limited.
+    `CREATE TABLE IF NOT EXISTS supplier_password_resets (
+      id           SERIAL PRIMARY KEY,
+      supplier_id  INTEGER NOT NULL REFERENCES marketplace_suppliers(id) ON DELETE CASCADE,
+      token_hash   VARCHAR(128) NOT NULL,
+      expires_at   TIMESTAMPTZ NOT NULL,
+      used_at      TIMESTAMPTZ,
+      requested_ip VARCHAR(50),
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_supplier_password_resets_supplier ON supplier_password_resets(supplier_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_supplier_password_resets_token    ON supplier_password_resets(token_hash)`,
+    `CREATE INDEX IF NOT EXISTS idx_supplier_password_resets_expiry   ON supplier_password_resets(expires_at)`,
+
+    // =========================================================
+    // POS checkout enhancements — customer credit limit
+    // Lets the checkout screen show "Credit: UGX X used of Y
+    // limit" the way Vitaria-style POS systems do, using the
+    // outstanding balance already tracked in ar_ledger.
+    // =========================================================
+    `ALTER TABLE customers ADD COLUMN IF NOT EXISTS credit_limit NUMERIC(14,2) NOT NULL DEFAULT 0`,
+
+    // =========================================================
+    // POS checkout enhancements — VAT / tax type per item
+    // Mirrors the ZERORATED / VATABLE tax column seen on other
+    // regional POS systems (e.g. Vitaria). Uganda's standard VAT
+    // rate is 18%, but it's stored per-pharmacy (not hardcoded)
+    // so other markets/rates can be supported later.
+    // =========================================================
+
+    // Default is 'zero_rated' rather than 'vatable' — most staple/
+    // essential medicines are commonly zero-rated or VAT-exempt, and
+    // defaulting existing inventory to VAT-free avoids silently
+    // inflating prices for pharmacies that don't set this up. Owners
+    // can mark specific items 'vatable' as needed.
+    `ALTER TABLE drugs ADD COLUMN IF NOT EXISTS tax_type VARCHAR(20) NOT NULL DEFAULT 'zero_rated'`,
+    `ALTER TABLE pharmacies ADD COLUMN IF NOT EXISTS vat_rate NUMERIC(5,2) NOT NULL DEFAULT 18.00`,
+
+    // Snapshot the tax type + computed VAT amount onto sale_items at the
+    // moment of sale — same reasoning as unit_price already being
+    // snapshotted there: a drug's tax_type or the pharmacy's vat_rate
+    // could change later, but a receipt/VAT return must reflect what was
+    // actually true at the time of that specific sale.
+    `ALTER TABLE sale_items ADD COLUMN IF NOT EXISTS tax_type VARCHAR(20) NOT NULL DEFAULT 'zero_rated'`,
+    `ALTER TABLE sale_items ADD COLUMN IF NOT EXISTS tax_amount NUMERIC(12,2) NOT NULL DEFAULT 0`,
+
+    // =========================================================
+    // UNIT OF MEASURE
+    // Before this, `drugs.quantity` was a bare integer with no
+    // defined meaning — one drug's "200" might be 200 loose tablets,
+    // another's might be 200 boxes of 21. Nothing recorded which, so
+    // stock deduction, reordering, and per-unit pricing were all
+    // silently inconsistent between drugs.
+    //
+    // Fix: `quantity` is now ALWAYS in `unit_label` units (the
+    // smallest unit the pharmacy actually sells/dispenses — tablet,
+    // capsule, bottle, ml, piece, etc). `pack_size` is a separate,
+    // optional convenience number: how many unit_label units come in
+    // one pack as typically purchased from a supplier, so staff can
+    // receive stock by entering "5 packs" instead of doing the
+    // multiplication by hand — see GRN unit-of-measure UI.
+    //
+    // Defaults (unit_label='unit', pack_size=1) are a no-op for every
+    // existing drug — "1 unit = 1 unit" — so nothing already in
+    // inventory changes meaning or behaviour until an owner
+    // deliberately sets a more specific unit on a drug.
+    // =========================================================
+    `ALTER TABLE drugs ADD COLUMN IF NOT EXISTS unit_label VARCHAR(30) NOT NULL DEFAULT 'unit'`,
+    `ALTER TABLE drugs ADD COLUMN IF NOT EXISTS pack_size  INTEGER NOT NULL DEFAULT 1 CHECK (pack_size >= 1)`,
+
+    // Snapshot the unit label onto sale_items too — same rationale as
+    // tax_type/unit_price: a drug's unit_label could be edited later,
+    // but a historical receipt/report line must keep showing what the
+    // unit actually was at the moment of that sale.
+    `ALTER TABLE sale_items ADD COLUMN IF NOT EXISTS unit_label VARCHAR(30) NOT NULL DEFAULT 'unit'`,
+
+    // =========================================================
+    // DRUG CATALOG
+    // A shared, canonical list of drugs (by generic name + strength +
+    // form) that both a pharmacy's own `drugs` table and a supplier's
+    // `marketplace_products` can optionally link to via catalog_id.
+    //
+    // Why: matching a pharmacy's low-stock drug to a supplier's listing
+    // by free-text name (ILIKE) is fuzzy — it can match the wrong
+    // strength/formulation, or miss an exact match entirely because a
+    // pharmacy stocks it under a brand name a supplier doesn't use.
+    // Linking both sides to the same catalog_id makes that match exact.
+    //
+    // This is an additive, backward-compatible migration: catalog_id is
+    // nullable everywhere and existing rows are left unlinked. Matching
+    // logic (see /api/marketplace/reorder-suggestions) prefers an exact
+    // catalog_id match when present and falls back to the old text
+    // match when it isn't — nothing breaks for unlinked data, and
+    // every new listing/drug added through the typeahead gets exact
+    // matching from day one.
+    // =========================================================
+    `CREATE TABLE IF NOT EXISTS drug_catalog (
+      id              SERIAL PRIMARY KEY,
+      generic_name    VARCHAR(255) NOT NULL,
+      brand_name      VARCHAR(255),
+      category        VARCHAR(100) NOT NULL DEFAULT 'General',
+      strength        VARCHAR(50),
+      form            VARCHAR(50),
+      unit            VARCHAR(50)  NOT NULL DEFAULT 'Pack',
+      requires_rx     BOOLEAN      NOT NULL DEFAULT false,
+      normalized_key  VARCHAR(400) NOT NULL,
+      created_by_type VARCHAR(20),
+      created_by_id   INTEGER,
+      created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+      updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_drug_catalog_normkey ON drug_catalog(normalized_key)`,
+    `CREATE INDEX IF NOT EXISTS idx_drug_catalog_generic ON drug_catalog(generic_name)`,
+    `CREATE INDEX IF NOT EXISTS idx_drug_catalog_brand ON drug_catalog(brand_name)`,
+
+    `ALTER TABLE drugs ADD COLUMN IF NOT EXISTS catalog_id INTEGER REFERENCES drug_catalog(id) ON DELETE SET NULL`,
+    `ALTER TABLE marketplace_products ADD COLUMN IF NOT EXISTS catalog_id INTEGER REFERENCES drug_catalog(id) ON DELETE SET NULL`,
+    `CREATE INDEX IF NOT EXISTS idx_drugs_catalog ON drugs(catalog_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_mkt_products_catalog ON marketplace_products(catalog_id)`
 
   ];
 

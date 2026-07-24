@@ -52,6 +52,7 @@ const errorHandler = require('./middleware/errorHandler');
 const app = new App();
 registerRoutes(app);
 app.use(errorHandler);
+app.use('/api/dhis2', dhis2Routes);
 // ── Optional modules ──────────────────────────────────────
 ['./payments/momo', './notifications/whatsapp', './jobs/scheduler'].forEach(mod => {
   try {
@@ -84,6 +85,7 @@ server.listen(PORT, HOST, () => {
     setTimeout(() => {
       try {
         const { runMigrations, seedSuperAdmin } = require('./database/db');
+const dhis2Routes = require('./routes/dhis2');
         runMigrations()
           .then(() => seedSuperAdmin())
           .then(() => console.log('✅ Database ready'))

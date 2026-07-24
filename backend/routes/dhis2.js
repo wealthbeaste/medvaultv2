@@ -1,0 +1,1 @@
+const express=require('express');const router=express.Router();router.get('/reports',(req,res)=>res.json({modules:['HMIS105','HMIS106','DHIS2 Export','NDW Export']}));module.exports=router;
