@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MedVault — NDA Pharmacovigilance (ADR/AEFI)</title>
+<style>
+  :root { --bg:#0b0f14; --s1:#131a22; --border:#232c37; --text:#e8edf2; --muted:#8b98a5; --accent:#3aa6ff; --good:#2ecc71; --warn:#f5a623; --bad:#e74c3c; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,Segoe UI,Roboto,sans-serif; padding:24px; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  .sub { color:var(--muted); font-size:13px; margin-bottom:20px; }
+  .bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:20px; }
+  .bar button { background:var(--accent); border:none; color:#04101c; font-weight:600; padding:9px 16px; border-radius:8px; cursor:pointer; font-size:13px; }
+  .bar button.secondary { background:transparent; border:1px solid var(--border); color:var(--text); }
+  .bar button.danger { background:var(--bad); color:#fff; }
+  table { width:100%; border-collapse:collapse; background:var(--s1); border:1px solid var(--border); border-radius:12px; overflow:hidden; margin-bottom:20px; }
+  th, td { text-align:left; padding:10px 12px; font-size:13px; border-bottom:1px solid var(--border); }
+  th { color:var(--muted); font-weight:600; }
+  tr:last-child td { border-bottom:none; }
+  .pill { display:inline-block; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:600; }
+  .pill.draft { background:rgba(245,166,35,.15); color:var(--warn); }
+  .pill.submitted { background:rgba(46,204,113,.15); color:var(--good); }
+  .section-title { font-size:14px; font-weight:700; margin:24px 0 10px; color:var(--text); }
+  .msg { font-size:13px; color:var(--warn); background:rgba(245,166,35,.1); border:1px solid rgba(245,166,35,.3); padding:10px 12px; border-radius:8px; margin-bottom:16px; }
+  .msg.good { color:var(--good); background:rgba(46,204,113,.1); border-color:rgba(46,204,113,.3); }
+  a.login-link, a.pdf-link { color:var(--accent); }
+  .card { background:var(--s1); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:16px; }
+  .formgrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; }
+  .formgrid label { font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px; }
+  .formgrid input, .formgrid select, .formgrid textarea {
+    background:var(--bg); border:1px solid var(--border); color:var(--text); padding:8px; border-radius:8px; font-size:13px; font-family:inherit;
+  }
+  .formgrid textarea { min-height:60px; resize:vertical; }
+  .full { grid-column:1/-1; }
+  .medrow { display:grid; grid-template-columns:1.2fr 1fr .8fr 1fr .8fr .8fr 1fr .6fr auto; gap:6px; align-items:center; margin-bottom:6px; }
+  .medrow input, .medrow select { width:100%; background:var(--bg); border:1px solid var(--border); color:var(--text); padding:6px; border-radius:6px; font-size:12px; }
+  .checkgroup { display:flex; flex-wrap:wrap; gap:12px; font-size:12px; color:var(--muted); }
+  .checkgroup label { display:flex; align-items:center; gap:4px; }
+  .actions button { font-size:12px; padding:5px 10px; }
+  #formPanel { display:none; }
+</style>
+</head>
+<body>
+
+<h1>NDA Pharmacovigilance — ADR/AEFI Reporting</h1>
+<div class="sub">Capture suspected adverse drug reactions matching the official NDA form (DPS/GDL/013). Uganda has no public API for pharmacovigilance yet — generate the PDF here and submit it via NDA's toll-free line, WhatsApp, regional centre, or the WHO-UMC portal.</div>
+
+<div id="authMsg"></div>
+
+<div class="bar">
+  <button onclick="showForm()">+ New ADR/AEFI Report</button>
+  <button class="secondary" onclick="loadReports()">Refresh List</button>
+</div>
+
+<div class="section-title">Reports</div>
+<div id="reportsWrap">Loading…</div>
+
+<div id="formPanel" class="card">
+  <div class="section-title" style="margin-top:0;">New / Edit ADR Report</div>
+
+  <div class="formgrid">
+    <label>Report type
+      <select id="f_report_type"><option value="initial">Initial</option><option value="follow_up">Follow-up</option></select>
+    </label>
+    <label>Seriousness
+      <select id="f_seriousness"><option value="not_serious">Not serious</option><option value="serious">Serious</option></select>
+    </label>
+    <label>Product type
+      <select id="f_product_type"><option value="drug">Drug</option><option value="vaccine">Vaccine</option><option value="herbal">Herbal</option><option value="other">Other</option></select>
+    </label>
+  </div>
+
+  <div class="section-title">Patient Information</div>
+  <div class="formgrid">
+    <label>Patient initials <input id="f_patient_initials" maxlength="10"></label>
+    <label>Gender
+      <select id="f_patient_gender"><option value="">—</option><option value="male">Male</option><option value="female">Female</option></select>
+    </label>
+    <label>Weight (kg) <input id="f_patient_weight_kg" type="number" step="0.1"></label>
+    <label>Pregnancy status
+      <select id="f_pregnancy_status"><option value="">—</option><option value="yes">Yes</option><option value="no">No</option><option value="n/a">N/A</option></select>
+    </label>
+    <label>Date of birth <input id="f_patient_dob" type="date"></label>
+    <label>Age at onset (if DOB unknown) <input id="f_patient_age_at_onset"></label>
+    <label class="full">Medical history <textarea id="f_medical_history"></textarea></label>
+  </div>
+
+  <div class="section-title">Medical Product Details <span style="font-weight:400;color:var(--muted);font-size:12px;">(all medicines used in the last 1 month)</span></div>
+  <div id="medsWrap"></div>
+  <button class="secondary" type="button" onclick="addMedRow()" style="margin-bottom:16px;">+ Add medicine</button>
+
+  <div class="section-title">Reaction Details</div>
+  <div class="formgrid">
+    <label class="full">Description of ADR/AEFI and treatment given <textarea id="f_reaction_description"></textarea></label>
+    <label>Onset date <input id="f_onset_date" type="date"></label>
+    <label>Onset time <input id="f_onset_time" type="time"></label>
+    <label>Date stopped <input id="f_stopped_date" type="date"></label>
+    <label class="full">Relevant lab results <textarea id="f_lab_results"></textarea></label>
+  </div>
+
+  <div class="section-title">Seriousness / Outcome</div>
+  <div class="checkgroup" id="f_seriousness_reason" style="margin-bottom:12px;">
+    <label><input type="checkbox" value="Prolonged hospitalization"> Prolonged hospitalization</label>
+    <label><input type="checkbox" value="Congenital anomaly"> Congenital anomaly</label>
+    <label><input type="checkbox" value="Disability"> Disability</label>
+    <label><input type="checkbox" value="Death"> Death</label>
+    <label><input type="checkbox" value="Life threatening"> Life threatening</label>
+  </div>
+  <div class="formgrid">
+    <label>Action taken
+      <select id="f_action_taken">
+        <option value="">—</option><option>Drug withdrawn</option><option>Dose increased</option>
+        <option>Dose reduced</option><option>Dose not changed</option><option>Not applicable</option><option>Unknown</option>
+      </select>
+    </label>
+    <label>Outcome
+      <select id="f_outcome">
+        <option value="">—</option><option>Recovered</option><option>Recovering</option><option>Continuing</option>
+        <option>Recovered with sequelae</option><option>Not recovered</option><option>Death</option><option>Unknown</option>
+      </select>
+    </label>
+    <label>Causality
+      <select id="f_causality">
+        <option value="">—</option><option>Certain</option><option>Probable/Likely</option><option>Possible</option>
+        <option>Unlikely</option><option>Unclassifiable</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="section-title">Reporter Details</div>
+  <div class="formgrid">
+    <label>Name <input id="f_reporter_name"></label>
+    <label>Contact <input id="f_reporter_contact"></label>
+    <label>Designation <input id="f_reporter_designation" placeholder="e.g. Pharmacist, Nurse"></label>
+    <label>Institution <input id="f_institution"></label>
+    <label>District <input id="f_district"></label>
+  </div>
+
+  <div id="formMsg" style="margin-top:12px;"></div>
+  <div class="bar" style="margin-top:12px;">
+    <button onclick="saveReport('draft')">Save Draft</button>
+    <button onclick="saveReport('submitted')">Mark as Submitted</button>
+    <button class="secondary" onclick="hideForm()">Cancel</button>
+  </div>
+</div>
+
+<script>
+const BASE = window.location.origin;
+let editingId = null;
+let medRowCount = 0;
+
+function authHeaders() {
+  const token = localStorage.getItem('mv_token');
+  return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (token || '') };
+}
+
+function requireAuth() {
+  const token = localStorage.getItem('mv_token');
+  const el = document.getElementById('authMsg');
+  if (!token) {
+    el.innerHTML = '<div class="msg">Not logged in. <a class="login-link" href="./app.html">Log in to MedVault</a>, then come back to this page.</div>';
+    return false;
+  }
+  el.innerHTML = '';
+  return true;
+}
+
+function addMedRow(vals) {
+  vals = vals || {};
+  const id = 'med_' + (medRowCount++);
+  const wrap = document.getElementById('medsWrap');
+  const row = document.createElement('div');
+  row.className = 'medrow';
+  row.id = id;
+  row.innerHTML = `
+    <input placeholder="Generic name" class="m_generic" value="${vals.generic || ''}">
+    <input placeholder="Brand name" class="m_brand" value="${vals.brand || ''}">
+    <input placeholder="Route" class="m_route" value="${vals.route || ''}">
+    <input placeholder="Dose & frequency" class="m_dose" value="${vals.dose || ''}">
+    <input type="date" class="m_start" value="${vals.start || ''}">
+    <input type="date" class="m_stop" value="${vals.stop || ''}">
+    <input placeholder="Indication" class="m_indication" value="${vals.indication || ''}">
+    <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);">
+      <input type="checkbox" class="m_suspected" ${vals.suspected ? 'checked' : ''}> Suspect
+    </label>
+    <button type="button" class="secondary" onclick="document.getElementById('${id}').remove()">✕</button>
+  `;
+  wrap.appendChild(row);
+}
+
+function collectMeds() {
+  return Array.from(document.querySelectorAll('#medsWrap .medrow')).map(row => ({
+    generic: row.querySelector('.m_generic').value,
+    brand: row.querySelector('.m_brand').value,
+    route: row.querySelector('.m_route').value,
+    dose: row.querySelector('.m_dose').value,
+    start: row.querySelector('.m_start').value,
+    stop: row.querySelector('.m_stop').value,
+    indication: row.querySelector('.m_indication').value,
+    suspected: row.querySelector('.m_suspected').checked,
+  })).filter(m => m.generic || m.brand);
+}
+
+function collectSeriousnessReasons() {
+  return Array.from(document.querySelectorAll('#f_seriousness_reason input:checked')).map(c => c.value);
+}
+
+function showForm(report) {
+  if (!requireAuth()) return;
+  document.getElementById('formPanel').style.display = 'block';
+  document.getElementById('medsWrap').innerHTML = '';
+  editingId = report ? report.id : null;
+
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v ?? ''; };
+  if (report) {
+    set('f_report_type', report.report_type);
+    set('f_seriousness', report.seriousness);
+    set('f_product_type', report.product_type);
+    set('f_patient_initials', report.patient_initials);
+    set('f_patient_gender', report.patient_gender);
+    set('f_patient_weight_kg', report.patient_weight_kg);
+    set('f_pregnancy_status', report.pregnancy_status);
+    set('f_patient_dob', report.patient_dob ? report.patient_dob.slice(0,10) : '');
+    set('f_patient_age_at_onset', report.patient_age_at_onset);
+    set('f_medical_history', report.medical_history);
+    set('f_reaction_description', report.reaction_description);
+    set('f_onset_date', report.onset_date ? report.onset_date.slice(0,10) : '');
+    set('f_onset_time', report.onset_time);
+    set('f_stopped_date', report.stopped_date ? report.stopped_date.slice(0,10) : '');
+    set('f_lab_results', report.lab_results);
+    set('f_action_taken', report.action_taken);
+    set('f_outcome', report.outcome);
+    set('f_causality', report.causality);
+    set('f_reporter_name', report.reporter_name);
+    set('f_reporter_contact', report.reporter_contact);
+    set('f_reporter_designation', report.reporter_designation);
+    set('f_institution', report.institution);
+    set('f_district', report.district);
+    (report.medicines || []).forEach(addMedRow);
+    (report.seriousness_reason || []).forEach(r => {
+      document.querySelectorAll('#f_seriousness_reason input').forEach(c => { if (c.value === r) c.checked = true; });
+    });
+  } else {
+    document.querySelectorAll('.formgrid input, .formgrid select, .formgrid textarea').forEach(el => el.value = '');
+    document.querySelectorAll('#f_seriousness_reason input').forEach(c => c.checked = false);
+    addMedRow();
+  }
+  document.getElementById('formPanel').scrollIntoView({ behavior: 'smooth' });
+}
+
+function hideForm() {
+  document.getElementById('formPanel').style.display = 'none';
+  editingId = null;
+}
+
+async function saveReport(status) {
+  if (!requireAuth()) return;
+  const msg = document.getElementById('formMsg');
+  msg.innerHTML = 'Saving…';
+
+  const body = {
+    report_type: document.getElementById('f_report_type').value,
+    seriousness: document.getElementById('f_seriousness').value,
+    product_type: document.getElementById('f_product_type').value,
+    patient_initials: document.getElementById('f_patient_initials').value,
+    patient_gender: document.getElementById('f_patient_gender').value,
+    patient_weight_kg: document.getElementById('f_patient_weight_kg').value || null,
+    pregnancy_status: document.getElementById('f_pregnancy_status').value,
+    patient_dob: document.getElementById('f_patient_dob').value || null,
+    patient_age_at_onset: document.getElementById('f_patient_age_at_onset').value,
+    medical_history: document.getElementById('f_medical_history').value,
+    medicines: collectMeds(),
+    reaction_description: document.getElementById('f_reaction_description').value,
+    onset_date: document.getElementById('f_onset_date').value || null,
+    onset_time: document.getElementById('f_onset_time').value,
+    stopped_date: document.getElementById('f_stopped_date').value || null,
+    lab_results: document.getElementById('f_lab_results').value,
+    seriousness_reason: collectSeriousnessReasons(),
+    action_taken: document.getElementById('f_action_taken').value,
+    outcome: document.getElementById('f_outcome').value,
+    causality: document.getElementById('f_causality').value,
+    reporter_name: document.getElementById('f_reporter_name').value,
+    reporter_contact: document.getElementById('f_reporter_contact').value,
+    reporter_designation: document.getElementById('f_reporter_designation').value,
+    institution: document.getElementById('f_institution').value,
+    district: document.getElementById('f_district').value,
+    status,
+  };
+
+  try {
+    const url = editingId ? BASE + '/api/adr/reports/' + editingId : BASE + '/api/adr/reports';
+    const method = editingId ? 'PUT' : 'POST';
+    const r = await fetch(url, { method, headers: authHeaders(), body: JSON.stringify(body) });
+    const d = await r.json();
+    if (!r.ok) { msg.innerHTML = '<div class="msg">' + (d.error || 'Failed to save') + '</div>'; return; }
+    msg.innerHTML = '<div class="msg good">Saved as ' + status + '.</div>';
+    setTimeout(() => { hideForm(); loadReports(); }, 700);
+  } catch (e) {
+    msg.innerHTML = '<div class="msg">Network error saving report.</div>';
+  }
+}
+
+async function editReport(id) {
+  if (!requireAuth()) return;
+  const r = await fetch(BASE + '/api/adr/reports/' + id, { headers: authHeaders() });
+  const d = await r.json();
+  if (r.ok) showForm(d.report);
+}
+
+async function deleteReport(id) {
+  if (!requireAuth()) return;
+  if (!confirm('Delete this draft report? This cannot be undone.')) return;
+  await fetch(BASE + '/api/adr/reports/' + id, { method: 'DELETE', headers: authHeaders() });
+  loadReports();
+}
+
+function downloadPdf(id) {
+  const token = localStorage.getItem('mv_token');
+  fetch(BASE + '/api/adr/reports/' + id + '/pdf', { headers: authHeaders() })
+    .then(r => r.blob())
+    .then(blob => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'ADR-' + id + '.pdf';
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    });
+}
+
+async function loadReports() {
+  if (!requireAuth()) return;
+  const wrap = document.getElementById('reportsWrap');
+  wrap.innerHTML = 'Loading…';
+  try {
+    const r = await fetch(BASE + '/api/adr/reports', { headers: authHeaders() });
+    const d = await r.json();
+    if (!r.ok) { wrap.innerHTML = '<div class="msg">' + (d.error || 'Failed to load reports') + '</div>'; return; }
+    if (!d.reports.length) { wrap.innerHTML = '<div class="msg">No ADR reports yet.</div>'; return; }
+
+    wrap.innerHTML = `<table>
+      <tr><th>Report #</th><th>Type</th><th>Seriousness</th><th>Patient</th><th>Reaction</th><th>Status</th><th>Date</th><th></th></tr>
+      ${d.reports.map(rep => `
+        <tr>
+          <td>${rep.report_number || '—'}</td>
+          <td>${rep.report_type || '—'}</td>
+          <td>${rep.seriousness || '—'}</td>
+          <td>${rep.patient_initials || '—'}</td>
+          <td>${(rep.reaction_description || '').slice(0, 40)}${(rep.reaction_description || '').length > 40 ? '…' : ''}</td>
+          <td><span class="pill ${rep.status === 'draft' ? 'draft' : 'submitted'}">${rep.status}</span></td>
+          <td>${new Date(rep.created_at).toISOString().slice(0,10)}</td>
+          <td class="actions" style="display:flex;gap:6px;">
+            <button class="secondary" onclick="editReport(${rep.id})">Edit</button>
+            <button class="secondary" onclick="downloadPdf(${rep.id})">PDF</button>
+            ${rep.status === 'draft' ? `<button class="danger" onclick="deleteReport(${rep.id})">Delete</button>` : ''}
+          </td>
+        </tr>
+      `).join('')}
+    </table>`;
+  } catch (e) {
+    wrap.innerHTML = '<div class="msg">Network error loading reports.</div>';
+  }
+}
+
+if (requireAuth()) loadReports();
+</script>
+</body>
+</html>
