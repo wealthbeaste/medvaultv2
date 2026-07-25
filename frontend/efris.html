@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MedVault — EFRIS / URA E-Invoicing</title>
+<style>
+  :root { --bg:#0b0f14; --s1:#131a22; --border:#232c37; --text:#e8edf2; --muted:#8b98a5; --accent:#3aa6ff; --good:#2ecc71; --warn:#f5a623; --bad:#e74c3c; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,Segoe UI,Roboto,sans-serif; padding:24px; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  .sub { color:var(--muted); font-size:13px; margin-bottom:20px; }
+  .card { background:var(--s1); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:20px; max-width:560px; }
+  .card label { font-size:12px; color:var(--muted); display:block; margin-bottom:10px; }
+  .card input, .card select { width:100%; margin-top:4px; background:var(--bg); border:1px solid var(--border); color:var(--text); padding:8px; border-radius:8px; font-size:13px; }
+  .bar { display:flex; gap:8px; margin-top:8px; }
+  .bar button { background:var(--accent); border:none; color:#04101c; font-weight:600; padding:9px 16px; border-radius:8px; cursor:pointer; font-size:13px; }
+  .bar button.secondary { background:transparent; border:1px solid var(--border); color:var(--text); }
+  .msg { font-size:13px; color:var(--warn); background:rgba(245,166,35,.1); border:1px solid rgba(245,166,35,.3); padding:10px 12px; border-radius:8px; margin-bottom:16px; }
+  .msg.good { color:var(--good); background:rgba(46,204,113,.1); border-color:rgba(46,204,113,.3); }
+  .msg.bad { color:var(--bad); background:rgba(231,76,60,.1); border-color:rgba(231,76,60,.3); }
+  a.login-link { color:var(--accent); }
+  .section-title { font-size:14px; font-weight:700; margin:24px 0 10px; color:var(--text); }
+  table { width:100%; border-collapse:collapse; background:var(--s1); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+  th, td { text-align:left; padding:10px 12px; font-size:13px; border-bottom:1px solid var(--border); }
+  th { color:var(--muted); font-weight:600; }
+  tr:last-child td { border-bottom:none; }
+  .pill { display:inline-block; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:600; }
+  .pill.success { background:rgba(46,204,113,.15); color:var(--good); }
+  .pill.failed { background:rgba(231,76,60,.15); color:var(--bad); }
+  .notice { font-size:12px; color:var(--muted); margin-top:10px; line-height:1.5; }
+  .notice a { color:var(--accent); }
+</style>
+</head>
+<body>
+
+<h1>EFRIS / URA E-Invoicing</h1>
+<div class="sub">MedVault doesn't connect to URA's EFRIS directly — it submits invoices through an EFRIS-accredited aggregator. Sign up with your chosen aggregator first, then paste your own credentials below. MedVault never holds or bills for your EFRIS account.</div>
+
+<div id="authMsg"></div>
+
+<div class="section-title">Connection Settings <span style="font-weight:400;color:var(--muted);font-size:12px;">(this pharmacy only)</span></div>
+<div class="card">
+  <label>Aggregator / Provider
+    <select id="s_provider">
+      <option value="efrisbuddy">EFRISBuddy (efris.dev)</option>
+      <option value="weaf">WEAF</option>
+      <option value="greytrix">Greytrix</option>
+      <option value="other">Other</option>
+    </select>
+  </label>
+  <label>Environment
+    <select id="s_environment">
+      <option value="sandbox">Sandbox (testing)</option>
+      <option value="production">Production (live)</option>
+    </select>
+  </label>
+  <label>API Key <span id="s_key_hint" style="color:var(--muted);"></span>
+    <input id="s_api_key" type="password" placeholder="leave blank to keep existing">
+  </label>
+  <label>Client ID <input id="s_client_id" placeholder="from your aggregator dashboard"></label>
+  <label>TIN <span style="color:var(--muted);">(leave blank if not VAT-registered — issues e-Receipts instead of e-Invoices)</span>
+    <input id="s_tin" placeholder="your URA Tax Identification Number">
+  </label>
+  <label>Device Number <span style="color:var(--muted);">(optional, if your aggregator requires one)</span>
+    <input id="s_device_no">
+  </label>
+  <div class="bar">
+    <button onclick="saveSettings()">Save Settings</button>
+    <button class="secondary" onclick="testConn()">Test Connection</button>
+  </div>
+  <div id="settingsMsg" style="margin-top:10px;"></div>
+  <div class="notice">
+    Don't have credentials yet? Sign up for a free sandbox at
+    <a href="https://efris.dev" target="_blank" rel="noopener">efris.dev</a> (EFRISBuddy) —
+    no cost to test. Production plans are billed annually, directly by your chosen aggregator, not through MedVault.
+  </div>
+</div>
+
+<div class="section-title">Submission History</div>
+<div id="historyWrap">Loading…</div>
+
+<script>
+const BASE = window.location.origin;
+
+function authHeaders() {
+  const token = localStorage.getItem('mv_token');
+  return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (token || '') };
+}
+
+function requireAuth() {
+  const token = localStorage.getItem('mv_token');
+  const el = document.getElementById('authMsg');
+  if (!token) {
+    el.innerHTML = '<div class="msg">Not logged in. <a class="login-link" href="./app.html">Log in to MedVault</a>, then come back to this page.</div>';
+    return false;
+  }
+  el.innerHTML = '';
+  return true;
+}
+
+async function loadSettings() {
+  if (!requireAuth()) return;
+  try {
+    const r = await fetch(BASE + '/api/efris/settings', { headers: authHeaders() });
+    const d = await r.json();
+    if (!r.ok) return;
+    document.getElementById('s_provider').value = d.provider || 'efrisbuddy';
+    document.getElementById('s_environment').value = d.environment || 'sandbox';
+    document.getElementById('s_client_id').value = d.client_id || '';
+    document.getElementById('s_tin').value = d.tin || '';
+    document.getElementById('s_device_no').value = d.device_no || '';
+    document.getElementById('s_key_hint').textContent = d.has_api_key ? '(saved — leave blank to keep it)' : '(not set)';
+  } catch (e) { /* non-fatal */ }
+}
+
+async function saveSettings() {
+  if (!requireAuth()) return;
+  const msg = document.getElementById('settingsMsg');
+  msg.innerHTML = 'Saving…';
+  const body = {
+    provider: document.getElementById('s_provider').value,
+    environment: document.getElementById('s_environment').value,
+    client_id: document.getElementById('s_client_id').value.trim(),
+    tin: document.getElementById('s_tin').value.trim(),
+    device_no: document.getElementById('s_device_no').value.trim(),
+    is_active: true,
+  };
+  const key = document.getElementById('s_api_key').value;
+  if (key) body.api_key = key;
+
+  try {
+    const r = await fetch(BASE + '/api/efris/settings', { method: 'PUT', headers: authHeaders(), body: JSON.stringify(body) });
+    const d = await r.json();
+    if (!r.ok) { msg.innerHTML = '<div class="msg bad">' + (d.error || 'Failed to save settings') + '</div>'; return; }
+    msg.innerHTML = '<div class="msg good">Saved.</div>';
+    document.getElementById('s_api_key').value = '';
+    loadSettings();
+  } catch (e) {
+    msg.innerHTML = '<div class="msg bad">Network error saving settings.</div>';
+  }
+}
+
+async function testConn() {
+  if (!requireAuth()) return;
+  const msg = document.getElementById('settingsMsg');
+  msg.innerHTML = 'Testing…';
+  try {
+    const r = await fetch(BASE + '/api/efris/test-connection', { method: 'POST', headers: authHeaders() });
+    const d = await r.json();
+    if (d.success) {
+      msg.innerHTML = '<div class="msg good">' + (d.message || 'Connected.') + '</div>';
+    } else {
+      msg.innerHTML = '<div class="msg bad">' + (d.error || 'Connection failed.') + '</div>';
+    }
+  } catch (e) {
+    msg.innerHTML = '<div class="msg bad">Network error testing connection.</div>';
+  }
+}
+
+async function loadHistory() {
+  if (!requireAuth()) return;
+  const wrap = document.getElementById('historyWrap');
+  wrap.innerHTML = 'Loading…';
+  try {
+    const r = await fetch(BASE + '/api/efris/submissions', { headers: authHeaders() });
+    const d = await r.json();
+    if (!r.ok) { wrap.innerHTML = '<div class="msg bad">' + (d.error || 'Failed to load history') + '</div>'; return; }
+    if (!d.submissions.length) { wrap.innerHTML = '<div class="msg">No submissions yet.</div>'; return; }
+    wrap.innerHTML = `<table>
+      <tr><th>Receipt #</th><th>Status</th><th>FDN</th><th>Date</th><th></th></tr>
+      ${d.submissions.map(s => `
+        <tr>
+          <td>${s.receipt_number || '—'}</td>
+          <td><span class="pill ${s.status}">${s.status}</span></td>
+          <td>${s.fdn || '—'}</td>
+          <td>${new Date(s.created_at).toISOString().slice(0,10)}</td>
+          <td>${s.qr_code_url ? `<a href="${s.qr_code_url}" target="_blank" class="login-link">QR</a>` : ''}</td>
+        </tr>
+      `).join('')}
+    </table>`;
+  } catch (e) {
+    wrap.innerHTML = '<div class="msg bad">Network error loading history.</div>';
+  }
+}
+
+if (requireAuth()) { loadSettings(); loadHistory(); }
+</script>
+</body>
+</html>
