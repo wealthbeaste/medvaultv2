@@ -1748,6 +1748,107 @@ async function runMigrations() {
     `CREATE UNIQUE INDEX IF NOT EXISTS idx_efris_sub_sale ON efris_submissions(sale_id) WHERE sale_id IS NOT NULL`,
 
     // =========================================================
+    // DHIS2 PHASE 4 — HIV/ART, PMTCT, TB PROGRAM DATA
+    // These feed Uganda's national ART Cohort, PMTCT, and TB
+    // program indicators via DHIS2/NDW export. Nothing here is
+    // reported unless a facility actually enters this data —
+    // the export layer must never fabricate or infer these from
+    // general consultation/lab data alone.
+    // =========================================================
+
+    // Tag lab tests as a specific program category (viral_load, cd4,
+    // gene_xpert/tb, etc.) so exports can find "the viral load test"
+    // rather than guessing from a free-text test name.
+    `ALTER TABLE lab_tests ADD COLUMN IF NOT EXISTS program_category VARCHAR(50) DEFAULT 'general'`,
+
+    // ART enrollment — one row per patient's HIV treatment episode.
+    `CREATE TABLE IF NOT EXISTS art_enrollments (
+      id                 SERIAL PRIMARY KEY,
+      org_id             INTEGER NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
+      pharmacy_id        INTEGER NOT NULL REFERENCES pharmacies(id) ON DELETE CASCADE,
+      patient_id         INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+      art_number         VARCHAR(100),
+      regimen            VARCHAR(100),
+      regimen_line       VARCHAR(20) DEFAULT 'first_line',
+      start_date         DATE NOT NULL,
+      status             VARCHAR(30) NOT NULL DEFAULT 'active',
+      status_date        DATE,
+      transfer_facility  VARCHAR(255),
+      notes              TEXT,
+      created_by         INTEGER REFERENCES users(id),
+      created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_art_pharmacy ON art_enrollments(pharmacy_id, status)`,
+    `CREATE INDEX IF NOT EXISTS idx_art_patient  ON art_enrollments(patient_id)`,
+
+    // Viral load results — linked to lab_results when available, but
+    // kept as its own table so date/value/suppression status are
+    // explicit and don't depend on parsing free-text lab result values.
+    `CREATE TABLE IF NOT EXISTS viral_load_results (
+      id               SERIAL PRIMARY KEY,
+      art_enrollment_id INTEGER NOT NULL REFERENCES art_enrollments(id) ON DELETE CASCADE,
+      pharmacy_id      INTEGER NOT NULL REFERENCES pharmacies(id) ON DELETE CASCADE,
+      lab_result_id    INTEGER REFERENCES lab_results(id) ON DELETE SET NULL,
+      sample_date      DATE NOT NULL,
+      result_date      DATE,
+      copies_per_ml    NUMERIC,
+      is_suppressed    BOOLEAN,
+      notes            TEXT,
+      created_by       INTEGER REFERENCES users(id),
+      created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_vl_enrollment ON viral_load_results(art_enrollment_id, sample_date DESC)`,
+    `CREATE INDEX IF NOT EXISTS idx_vl_pharmacy   ON viral_load_results(pharmacy_id, sample_date DESC)`,
+
+    // PMTCT enrollment — mother-centric, optionally linked to an infant
+    // patient record once born.
+    `CREATE TABLE IF NOT EXISTS pmtct_enrollments (
+      id                SERIAL PRIMARY KEY,
+      org_id            INTEGER NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
+      pharmacy_id       INTEGER NOT NULL REFERENCES pharmacies(id) ON DELETE CASCADE,
+      mother_patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+      infant_patient_id INTEGER REFERENCES patients(id) ON DELETE SET NULL,
+      hiv_status        VARCHAR(30),
+      art_enrollment_id INTEGER REFERENCES art_enrollments(id) ON DELETE SET NULL,
+      lmp_date          DATE,
+      edd_date          DATE,
+      delivery_date     DATE,
+      infant_prophylaxis VARCHAR(100),
+      infant_test_result VARCHAR(30),
+      status            VARCHAR(30) NOT NULL DEFAULT 'active',
+      notes             TEXT,
+      created_by        INTEGER REFERENCES users(id),
+      created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_pmtct_pharmacy ON pmtct_enrollments(pharmacy_id, status)`,
+    `CREATE INDEX IF NOT EXISTS idx_pmtct_mother   ON pmtct_enrollments(mother_patient_id)`,
+
+    // TB screening — one row per screening event, distinct from a
+    // full consultation since screening happens at every visit.
+    `CREATE TABLE IF NOT EXISTS tb_screenings (
+      id              SERIAL PRIMARY KEY,
+      org_id          INTEGER NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
+      pharmacy_id     INTEGER NOT NULL REFERENCES pharmacies(id) ON DELETE CASCADE,
+      patient_id      INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+      consultation_id INTEGER REFERENCES consultations(id) ON DELETE SET NULL,
+      screening_date  DATE NOT NULL DEFAULT CURRENT_DATE,
+      symptoms        JSONB NOT NULL DEFAULT '[]',
+      presumptive_tb  BOOLEAN NOT NULL DEFAULT false,
+      referred_for_test BOOLEAN NOT NULL DEFAULT false,
+      test_result     VARCHAR(30),
+      treatment_started BOOLEAN NOT NULL DEFAULT false,
+      notes           TEXT,
+      created_by      INTEGER REFERENCES users(id),
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_tb_pharmacy ON tb_screenings(pharmacy_id, screening_date DESC)`,
+    `CREATE INDEX IF NOT EXISTS idx_tb_patient  ON tb_screenings(patient_id)`,
+
+    // Counters for atomic ART/PMTCT numbering, same pattern as other counters
+    `ALTER TABLE pharmacies ADD COLUMN IF NOT EXISTS art_counter INTEGER NOT NULL DEFAULT 0`,
+
+    // =========================================================
     // ADR REPORTS — NDA Pharmacovigilance (Uganda)
     // Structured capture matching the official NDA ADR/AEFI
     // reporting form (Appendix 3, DPS/GDL/013). No public NDA
