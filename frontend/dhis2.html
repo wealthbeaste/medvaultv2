@@ -1,1 +1,246 @@
-<html><body><h1>DHIS2 Reporting</h1></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MedVault — MOH / DHIS2 Reporting</title>
+<style>
+  :root { --bg:#0b0f14; --s1:#131a22; --border:#232c37; --text:#e8edf2; --muted:#8b98a5; --accent:#3aa6ff; --good:#2ecc71; --warn:#f5a623; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,Segoe UI,Roboto,sans-serif; padding:24px; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  .sub { color:var(--muted); font-size:13px; margin-bottom:20px; }
+  .bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:20px; }
+  .bar input { background:var(--s1); border:1px solid var(--border); color:var(--text); padding:8px 10px; border-radius:8px; font-size:13px; }
+  .bar button { background:var(--accent); border:none; color:#04101c; font-weight:600; padding:9px 16px; border-radius:8px; cursor:pointer; font-size:13px; }
+  .bar button.secondary { background:transparent; border:1px solid var(--border); color:var(--text); }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-bottom:20px; }
+  .card { background:var(--s1); border:1px solid var(--border); border-radius:12px; padding:16px; }
+  .card .label { color:var(--muted); font-size:12px; margin-bottom:6px; }
+  .card .value { font-size:26px; font-weight:700; }
+  table { width:100%; border-collapse:collapse; background:var(--s1); border:1px solid var(--border); border-radius:12px; overflow:hidden; margin-bottom:20px; }
+  th, td { text-align:left; padding:10px 12px; font-size:13px; border-bottom:1px solid var(--border); }
+  th { color:var(--muted); font-weight:600; }
+  tr:last-child td { border-bottom:none; }
+  .pill { display:inline-block; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:600; }
+  .pill.out { background:rgba(231,76,60,.15); color:#e74c3c; }
+  .pill.ok { background:rgba(46,204,113,.15); color:var(--good); }
+  .section-title { font-size:14px; font-weight:700; margin:24px 0 10px; color:var(--text); }
+  .msg { font-size:13px; color:var(--warn); background:rgba(245,166,35,.1); border:1px solid rgba(245,166,35,.3); padding:10px 12px; border-radius:8px; margin-bottom:16px; }
+  .msg.good { color:var(--good); background:rgba(46,204,113,.1); border-color:rgba(46,204,113,.3); }
+  pre { background:var(--s1); border:1px solid var(--border); border-radius:12px; padding:14px; font-size:12px; overflow:auto; max-height:320px; }
+  a.login-link { color:var(--accent); }
+</style>
+</head>
+<body>
+
+<h1>Ministry of Health Reporting (DHIS2)</h1>
+<div class="sub">HMIS 105 (OPD Attendance &amp; Morbidity), HMIS 106 (Commodity Logistics), and a DHIS2 dataValueSet export.</div>
+
+<div class="bar">
+  <label style="font-size:13px;color:var(--muted);">From <input id="start" type="date"></label>
+  <label style="font-size:13px;color:var(--muted);">To <input id="end" type="date"></label>
+  <button onclick="loadAll()">Run Reports</button>
+  <button class="secondary" onclick="loadExport()">Build DHIS2 Export</button>
+</div>
+
+<div id="authMsg"></div>
+
+<div class="section-title">DHIS2 Connection Settings <span style="font-weight:400;color:var(--muted);font-size:12px;">(this pharmacy only)</span></div>
+<div class="card" style="max-width:520px;">
+  <div style="display:flex;flex-direction:column;gap:10px;">
+    <label style="font-size:12px;color:var(--muted);">DHIS2 Base URL
+      <input id="s_base_url" placeholder="https://your-instance.dhis2.org" style="width:100%;margin-top:4px;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:8px;">
+    </label>
+    <label style="font-size:12px;color:var(--muted);">DHIS2 Username
+      <input id="s_username" placeholder="your-dhis2-username" style="width:100%;margin-top:4px;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:8px;">
+    </label>
+    <label style="font-size:12px;color:var(--muted);">DHIS2 Password <span id="s_pw_hint" style="color:var(--muted);"></span>
+      <input id="s_password" type="password" placeholder="leave blank to keep existing" style="width:100%;margin-top:4px;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:8px;">
+    </label>
+    <label style="font-size:12px;color:var(--muted);">Organisation Unit UID (your facility)
+      <input id="s_org_unit" placeholder="e.g. aBc123XyZ01" style="width:100%;margin-top:4px;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:8px;">
+    </label>
+    <div style="font-size:12px;color:var(--muted);">Don't have these? In your DHIS2 instance's API, look up:
+      <code>/api/organisationUnits.json?filter=name:like:YourFacility&fields=id,name</code></div>
+    <button onclick="saveSettings()" style="align-self:flex-start;">Save Connection Settings</button>
+    <div id="settingsMsg"></div>
+  </div>
+</div>
+
+<div class="section-title">HMIS 105 — OPD Attendance</div>
+<div id="hmis105Grid" class="grid"></div>
+<div id="diagnosesWrap"></div>
+
+<div class="section-title">HMIS 106 — Commodity Logistics</div>
+<div id="hmis106Wrap"></div>
+
+<div class="section-title">DHIS2 Export Preview</div>
+<div id="exportMsg"></div>
+<pre id="exportOut">Click "Build DHIS2 Export" to preview the dataValueSet payload.</pre>
+
+<script>
+const BASE = window.location.origin;
+
+function authHeaders() {
+  const token = localStorage.getItem('mv_token');
+  return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (token || '') };
+}
+
+function dateRange() {
+  const start = document.getElementById('start').value;
+  const end = document.getElementById('end').value;
+  const qs = [];
+  if (start) qs.push('start=' + start);
+  if (end)   qs.push('end=' + end);
+  return qs.length ? '?' + qs.join('&') : '';
+}
+
+function requireAuth() {
+  const token = localStorage.getItem('mv_token');
+  const el = document.getElementById('authMsg');
+  if (!token) {
+    el.innerHTML = '<div class="msg">Not logged in. <a class="login-link" href="./app.html">Log in to MedVault</a>, then come back to this page.</div>';
+    return false;
+  }
+  el.innerHTML = '';
+  return true;
+}
+
+async function loadAll() {
+  if (!requireAuth()) return;
+  await Promise.all([loadHmis105(), loadHmis106()]);
+}
+
+async function loadSettings() {
+  if (!requireAuth()) return;
+  try {
+    const r = await fetch(BASE + '/api/dhis2/settings', { headers: authHeaders() });
+    const d = await r.json();
+    if (!r.ok) return;
+    document.getElementById('s_base_url').value = d.base_url || '';
+    document.getElementById('s_username').value = d.username || '';
+    document.getElementById('s_org_unit').value = d.org_unit_uid || '';
+    document.getElementById('s_pw_hint').textContent = d.has_password ? '(saved — leave blank to keep it)' : '(not set)';
+  } catch (e) { /* non-fatal */ }
+}
+
+async function saveSettings() {
+  if (!requireAuth()) return;
+  const msg = document.getElementById('settingsMsg');
+  msg.innerHTML = 'Saving…';
+  const body = {
+    base_url: document.getElementById('s_base_url').value.trim(),
+    username: document.getElementById('s_username').value.trim(),
+    org_unit_uid: document.getElementById('s_org_unit').value.trim(),
+  };
+  const pw = document.getElementById('s_password').value;
+  if (pw) body.password = pw;
+  try {
+    const r = await fetch(BASE + '/api/dhis2/settings', { method: 'PUT', headers: authHeaders(), body: JSON.stringify(body) });
+    const d = await r.json();
+    if (!r.ok) { msg.innerHTML = '<div class="msg">' + (d.error || 'Failed to save settings') + '</div>'; return; }
+    msg.innerHTML = '<div class="msg good">Saved.</div>';
+    document.getElementById('s_password').value = '';
+    loadSettings();
+  } catch (e) {
+    msg.innerHTML = '<div class="msg">Network error saving settings.</div>';
+  }
+}
+
+async function loadHmis105() {
+  const grid = document.getElementById('hmis105Grid');
+  const diagWrap = document.getElementById('diagnosesWrap');
+  grid.innerHTML = '<div class="card"><div class="label">Loading…</div></div>';
+  try {
+    const r = await fetch(BASE + '/api/dhis2/hmis105' + dateRange(), { headers: authHeaders() });
+    const d = await r.json();
+    if (!r.ok) { grid.innerHTML = '<div class="msg">' + (d.error || 'Failed to load HMIS 105') + '</div>'; return; }
+    const o = d.opd;
+    const cards = [
+      ['Total Attendance', o.total_attendance],
+      ['New Cases', o.new_cases],
+      ['Re-attendance', o.reattendance],
+      ['Male', o.male],
+      ['Female', o.female],
+      ['Under 1yr', o.age_under1],
+      ['1–4yrs', o.age_1to4],
+      ['5–14yrs', o.age_5to14],
+      ['15–17yrs', o.age_15to17],
+      ['18–49yrs', o.age_18to49],
+      ['50–59yrs', o.age_50to59],
+      ['60yrs+', o.age_60plus],
+    ];
+    grid.innerHTML = cards.map(([label, val]) =>
+      `<div class="card"><div class="label">${label}</div><div class="value">${val ?? 0}</div></div>`
+    ).join('');
+
+    if (d.topDiagnoses && d.topDiagnoses.length) {
+      diagWrap.innerHTML = `<table><thead><tr><th>Diagnosis</th><th>Cases</th></tr></thead><tbody>${
+        d.topDiagnoses.map(x => `<tr><td>${x.diagnosis}</td><td>${x.count}</td></tr>`).join('')
+      }</tbody></table>`;
+    } else {
+      diagWrap.innerHTML = '';
+    }
+  } catch (e) {
+    grid.innerHTML = '<div class="msg">Network error loading HMIS 105.</div>';
+  }
+}
+
+async function loadHmis106() {
+  const wrap = document.getElementById('hmis106Wrap');
+  wrap.innerHTML = 'Loading…';
+  try {
+    const r = await fetch(BASE + '/api/dhis2/hmis106' + dateRange(), { headers: authHeaders() });
+    const d = await r.json();
+    if (!r.ok) { wrap.innerHTML = '<div class="msg">' + (d.error || 'Failed to load HMIS 106') + '</div>'; return; }
+    const rows = (d.commodities || []).map(c => `<tr>
+        <td>${c.drug_name}</td>
+        <td>${c.closing_stock}</td>
+        <td>${c.quantity_consumed}</td>
+        <td>${c.currently_stocked_out ? '<span class="pill out">Stocked out</span>' : '<span class="pill ok">In stock</span>'}</td>
+      </tr>`).join('');
+    wrap.innerHTML = `
+      <div class="msg">${d.note || ''}</div>
+      <table><thead><tr><th>Commodity</th><th>Closing Stock</th><th>Consumed (period)</th><th>Status</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="4">No commodities found.</td></tr>'}</tbody></table>`;
+  } catch (e) {
+    wrap.innerHTML = '<div class="msg">Network error loading HMIS 106.</div>';
+  }
+}
+
+async function loadExport() {
+  if (!requireAuth()) return;
+  const msg = document.getElementById('exportMsg');
+  const out = document.getElementById('exportOut');
+  out.textContent = 'Building export…';
+  msg.innerHTML = '';
+  try {
+    const r = await fetch(BASE + '/api/dhis2/export' + dateRange(), { headers: authHeaders() });
+    const d = await r.json();
+    if (!r.ok) { msg.innerHTML = '<div class="msg">' + (d.error || 'Failed to build export') + '</div>'; out.textContent = ''; return; }
+    if (d.readyToPush) {
+      msg.innerHTML = '<div class="msg good">' + d.note + '</div>';
+    } else {
+      msg.innerHTML = '<div class="msg">' + d.note + '<br>Unconfigured: ' + d.unconfigured.join(', ') + '</div>';
+    }
+    out.textContent = JSON.stringify(d.dataValueSet, null, 2);
+  } catch (e) {
+    out.textContent = '';
+    msg.innerHTML = '<div class="msg">Network error building export.</div>';
+  }
+}
+
+// Default date range: current calendar month
+(function initDates() {
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth(), 1);
+  document.getElementById('start').value = first.toISOString().slice(0,10);
+  document.getElementById('end').value = now.toISOString().slice(0,10);
+})();
+
+requireAuth();
+loadSettings();
+</script>
+</body>
+</html>

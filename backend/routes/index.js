@@ -52,5 +52,5 @@ module.exports = function registerRoutes(app) {
   require('./sms')(app, deps);          // Africa's Talking SMS integration
 
   // DHIS2 integration
-  require('./dhis2')(app);              // HMIS/DHIS2 export reports
+  require('./dhis2')(app, deps);       // HMIS/DHIS2 export reports
 };

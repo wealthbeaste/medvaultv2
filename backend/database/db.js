@@ -1683,7 +1683,27 @@ async function runMigrations() {
     `ALTER TABLE drugs ADD COLUMN IF NOT EXISTS catalog_id INTEGER REFERENCES drug_catalog(id) ON DELETE SET NULL`,
     `ALTER TABLE marketplace_products ADD COLUMN IF NOT EXISTS catalog_id INTEGER REFERENCES drug_catalog(id) ON DELETE SET NULL`,
     `CREATE INDEX IF NOT EXISTS idx_drugs_catalog ON drugs(catalog_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_mkt_products_catalog ON marketplace_products(catalog_id)`
+    `CREATE INDEX IF NOT EXISTS idx_mkt_products_catalog ON marketplace_products(catalog_id)`,
+
+    // =========================================================
+    // DHIS2 SETTINGS — per-pharmacy connection config.
+    // MedVault is multi-tenant: each pharmacy/facility reports to
+    // its own country/ministry DHIS2 instance with its own org
+    // unit and credentials, so this cannot be a single shared
+    // config — it's one row per pharmacy.
+    // =========================================================
+    `CREATE TABLE IF NOT EXISTS dhis2_settings (
+      id                SERIAL PRIMARY KEY,
+      pharmacy_id       INTEGER NOT NULL UNIQUE REFERENCES pharmacies(id) ON DELETE CASCADE,
+      base_url          VARCHAR(500),
+      username          VARCHAR(255),
+      password_enc      TEXT,
+      org_unit_uid      VARCHAR(50),
+      element_map       JSONB NOT NULL DEFAULT '{}',
+      is_active         BOOLEAN NOT NULL DEFAULT false,
+      updated_by        INTEGER REFERENCES users(id),
+      updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`
 
   ];
 

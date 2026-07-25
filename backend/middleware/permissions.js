@@ -79,6 +79,7 @@ const PERMISSIONS = {
   'reports:expiry':           ['owner', 'manager', 'pharmacist', 'inventory_manager'],
   'reports:org_summary':      ['owner'],
   'reports:financial':        ['owner', 'manager'],
+  'reports:moh':              ['owner', 'manager', 'pharmacist'],
 
   // ── Subscription ─────────────────────────────────────────
   'subscription:read':        ['owner'],
@@ -129,6 +130,9 @@ const PERMISSIONS = {
 
   // ── SMS ───────────────────────────────────────────────────
   'sms:send':                 ['owner', 'manager', 'pharmacist'],
+
+  // ── DHIS2 / MOH Reporting ─────────────────────────────────
+  'dhis2:read':               ['owner', 'manager', 'pharmacist', 'doctor', 'nurse'],
 };
 
 function can(permission) {
