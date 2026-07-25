@@ -12,12 +12,16 @@
 // defines which fields exist and their human-readable labels, but
 // every UID in it is a placeholder until a pharmacy fills in its
 // own values via PUT /api/dhis2/settings.
+//
+// Payload-building and submission logic live in dhis2/dhis2Service.js
+// so the scheduler (automated monthly submission + retries) shares
+// the exact same code path as these manual routes.
 // ============================================================
 const err = require('./_err');
-const template = require('../dhis2/dataElementMap');
 const { encrypt, decrypt } = require('../core/credsCrypto');
-
-const isConfigured = (uid) => !!uid && !String(uid).startsWith('CHANGE_ME');
+const { testConnection, pushDataValueSet } = require('../dhis2/client');
+const { buildDataValueSet } = require('../dhis2/dhis2Service');
+const { validateIndicators } = require('../dhis2/validator');
 
 function resolvePeriod(req) {
   const now = new Date();
@@ -26,32 +30,8 @@ function resolvePeriod(req) {
   return { start: req.query.start || firstOfMonth, end: req.query.end || today };
 }
 
-// Merge a pharmacy's saved element_map (from the DB) over the static
-// template, so unset fields still fall back to the CHANGE_ME shape
-// (and therefore still show up as "unconfigured" rather than silently
-// vanishing).
-function mergeMap(saved) {
-  const out = JSON.parse(JSON.stringify(template)); // deep clone defaults
-  if (!saved) return out;
-  for (const section of ['hmis105', 'hmis106']) {
-    if (!saved[section]) continue;
-    if (saved[section].orgUnit) out[section].orgUnit = saved[section].orgUnit;
-    if (saved[section].dataElements) {
-      for (const [k, v] of Object.entries(saved[section].dataElements)) {
-        out[section].dataElements[k] = { ...out[section].dataElements[k], ...v };
-      }
-    }
-    if (section === 'hmis105' && saved[section].diagnosisMap) {
-      out[section].diagnosisMap = { ...out[section].diagnosisMap, ...saved[section].diagnosisMap };
-    }
-    if (section === 'hmis106' && saved[section].drugMap) {
-      out[section].drugMap = { ...out[section].drugMap, ...saved[section].drugMap };
-    }
-  }
-  return out;
-}
 
-module.exports = function registerDhis2Routes(app, { query, auth, can }) {
+module.exports = function registerDhis2Routes(app, { query, auth, can, audit }) {
 
   // ── Phase 1 — static module list (kept for backward compat) ──
   app.get('/api/dhis2/reports', (req, res) => {
@@ -63,10 +43,10 @@ module.exports = function registerDhis2Routes(app, { query, auth, can }) {
     const { pharmacyId } = req.user;
     if (!pharmacyId) return err(res, 400, 'AUTH_NO_PHARMACY', 'No pharmacy assigned.', 'pharmacyId');
     try {
-      const r = await query(`SELECT base_url, username, org_unit_uid, element_map, is_active, password_enc, updated_at
+      const r = await query(`SELECT base_url, username, org_unit_uid, district, element_map, is_active, password_enc, updated_at
                               FROM dhis2_settings WHERE pharmacy_id = $1`, [pharmacyId]);
       if (!r.rows.length) {
-        return res.json({ configured: false, base_url: null, username: null, org_unit_uid: null, element_map: {}, is_active: false, has_password: false });
+        return res.json({ configured: false, base_url: null, username: null, org_unit_uid: null, district: null, element_map: {}, is_active: false, has_password: false });
       }
       const row = r.rows[0];
       res.json({
@@ -74,6 +54,7 @@ module.exports = function registerDhis2Routes(app, { query, auth, can }) {
         base_url: row.base_url,
         username: row.username,
         org_unit_uid: row.org_unit_uid,
+        district: row.district,
         element_map: row.element_map || {},
         is_active: row.is_active,
         has_password: !!row.password_enc,
@@ -89,7 +70,7 @@ module.exports = function registerDhis2Routes(app, { query, auth, can }) {
   app.put('/api/dhis2/settings', auth, can('settings:write'), async (req, res) => {
     const { pharmacyId, userId } = req.user;
     if (!pharmacyId) return err(res, 400, 'AUTH_NO_PHARMACY', 'No pharmacy assigned.', 'pharmacyId');
-    const { base_url, username, password, org_unit_uid, element_map, is_active } = req.body || {};
+    const { base_url, username, password, org_unit_uid, district, element_map, is_active } = req.body || {};
 
     if (base_url && !/^https?:\/\//i.test(base_url)) {
       return err(res, 400, 'VALIDATION_INVALID', 'base_url must start with http:// or https://', 'base_url');
@@ -100,18 +81,19 @@ module.exports = function registerDhis2Routes(app, { query, auth, can }) {
       const passwordEnc = password ? encrypt(password) : (existing.rows[0]?.password_enc || null);
 
       await query(
-        `INSERT INTO dhis2_settings (pharmacy_id, base_url, username, password_enc, org_unit_uid, element_map, is_active, updated_by, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())
+        `INSERT INTO dhis2_settings (pharmacy_id, base_url, username, password_enc, org_unit_uid, district, element_map, is_active, updated_by, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())
          ON CONFLICT (pharmacy_id) DO UPDATE SET
            base_url = EXCLUDED.base_url,
            username = EXCLUDED.username,
            password_enc = EXCLUDED.password_enc,
            org_unit_uid = EXCLUDED.org_unit_uid,
+           district = EXCLUDED.district,
            element_map = EXCLUDED.element_map,
            is_active = EXCLUDED.is_active,
            updated_by = EXCLUDED.updated_by,
            updated_at = NOW()`,
-        [pharmacyId, base_url || null, username || null, passwordEnc, org_unit_uid || null,
+        [pharmacyId, base_url || null, username || null, passwordEnc, org_unit_uid || null, district || null,
          JSON.stringify(element_map || {}), !!is_active, userId || null]
       );
       res.json({ success: true });
@@ -212,96 +194,333 @@ module.exports = function registerDhis2Routes(app, { query, auth, can }) {
     }
   });
 
-  // ── DHIS2-compatible dataValueSet export (uses this pharmacy's own settings) ──
+  // ── DHIS2-compatible dataValueSet export — PREVIEW ONLY (uses this pharmacy's own settings) ──
   app.get('/api/dhis2/export', auth, can('reports:moh'), async (req, res) => {
+    const { pharmacyId } = req.user;
+    if (!pharmacyId) return err(res, 400, 'AUTH_NO_PHARMACY', 'No pharmacy assigned.', 'pharmacyId');
+    const { start, end } = resolvePeriod(req);
+
+    try {
+      const built = await buildDataValueSet(query, pharmacyId, start, end);
+      res.json({
+        ...built,
+        note: built.unconfigured.length
+          ? 'This pharmacy has not configured all DHIS2 UIDs yet — go to DHIS2 Settings and fill in the missing org unit / data element / category option combo IDs from your own DHIS2 instance.'
+          : 'All mapped elements are configured. Use "Push to DHIS2" to submit this payload, or POST it yourself to {your DHIS2 base_url}/api/dataValueSets.',
+      });
+    } catch (e) {
+      return err(res, 500, 'SERVER_ERROR', e.message);
+    }
+  });
+
+  // ── DHIS2-compatible dataValueSet export — CSV ────────────
+  // Same underlying payload as GET /export, flattened to one row per
+  // data value for spreadsheet review / manual upload to DHIS2's
+  // "Import/Export" CSV importer.
+  app.get('/api/dhis2/export/csv', auth, can('reports:moh'), async (req, res) => {
+    const { pharmacyId } = req.user;
+    if (!pharmacyId) return err(res, 400, 'AUTH_NO_PHARMACY', 'No pharmacy assigned.', 'pharmacyId');
+    const { start, end } = resolvePeriod(req);
+
+    try {
+      const built = await buildDataValueSet(query, pharmacyId, start, end);
+      const header = ['dataElement', 'period', 'orgUnit', 'categoryOptionCombo', 'value'];
+      const escape = (v) => {
+        const s = String(v ?? '');
+        return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+      const rows = built.dataValueSet.dataValues.map(dv =>
+        [dv.dataElement, dv.period, dv.orgUnit, dv.categoryOptionCombo, dv.value].map(escape).join(',')
+      );
+      const csv = [header.join(','), ...rows].join('\n');
+
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="dhis2-export-${built.period}.csv"`);
+      res.send(csv);
+    } catch (e) {
+      return err(res, 500, 'SERVER_ERROR', e.message);
+    }
+  });
+
+  // ── NDW (National Data Warehouse) export — standard indicator codes ──
+  // Unlike GET /export, this doesn't depend on a pharmacy's DHIS2 UID
+  // configuration at all — NDW feeds are typically keyed by standard
+  // indicator codes, not instance-specific data element UIDs. Runs
+  // through dhis2/validator.js first so obvious data gaps are visible
+  // before submission rather than after a national reviewer notices.
+  app.get('/api/dhis2/export/ndw', auth, can('reports:moh'), async (req, res) => {
     const { pharmacyId } = req.user;
     if (!pharmacyId) return err(res, 400, 'AUTH_NO_PHARMACY', 'No pharmacy assigned.', 'pharmacyId');
     const { start, end } = resolvePeriod(req);
     const period = start.slice(0, 7).replace('-', '');
 
     try {
-      const settingsRow = await query(`SELECT element_map FROM dhis2_settings WHERE pharmacy_id = $1`, [pharmacyId]);
-      const map = mergeMap(settingsRow.rows[0]?.element_map);
+      const facilityRow = await query(
+        `SELECT p.id, p.name, p.address, s.org_unit_uid, s.district
+         FROM pharmacies p LEFT JOIN dhis2_settings s ON s.pharmacy_id = p.id
+         WHERE p.id = $1`,
+        [pharmacyId]
+      );
+      const facility = facilityRow.rows[0] || {};
 
       const attendance = await query(
         `SELECT
-           COUNT(*)::int AS opd_total_attendance,
-           COUNT(*) FILTER (WHERE p.gender ILIKE 'male')::int   AS opd_male,
-           COUNT(*) FILTER (WHERE p.gender ILIKE 'female')::int AS opd_female,
-           COUNT(*) FILTER (WHERE p.dob IS NOT NULL AND AGE(c.created_at, p.dob) < INTERVAL '1 year')::int AS opd_age_under1,
-           COUNT(*) FILTER (WHERE p.dob IS NOT NULL AND AGE(c.created_at, p.dob) >= INTERVAL '1 year'  AND AGE(c.created_at, p.dob) < INTERVAL '5 years')::int  AS opd_age_1to4,
-           COUNT(*) FILTER (WHERE p.dob IS NOT NULL AND AGE(c.created_at, p.dob) >= INTERVAL '5 years'  AND AGE(c.created_at, p.dob) < INTERVAL '15 years')::int AS opd_age_5to14,
-           COUNT(*) FILTER (WHERE p.dob IS NOT NULL AND AGE(c.created_at, p.dob) >= INTERVAL '15 years' AND AGE(c.created_at, p.dob) < INTERVAL '18 years')::int AS opd_age_15to17,
-           COUNT(*) FILTER (WHERE p.dob IS NOT NULL AND AGE(c.created_at, p.dob) >= INTERVAL '18 years' AND AGE(c.created_at, p.dob) < INTERVAL '50 years')::int AS opd_age_18to49,
-           COUNT(*) FILTER (WHERE p.dob IS NOT NULL AND AGE(c.created_at, p.dob) >= INTERVAL '50 years' AND AGE(c.created_at, p.dob) < INTERVAL '60 years')::int AS opd_age_50to59,
-           COUNT(*) FILTER (WHERE p.dob IS NOT NULL AND AGE(c.created_at, p.dob) >= INTERVAL '60 years')::int AS opd_age_60plus,
+           COUNT(*)::int AS total,
+           COUNT(*) FILTER (WHERE p.gender ILIKE 'male')::int   AS male,
+           COUNT(*) FILTER (WHERE p.gender ILIKE 'female')::int AS female,
+           COUNT(*) FILTER (WHERE p.dob IS NOT NULL AND AGE(c.created_at, p.dob) < INTERVAL '5 years')::int AS under5,
            COUNT(*) FILTER (
              WHERE NOT EXISTS (
                SELECT 1 FROM consultations c2
                WHERE c2.patient_id = c.patient_id AND c2.created_at < c.created_at
              )
-           )::int AS opd_new_cases
+           )::int AS new_cases
          FROM consultations c
          JOIN patients p ON p.id = c.patient_id
          WHERE c.pharmacy_id = $1 AND c.created_at::date BETWEEN $2 AND $3`,
         [pharmacyId, start, end]
       );
       const opd = attendance.rows[0];
-      opd.opd_reattendance = opd.opd_total_attendance - opd.opd_new_cases;
+      const reattendance = opd.total - opd.new_cases;
 
       const consumed = await query(
-        `SELECT si.drug_name, SUM(si.quantity)::int AS quantity_consumed
+        `SELECT COALESCE(SUM(si.quantity), 0)::int AS total
          FROM sale_items si JOIN sales s ON s.id = si.sale_id
-         WHERE s.pharmacy_id = $1 AND s.voided_at IS NULL AND s.created_at::date BETWEEN $2 AND $3
-         GROUP BY si.drug_name`,
+         WHERE s.pharmacy_id = $1 AND s.voided_at IS NULL AND s.created_at::date BETWEEN $2 AND $3`,
         [pharmacyId, start, end]
       );
-      const stock = await query(`SELECT name AS drug_name, quantity AS closing_stock FROM drugs WHERE pharmacy_id = $1`, [pharmacyId]);
+      const stock = await query(
+        `SELECT COUNT(*)::int AS total_drugs, COUNT(*) FILTER (WHERE quantity <= 0)::int AS stocked_out,
+                COALESCE(SUM(quantity), 0)::int AS closing_stock
+         FROM drugs WHERE pharmacy_id = $1`,
+        [pharmacyId]
+      );
+      const st = stock.rows[0];
+      const stockoutRate = st.total_drugs > 0 ? Math.round((st.stocked_out / st.total_drugs) * 1000) / 10 : 0;
 
-      const dataValues = [];
-      const unconfigured = [];
+      const indicators = [
+        { code: 'OPD_ATTENDANCE_TOTAL',        label: 'Total OPD Attendance',        value: opd.total },
+        { code: 'OPD_ATTENDANCE_NEW_CASES',    label: 'New Cases',                   value: opd.new_cases },
+        { code: 'OPD_ATTENDANCE_REATTENDANCE', label: 'Re-attendance',               value: reattendance },
+        { code: 'OPD_ATTENDANCE_MALE',         label: 'Attendance — Male',           value: opd.male },
+        { code: 'OPD_ATTENDANCE_FEMALE',       label: 'Attendance — Female',         value: opd.female },
+        { code: 'OPD_ATTENDANCE_UNDER5',       label: 'Attendance — Under 5yrs',     value: opd.under5 },
+        { code: 'COMMODITY_CLOSING_STOCK',     label: 'Total Closing Stock (units)', value: st.closing_stock },
+        { code: 'COMMODITY_CONSUMED',          label: 'Total Consumed (units)',      value: consumed.rows[0].total },
+        { code: 'COMMODITY_STOCKOUT_RATE',     label: 'Stockout Rate (%)',           value: stockoutRate },
+      ];
 
-      if (isConfigured(map.hmis105.orgUnit)) {
-        for (const [key, def] of Object.entries(map.hmis105.dataElements)) {
-          if (!isConfigured(def.id) || !isConfigured(def.coc)) { unconfigured.push(`hmis105.${key}`); continue; }
-          const value = opd[key];
-          if (value === undefined) continue;
-          dataValues.push({ dataElement: def.id, categoryOptionCombo: def.coc, orgUnit: map.hmis105.orgUnit, period, value: String(value) });
-        }
-      } else {
-        unconfigured.push('hmis105.orgUnit');
-      }
-
-      if (isConfigured(map.hmis106.orgUnit)) {
-        const totalClosing = stock.rows.reduce((s, r) => s + r.closing_stock, 0);
-        const totalConsumed = consumed.rows.reduce((s, r) => s + r.quantity_consumed, 0);
-        const totals = { commodity_closing_stock: totalClosing, commodity_consumed: totalConsumed };
-
-        for (const [key, def] of Object.entries(map.hmis106.dataElements)) {
-          if (key === 'commodity_stockout_days') continue;
-          if (!isConfigured(def.id) || !isConfigured(def.coc)) { unconfigured.push(`hmis106.${key}`); continue; }
-          dataValues.push({ dataElement: def.id, categoryOptionCombo: def.coc, orgUnit: map.hmis106.orgUnit, period, value: String(totals[key]) });
-        }
-
-        for (const row of stock.rows) {
-          const mapped = map.hmis106.drugMap[row.drug_name.toLowerCase()];
-          if (mapped && isConfigured(mapped.id) && isConfigured(mapped.coc)) {
-            dataValues.push({ dataElement: mapped.id, categoryOptionCombo: mapped.coc, orgUnit: map.hmis106.orgUnit, period, value: String(row.closing_stock) });
-          }
-        }
-      } else {
-        unconfigured.push('hmis106.orgUnit');
-      }
+      const validation = validateIndicators(indicators);
 
       res.json({
-        period,
-        dataValueSet: { dataValues },
-        unconfigured,
-        readyToPush: unconfigured.length === 0,
-        note: unconfigured.length
-          ? 'This pharmacy has not configured all DHIS2 UIDs yet — go to DHIS2 Settings and fill in the missing org unit / data element / category option combo IDs from your own DHIS2 instance.'
-          : 'All mapped elements are configured. POST dataValueSet to {your DHIS2 base_url}/api/dataValueSets to push (use this pharmacy\'s saved credentials).',
+        source: 'MedVault',
+        facility: {
+          id: facility.id,
+          name: facility.name,
+          address: facility.address || null,
+          district: facility.district || null,
+          orgUnitUid: facility.org_unit_uid || null,
+        },
+        period: { code: period, start, end },
+        indicators,
+        validation,
       });
+    } catch (e) {
+      return err(res, 500, 'SERVER_ERROR', e.message);
+    }
+  });
+
+  // ── Test this pharmacy's saved DHIS2 connection ──────────
+  app.post('/api/dhis2/test-connection', auth, can('reports:moh'), async (req, res) => {
+    const { pharmacyId } = req.user;
+    if (!pharmacyId) return err(res, 400, 'AUTH_NO_PHARMACY', 'No pharmacy assigned.', 'pharmacyId');
+    try {
+      const row = await query(`SELECT base_url, username, password_enc FROM dhis2_settings WHERE pharmacy_id = $1`, [pharmacyId]);
+      if (!row.rows.length || !row.rows[0].base_url) {
+        return err(res, 400, 'VALIDATION_INVALID', 'Save your DHIS2 base URL, username, and password in settings first.');
+      }
+      const { base_url, username, password_enc } = row.rows[0];
+      const password = decrypt(password_enc);
+      if (!password) {
+        return err(res, 400, 'VALIDATION_INVALID', 'No password saved for this connection yet.');
+      }
+      const result = await testConnection({ base_url, username, password });
+      res.json(result);
+    } catch (e) {
+      return err(res, 500, 'SERVER_ERROR', e.message);
+    }
+  });
+
+  // ── Push this period's report to DHIS2 ───────────────────
+  app.post('/api/dhis2/push', auth, can('reports:moh'), async (req, res) => {
+    const { pharmacyId, userId } = req.user;
+    if (!pharmacyId) return err(res, 400, 'AUTH_NO_PHARMACY', 'No pharmacy assigned.', 'pharmacyId');
+    const { start, end } = resolvePeriod(req);
+
+    try {
+      const settingsRow = await query(`SELECT base_url, username, password_enc FROM dhis2_settings WHERE pharmacy_id = $1`, [pharmacyId]);
+      if (!settingsRow.rows.length || !settingsRow.rows[0].base_url) {
+        return err(res, 400, 'VALIDATION_INVALID', 'Save your DHIS2 base URL, username, and password in settings first.');
+      }
+      const { base_url, username, password_enc } = settingsRow.rows[0];
+      const password = decrypt(password_enc);
+      if (!password) {
+        return err(res, 400, 'VALIDATION_INVALID', 'No password saved for this connection yet.');
+      }
+
+      const built = await buildDataValueSet(query, pharmacyId, start, end);
+      if (!built.readyToPush) {
+        return err(res, 400, 'VALIDATION_INVALID',
+          'Not all DHIS2 UIDs are configured yet: ' + built.unconfigured.join(', ') + '. Fill these in under DHIS2 Settings before pushing.');
+      }
+      if (!built.dataValueSet.dataValues.length) {
+        return err(res, 400, 'VALIDATION_INVALID', 'Nothing to push — no data values were generated for this period.');
+      }
+
+      const result = await pushDataValueSet({ base_url, username, password }, built.dataValueSet);
+
+      await query(
+        `INSERT INTO dhis2_push_log (pharmacy_id, period, success, value_count, imported, updated_count, ignored, error, pushed_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [pharmacyId, built.period, !!result.success, built.dataValueSet.dataValues.length,
+         result.imported || 0, result.updated || 0, result.ignored || 0, result.error || null, userId || null]
+      );
+
+      if (audit) {
+        await audit(query, { req, action: 'dhis2.push', entity: 'dhis2_push', entityId: null,
+          payload: { period: built.period, success: result.success, imported: result.imported, updated: result.updated } });
+      }
+
+      if (!result.success) {
+        return err(res, 502, 'SERVER_ERROR', result.error || 'DHIS2 rejected the push.');
+      }
+      res.json({ success: true, period: built.period, imported: result.imported, updated: result.updated, ignored: result.ignored });
+    } catch (e) {
+      return err(res, 500, 'SERVER_ERROR', e.message);
+    }
+  });
+
+  // ── Analytics — trends for the DHIS2 dashboard ────────────
+  // months: how many calendar months back to include (default 6, max 24).
+  app.get('/api/dhis2/analytics', auth, can('reports:moh'), async (req, res) => {
+    const { pharmacyId } = req.user;
+    if (!pharmacyId) return err(res, 400, 'AUTH_NO_PHARMACY', 'No pharmacy assigned.', 'pharmacyId');
+    const months = Math.min(Math.max(parseInt(req.query.months, 10) || 6, 1), 24);
+
+    try {
+      // Medicine consumption trend — real historical data from sales.
+      const consumption = await query(
+        `SELECT to_char(date_trunc('month', s.created_at), 'YYYY-MM') AS month,
+                COALESCE(SUM(si.quantity), 0)::int AS quantity_dispensed
+         FROM sales s JOIN sale_items si ON si.sale_id = s.id
+         WHERE s.pharmacy_id = $1 AND s.voided_at IS NULL
+           AND s.created_at >= date_trunc('month', NOW()) - ($2 || ' months')::interval
+         GROUP BY 1 ORDER BY 1`,
+        [pharmacyId, months - 1]
+      );
+
+      // Disease / diagnosis patterns — top 5 diagnoses per month, real data from consultations.
+      const diagnoses = await query(
+        `SELECT to_char(date_trunc('month', created_at), 'YYYY-MM') AS month, diagnosis, COUNT(*)::int AS count
+         FROM consultations
+         WHERE pharmacy_id = $1
+           AND created_at >= date_trunc('month', NOW()) - ($2 || ' months')::interval
+           AND diagnosis IS NOT NULL AND TRIM(diagnosis) <> ''
+         GROUP BY 1, 2 ORDER BY 1, count DESC`,
+        [pharmacyId, months - 1]
+      );
+      const diseaseTrend = {};
+      for (const row of diagnoses.rows) {
+        if (!diseaseTrend[row.month]) diseaseTrend[row.month] = [];
+        if (diseaseTrend[row.month].length < 5) diseaseTrend[row.month].push({ diagnosis: row.diagnosis, count: row.count });
+      }
+
+      // Stockout trend — only as far back as dhis2_stock_snapshots has been
+      // running (see jobs/scheduler.js: writeDhis2StockSnapshots). MedVault
+      // never tracked historical stock levels before this, so early months
+      // may be empty — that's expected, not a bug.
+      const stockout = await query(
+        `SELECT snapshot_date, total_drugs, stocked_out_count
+         FROM dhis2_stock_snapshots
+         WHERE pharmacy_id = $1 AND snapshot_date >= (NOW() - ($2 || ' months')::interval)::date
+         ORDER BY snapshot_date`,
+        [pharmacyId, months]
+      );
+
+      // Facility performance summary — OPD attendance this month vs last
+      // month, and on-time DHIS2 reporting rate (submitted within the
+      // first 5 days of the following month, per dhis2_push_log).
+      const attendanceByMonth = await query(
+        `SELECT to_char(date_trunc('month', created_at), 'YYYY-MM') AS month, COUNT(*)::int AS attendance
+         FROM consultations
+         WHERE pharmacy_id = $1 AND created_at >= date_trunc('month', NOW()) - INTERVAL '1 month'
+         GROUP BY 1 ORDER BY 1`,
+        [pharmacyId]
+      );
+      const submissionRate = await query(
+        `SELECT period,
+                MIN(created_at) FILTER (WHERE success) AS first_success_at
+         FROM dhis2_push_log
+         WHERE pharmacy_id = $1 AND success = true
+         GROUP BY period
+         ORDER BY period DESC LIMIT 12`,
+        [pharmacyId]
+      );
+      const onTime = submissionRate.rows.filter(r => {
+        const y = Number(r.period.slice(0, 4)), m = Number(r.period.slice(4, 6));
+        const deadline = new Date(y, m, 5); // 5th of the month following the reporting period
+        return new Date(r.first_success_at) <= deadline;
+      }).length;
+
+      res.json({
+        months,
+        consumptionTrend: consumption.rows,
+        diseaseTrend,
+        stockoutTrend: stockout.rows,
+        stockoutTrendNote: stockout.rows.length
+          ? null
+          : 'No stock-history data yet — daily snapshots started recently, so the trend will fill in over the coming days.',
+        facilityPerformance: {
+          attendanceByMonth: attendanceByMonth.rows,
+          reportsSubmittedLast12Periods: submissionRate.rows.length,
+          reportsOnTimeLast12Periods: onTime,
+        },
+      });
+    } catch (e) {
+      return err(res, 500, 'SERVER_ERROR', e.message);
+    }
+  });
+
+  // ── Push history for this pharmacy ───────────────────────
+  app.get('/api/dhis2/push-history', auth, can('reports:moh'), async (req, res) => {
+    const { pharmacyId } = req.user;
+    if (!pharmacyId) return err(res, 400, 'AUTH_NO_PHARMACY', 'No pharmacy assigned.', 'pharmacyId');
+    try {
+      const r = await query(
+        `SELECT period, success, value_count, imported, updated_count, ignored, error, created_at
+         FROM dhis2_push_log WHERE pharmacy_id = $1 ORDER BY created_at DESC LIMIT 50`,
+        [pharmacyId]
+      );
+
+      // A failed row is "queued for retry" (rather than permanently failed) if:
+      //  - no later row for the same period succeeded, and
+      //  - fewer than 3 total attempts have been logged for that period.
+      // This mirrors the cap used by jobs/scheduler.js's retryFailedDhis2Submissions,
+      // so what the user sees here always matches what the background job will do next.
+      const attemptCounts = {}, everSucceeded = {};
+      for (const row of r.rows) {
+        attemptCounts[row.period] = (attemptCounts[row.period] || 0) + 1;
+        if (row.success) everSucceeded[row.period] = true;
+      }
+      const history = r.rows.map(row => ({
+        ...row,
+        status: row.success
+          ? 'success'
+          : (everSucceeded[row.period] ? 'failed_then_recovered'
+              : (attemptCounts[row.period] < 3 ? 'queued_for_retry' : 'failed_permanently')),
+      }));
+
+      res.json({ history });
     } catch (e) {
       return err(res, 500, 'SERVER_ERROR', e.message);
     }

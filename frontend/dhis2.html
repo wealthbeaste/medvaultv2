@@ -30,6 +30,14 @@
   .msg.good { color:var(--good); background:rgba(46,204,113,.1); border-color:rgba(46,204,113,.3); }
   pre { background:var(--s1); border:1px solid var(--border); border-radius:12px; padding:14px; font-size:12px; overflow:auto; max-height:320px; }
   a.login-link { color:var(--accent); }
+  .barchart { display:flex; flex-direction:column; gap:6px; }
+  .barchart .row { display:flex; align-items:center; gap:10px; font-size:12px; }
+  .barchart .row .rlabel { width:64px; flex-shrink:0; color:var(--muted); }
+  .barchart .row .track { flex:1; background:var(--bg); border-radius:6px; overflow:hidden; height:16px; border:1px solid var(--border); }
+  .barchart .row .fill { height:100%; background:var(--accent); border-radius:6px; }
+  .barchart .row .fill.warn { background:var(--warn); }
+  .barchart .row .rval { width:52px; text-align:right; flex-shrink:0; }
+  .analytics-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; }
 </style>
 </head>
 <body>
@@ -42,6 +50,7 @@
   <label style="font-size:13px;color:var(--muted);">To <input id="end" type="date"></label>
   <button onclick="loadAll()">Run Reports</button>
   <button class="secondary" onclick="loadExport()">Build DHIS2 Export</button>
+  <button onclick="pushToDhis2()">Push to DHIS2</button>
 </div>
 
 <div id="authMsg"></div>
@@ -61,9 +70,15 @@
     <label style="font-size:12px;color:var(--muted);">Organisation Unit UID (your facility)
       <input id="s_org_unit" placeholder="e.g. aBc123XyZ01" style="width:100%;margin-top:4px;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:8px;">
     </label>
+    <label style="font-size:12px;color:var(--muted);">District
+      <input id="s_district" placeholder="e.g. Kampala" style="width:100%;margin-top:4px;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:8px;">
+    </label>
     <div style="font-size:12px;color:var(--muted);">Don't have these? In your DHIS2 instance's API, look up:
       <code>/api/organisationUnits.json?filter=name:like:YourFacility&fields=id,name</code></div>
-    <button onclick="saveSettings()" style="align-self:flex-start;">Save Connection Settings</button>
+    <div style="display:flex;gap:8px;">
+      <button onclick="saveSettings()" style="align-self:flex-start;">Save Connection Settings</button>
+      <button class="secondary" onclick="testConn()" style="align-self:flex-start;">Test Connection</button>
+    </div>
     <div id="settingsMsg"></div>
   </div>
 </div>
@@ -78,6 +93,12 @@
 <div class="section-title">DHIS2 Export Preview</div>
 <div id="exportMsg"></div>
 <pre id="exportOut">Click "Build DHIS2 Export" to preview the dataValueSet payload.</pre>
+
+<div class="section-title">Analytics <span style="font-weight:400;color:var(--muted);font-size:12px;">(last 6 months)</span></div>
+<div id="analyticsWrap">Loading…</div>
+
+<div class="section-title">Push History</div>
+<div id="pushHistoryWrap">Loading…</div>
 
 <script>
 const BASE = window.location.origin;
@@ -121,6 +142,7 @@ async function loadSettings() {
     document.getElementById('s_base_url').value = d.base_url || '';
     document.getElementById('s_username').value = d.username || '';
     document.getElementById('s_org_unit').value = d.org_unit_uid || '';
+    document.getElementById('s_district').value = d.district || '';
     document.getElementById('s_pw_hint').textContent = d.has_password ? '(saved — leave blank to keep it)' : '(not set)';
   } catch (e) { /* non-fatal */ }
 }
@@ -133,6 +155,7 @@ async function saveSettings() {
     base_url: document.getElementById('s_base_url').value.trim(),
     username: document.getElementById('s_username').value.trim(),
     org_unit_uid: document.getElementById('s_org_unit').value.trim(),
+    district: document.getElementById('s_district').value.trim(),
   };
   const pw = document.getElementById('s_password').value;
   if (pw) body.password = pw;
@@ -231,6 +254,129 @@ async function loadExport() {
   }
 }
 
+async function testConn() {
+  if (!requireAuth()) return;
+  const msg = document.getElementById('settingsMsg');
+  msg.innerHTML = 'Testing…';
+  try {
+    const r = await fetch(BASE + '/api/dhis2/test-connection', { method: 'POST', headers: authHeaders() });
+    const d = await r.json();
+    if (!r.ok || !d.success) { msg.innerHTML = '<div class="msg">' + (d.error || 'Connection failed') + '</div>'; return; }
+    msg.innerHTML = `<div class="msg good">Connected — DHIS2 v${d.version || '?'}${d.instanceName ? ' ('+d.instanceName+')' : ''}</div>`;
+  } catch (e) {
+    msg.innerHTML = '<div class="msg">Network error testing connection.</div>';
+  }
+}
+
+async function pushToDhis2() {
+  if (!requireAuth()) return;
+  const msg = document.getElementById('exportMsg');
+  msg.innerHTML = 'Pushing to DHIS2…';
+  try {
+    const r = await fetch(BASE + '/api/dhis2/push' + dateRange(), { method: 'POST', headers: authHeaders() });
+    const d = await r.json();
+    if (!r.ok) { msg.innerHTML = '<div class="msg">' + (d.error || 'Push failed') + '</div>'; return; }
+    msg.innerHTML = `<div class="msg good">Pushed period ${d.period} — imported ${d.imported}, updated ${d.updated}, ignored ${d.ignored}.</div>`;
+    loadPushHistory();
+  } catch (e) {
+    msg.innerHTML = '<div class="msg">Network error pushing to DHIS2.</div>';
+  }
+}
+
+async function loadPushHistory() {
+  const wrap = document.getElementById('pushHistoryWrap');
+  if (!requireAuth()) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = 'Loading…';
+  try {
+    const r = await fetch(BASE + '/api/dhis2/push-history', { headers: authHeaders() });
+    const d = await r.json();
+    if (!r.ok) { wrap.innerHTML = '<div class="msg">' + (d.error || 'Failed to load history') + '</div>'; return; }
+    if (!d.history.length) { wrap.innerHTML = '<div class="sub">No pushes yet.</div>'; return; }
+    const statusPill = (h) => {
+      if (h.status === 'success') return '<span class="pill ok">Success</span>';
+      if (h.status === 'queued_for_retry') return '<span class="pill" style="background:rgba(245,166,35,.15);color:var(--warn);">Queued for retry</span>';
+      if (h.status === 'failed_then_recovered') return '<span class="pill out">Failed (later recovered)</span>';
+      return '<span class="pill out">Failed — gave up after 3 tries</span>';
+    };
+    wrap.innerHTML = `<table><thead><tr><th>Period</th><th>Status</th><th>Values</th><th>Imported</th><th>Updated</th><th>Ignored</th><th>When</th></tr></thead><tbody>${
+      d.history.map(h => `<tr>
+        <td>${h.period}</td>
+        <td>${statusPill(h)}</td>
+        <td>${h.value_count}</td><td>${h.imported}</td><td>${h.updated_count}</td><td>${h.ignored}</td>
+        <td>${new Date(h.created_at).toLocaleString()}</td>
+      </tr>`).join('')
+    }</tbody></table>`;
+  } catch (e) {
+    wrap.innerHTML = '<div class="msg">Network error loading push history.</div>';
+  }
+}
+
+function barChart(rows, warn) {
+  if (!rows.length) return '<div class="sub">No data yet.</div>';
+  const max = Math.max(...rows.map(r => r.value), 1);
+  return `<div class="barchart">${rows.map(r => `
+    <div class="row">
+      <div class="rlabel">${r.label}</div>
+      <div class="track"><div class="fill${warn ? ' warn' : ''}" style="width:${Math.round((r.value / max) * 100)}%"></div></div>
+      <div class="rval">${r.value}</div>
+    </div>`).join('')}</div>`;
+}
+
+async function loadAnalytics() {
+  const wrap = document.getElementById('analyticsWrap');
+  if (!requireAuth()) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = 'Loading…';
+  try {
+    const r = await fetch(BASE + '/api/dhis2/analytics?months=6', { headers: authHeaders() });
+    const d = await r.json();
+    if (!r.ok) { wrap.innerHTML = '<div class="msg">' + (d.error || 'Failed to load analytics') + '</div>'; return; }
+
+    const consumptionRows = d.consumptionTrend.map(m => ({ label: m.month, value: m.quantity_dispensed }));
+
+    const diseaseMonths = Object.keys(d.diseaseTrend).sort();
+    const latestMonth = diseaseMonths[diseaseMonths.length - 1];
+    const diseaseRows = latestMonth
+      ? d.diseaseTrend[latestMonth].map(x => ({ label: x.diagnosis.slice(0, 12), value: x.count }))
+      : [];
+
+    const stockoutRows = d.stockoutTrend.map(s => ({
+      label: s.snapshot_date.slice(0, 10),
+      value: s.stocked_out_count,
+    }));
+
+    const fp = d.facilityPerformance;
+    const attendanceRows = fp.attendanceByMonth.map(m => ({ label: m.month, value: m.attendance }));
+    const onTimePct = fp.reportsSubmittedLast12Periods
+      ? Math.round((fp.reportsOnTimeLast12Periods / fp.reportsSubmittedLast12Periods) * 100)
+      : null;
+
+    wrap.innerHTML = `
+      <div class="analytics-grid">
+        <div class="card">
+          <div class="label">Medicine Consumption Trend (units dispensed/month)</div>
+          ${barChart(consumptionRows)}
+        </div>
+        <div class="card">
+          <div class="label">Top Diagnoses — ${latestMonth || 'this period'}</div>
+          ${barChart(diseaseRows)}
+        </div>
+        <div class="card">
+          <div class="label">Stock-out Trend (# drugs at zero, daily)</div>
+          ${barChart(stockoutRows, true)}
+          ${d.stockoutTrendNote ? `<div class="sub" style="margin-top:8px;">${d.stockoutTrendNote}</div>` : ''}
+        </div>
+        <div class="card">
+          <div class="label">Facility Performance</div>
+          <div style="margin-bottom:10px;">${barChart(attendanceRows)}</div>
+          <div class="sub">OPD attendance by month (current + prior)</div>
+          ${onTimePct !== null ? `<div style="margin-top:12px;font-size:13px;">On-time DHIS2 reporting: <strong>${onTimePct}%</strong> (${fp.reportsOnTimeLast12Periods}/${fp.reportsSubmittedLast12Periods} of last periods, submitted by the 5th)</div>` : '<div class="sub" style="margin-top:12px;">No submissions yet to measure on-time rate.</div>'}
+        </div>
+      </div>`;
+  } catch (e) {
+    wrap.innerHTML = '<div class="msg">Network error loading analytics.</div>';
+  }
+}
+
 // Default date range: current calendar month
 (function initDates() {
   const now = new Date();
@@ -241,6 +387,8 @@ async function loadExport() {
 
 requireAuth();
 loadSettings();
+loadPushHistory();
+loadAnalytics();
 </script>
 </body>
 </html>
