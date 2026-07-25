@@ -69,4 +69,51 @@ module.exports = {
       // 'amoxicillin 250mg': { id: 'CHANGE_ME_DE_UID', coc: 'CHANGE_ME_COC_UID' },
     },
   },
+
+  // ── ART Cohort — HIV/ART enrollment & viral load monitoring ──
+  // Standard cohort-style indicators (new enrollments, active on
+  // ART by regimen line, attrition, viral load suppression). Names
+  // follow the common WHO/PEPFAR MER cohort-monitoring convention;
+  // rename dataElements' `id`/`coc` to your instance's real UIDs —
+  // the keys themselves don't need to match DHIS2, only the map does.
+  artCohort: {
+    orgUnit: 'CHANGE_ME_ORG_UNIT_UID',
+    dataElements: {
+      art_new_enrollments:    { id: 'CHANGE_ME_DE_UID', coc: 'CHANGE_ME_COC_UID', label: 'ART — New Enrollments' },
+      art_currently_active:   { id: 'CHANGE_ME_DE_UID', coc: 'CHANGE_ME_COC_UID', label: 'ART — Currently Active' },
+      art_first_line:         { id: 'CHANGE_ME_DE_UID', coc: 'CHANGE_ME_COC_UID', label: 'ART — Active, First Line' },
+      art_second_line:        { id: 'CHANGE_ME_DE_UID', coc: 'CHANGE_ME_COC_UID', label: 'ART — Active, Second Line' },
+      art_third_line:         { id: 'CHANGE_ME_DE_UID', coc: 'CHANGE_ME_COC_UID', label: 'ART — Active, Third Line' },
+      art_transferred_out:    { id: 'CHANGE_ME_DE_UID', coc: 'CHANGE_ME_COC_UID', label: 'ART — Transferred Out' },
+      art_stopped:            { id: 'CHANGE_ME_DE_UID', coc: 'CHANGE_ME_COC_UID', label: 'ART — Stopped' },
+      art_lost_to_followup:   { id: 'CHANGE_ME_DE_UID', coc: 'CHANGE_ME_COC_UID', label: 'ART — Lost to Follow-up' },
+      art_deceased:           { id: 'CHANGE_ME_DE_UID', coc: 'CHANGE_ME_COC_UID', label: 'ART — Deceased' },
+      vl_tests_done:          { id: 'CHANGE_ME_DE_UID', coc: 'CHANGE_ME_COC_UID', label: 'Viral Load — Tests Done' },
+      vl_suppressed:          { id: 'CHANGE_ME_DE_UID', coc: 'CHANGE_ME_COC_UID', label: 'Viral Load — Suppressed (<1000 copies/mL)' },
+    },
+  },
+
+  // ── PMTCT — Prevention of Mother-to-Child Transmission cascade ──
+  pmtct: {
+    orgUnit: 'CHANGE_ME_ORG_UNIT_UID',
+    dataElements: {
+      pmtct_mothers_enrolled:    { id: 'CHANGE_ME_DE_UID', coc: 'CHANGE_ME_COC_UID', label: 'PMTCT — Mothers Enrolled' },
+      pmtct_hiv_positive_mothers:{ id: 'CHANGE_ME_DE_UID', coc: 'CHANGE_ME_COC_UID', label: 'PMTCT — HIV+ Mothers Enrolled' },
+      pmtct_deliveries:          { id: 'CHANGE_ME_DE_UID', coc: 'CHANGE_ME_COC_UID', label: 'PMTCT — Deliveries' },
+      pmtct_infant_prophylaxis:  { id: 'CHANGE_ME_DE_UID', coc: 'CHANGE_ME_COC_UID', label: 'PMTCT — Infant Prophylaxis Given' },
+      pmtct_infant_tested:       { id: 'CHANGE_ME_DE_UID', coc: 'CHANGE_ME_COC_UID', label: 'PMTCT — Infants Tested' },
+      pmtct_infant_positive:     { id: 'CHANGE_ME_DE_UID', coc: 'CHANGE_ME_COC_UID', label: 'PMTCT — Infants HIV+ (MTCT)' },
+    },
+  },
+
+  // ── TB Screening cascade ──────────────────────────────────
+  tbScreening: {
+    orgUnit: 'CHANGE_ME_ORG_UNIT_UID',
+    dataElements: {
+      tb_screened:            { id: 'CHANGE_ME_DE_UID', coc: 'CHANGE_ME_COC_UID', label: 'TB — Screened' },
+      tb_presumptive:         { id: 'CHANGE_ME_DE_UID', coc: 'CHANGE_ME_COC_UID', label: 'TB — Presumptive Cases' },
+      tb_referred:            { id: 'CHANGE_ME_DE_UID', coc: 'CHANGE_ME_COC_UID', label: 'TB — Referred for Testing' },
+      tb_treatment_started:   { id: 'CHANGE_ME_DE_UID', coc: 'CHANGE_ME_COC_UID', label: 'TB — Treatment Started' },
+    },
+  },
 };

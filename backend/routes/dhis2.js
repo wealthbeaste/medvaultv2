@@ -194,6 +194,67 @@ module.exports = function registerDhis2Routes(app, { query, auth, can, audit }) 
     }
   });
 
+  // ── HIV/ART Cohort, PMTCT & TB — human-readable summary ────
+  // Same shape as hmis105/hmis106: a plain JSON summary for display
+  // in dhis2.html, independent of whether DHIS2 UIDs are configured.
+  app.get('/api/dhis2/hiv-tb-cohort', auth, can('reports:moh'), async (req, res) => {
+    const { pharmacyId } = req.user;
+    if (!pharmacyId) return err(res, 400, 'AUTH_NO_PHARMACY', 'No pharmacy assigned.', 'pharmacyId');
+    const { start, end } = resolvePeriod(req);
+    try {
+      const art = await query(
+        `SELECT
+           COUNT(*) FILTER (WHERE start_date BETWEEN $2 AND $3)::int AS new_enrollments,
+           COUNT(*) FILTER (WHERE status = 'active')::int AS currently_active,
+           COUNT(*) FILTER (WHERE status = 'active' AND regimen_line = 'first_line')::int AS first_line,
+           COUNT(*) FILTER (WHERE status = 'active' AND regimen_line = 'second_line')::int AS second_line,
+           COUNT(*) FILTER (WHERE status = 'active' AND regimen_line = 'third_line')::int AS third_line,
+           COUNT(*) FILTER (WHERE status = 'transferred_out' AND status_date BETWEEN $2 AND $3)::int AS transferred_out,
+           COUNT(*) FILTER (WHERE status = 'stopped' AND status_date BETWEEN $2 AND $3)::int AS stopped,
+           COUNT(*) FILTER (WHERE status = 'lost_to_followup' AND status_date BETWEEN $2 AND $3)::int AS lost_to_followup,
+           COUNT(*) FILTER (WHERE status = 'deceased' AND status_date BETWEEN $2 AND $3)::int AS deceased
+         FROM art_enrollments WHERE pharmacy_id = $1`,
+        [pharmacyId, start, end]
+      );
+      const vl = await query(
+        `SELECT COUNT(*)::int AS tests_done, COUNT(*) FILTER (WHERE is_suppressed = true)::int AS suppressed
+         FROM viral_load_results WHERE pharmacy_id = $1 AND sample_date BETWEEN $2 AND $3`,
+        [pharmacyId, start, end]
+      );
+      const pmtct = await query(
+        `SELECT
+           COUNT(*) FILTER (WHERE created_at::date BETWEEN $2 AND $3)::int AS mothers_enrolled,
+           COUNT(*) FILTER (WHERE hiv_status = 'positive' AND created_at::date BETWEEN $2 AND $3)::int AS hiv_positive_mothers,
+           COUNT(*) FILTER (WHERE delivery_date BETWEEN $2 AND $3)::int AS deliveries,
+           COUNT(*) FILTER (WHERE delivery_date BETWEEN $2 AND $3 AND infant_prophylaxis IS NOT NULL AND TRIM(infant_prophylaxis) <> '')::int AS infant_prophylaxis,
+           COUNT(*) FILTER (WHERE infant_test_result IS NOT NULL AND infant_test_result <> '' AND delivery_date BETWEEN $2 AND $3)::int AS infant_tested,
+           COUNT(*) FILTER (WHERE infant_test_result = 'positive' AND delivery_date BETWEEN $2 AND $3)::int AS infant_positive
+         FROM pmtct_enrollments WHERE pharmacy_id = $1`,
+        [pharmacyId, start, end]
+      );
+      const tb = await query(
+        `SELECT
+           COUNT(*)::int AS screened,
+           COUNT(*) FILTER (WHERE presumptive_tb = true)::int AS presumptive,
+           COUNT(*) FILTER (WHERE referred_for_test = true)::int AS referred,
+           COUNT(*) FILTER (WHERE treatment_started = true)::int AS treatment_started
+         FROM tb_screenings WHERE pharmacy_id = $1 AND screening_date BETWEEN $2 AND $3`,
+        [pharmacyId, start, end]
+      );
+      const vlRow = vl.rows[0];
+      const vlSuppressionRate = vlRow.tests_done > 0 ? Math.round((vlRow.suppressed / vlRow.tests_done) * 1000) / 10 : 0;
+      res.json({
+        period: { start, end },
+        art: art.rows[0],
+        viralLoad: { ...vlRow, suppression_rate: vlSuppressionRate },
+        pmtct: pmtct.rows[0],
+        tb: tb.rows[0],
+      });
+    } catch (e) {
+      return err(res, 500, 'SERVER_ERROR', e.message);
+    }
+  });
+
   // ── DHIS2-compatible dataValueSet export — PREVIEW ONLY (uses this pharmacy's own settings) ──
   app.get('/api/dhis2/export', auth, can('reports:moh'), async (req, res) => {
     const { pharmacyId } = req.user;
@@ -298,6 +359,37 @@ module.exports = function registerDhis2Routes(app, { query, auth, can, audit }) 
       const st = stock.rows[0];
       const stockoutRate = st.total_drugs > 0 ? Math.round((st.stocked_out / st.total_drugs) * 1000) / 10 : 0;
 
+      const artCounts = await query(
+        `SELECT
+           COUNT(*) FILTER (WHERE start_date BETWEEN $2 AND $3)::int AS new_enrollments,
+           COUNT(*) FILTER (WHERE status = 'active')::int AS currently_active,
+           COUNT(*) FILTER (WHERE status = 'transferred_out' AND status_date BETWEEN $2 AND $3)::int AS transferred_out,
+           COUNT(*) FILTER (WHERE status = 'lost_to_followup' AND status_date BETWEEN $2 AND $3)::int AS lost_to_followup
+         FROM art_enrollments WHERE pharmacy_id = $1`,
+        [pharmacyId, start, end]
+      );
+      const vlCounts = await query(
+        `SELECT COUNT(*)::int AS tests_done, COUNT(*) FILTER (WHERE is_suppressed = true)::int AS suppressed
+         FROM viral_load_results WHERE pharmacy_id = $1 AND sample_date BETWEEN $2 AND $3`,
+        [pharmacyId, start, end]
+      );
+      const pmtctCounts = await query(
+        `SELECT
+           COUNT(*) FILTER (WHERE created_at::date BETWEEN $2 AND $3)::int AS mothers_enrolled,
+           COUNT(*) FILTER (WHERE delivery_date BETWEEN $2 AND $3)::int AS deliveries,
+           COUNT(*) FILTER (WHERE infant_test_result = 'positive' AND delivery_date BETWEEN $2 AND $3)::int AS infant_positive
+         FROM pmtct_enrollments WHERE pharmacy_id = $1`,
+        [pharmacyId, start, end]
+      );
+      const tbCounts = await query(
+        `SELECT COUNT(*)::int AS screened, COUNT(*) FILTER (WHERE presumptive_tb = true)::int AS presumptive,
+                COUNT(*) FILTER (WHERE treatment_started = true)::int AS treatment_started
+         FROM tb_screenings WHERE pharmacy_id = $1 AND screening_date BETWEEN $2 AND $3`,
+        [pharmacyId, start, end]
+      );
+      const art = artCounts.rows[0], vl = vlCounts.rows[0], pmtctR = pmtctCounts.rows[0], tbR = tbCounts.rows[0];
+      const vlSuppressionRate = vl.tests_done > 0 ? Math.round((vl.suppressed / vl.tests_done) * 1000) / 10 : 0;
+
       const indicators = [
         { code: 'OPD_ATTENDANCE_TOTAL',        label: 'Total OPD Attendance',        value: opd.total },
         { code: 'OPD_ATTENDANCE_NEW_CASES',    label: 'New Cases',                   value: opd.new_cases },
@@ -308,6 +400,18 @@ module.exports = function registerDhis2Routes(app, { query, auth, can, audit }) 
         { code: 'COMMODITY_CLOSING_STOCK',     label: 'Total Closing Stock (units)', value: st.closing_stock },
         { code: 'COMMODITY_CONSUMED',          label: 'Total Consumed (units)',      value: consumed.rows[0].total },
         { code: 'COMMODITY_STOCKOUT_RATE',     label: 'Stockout Rate (%)',           value: stockoutRate },
+        { code: 'ART_NEW_ENROLLMENTS',         label: 'ART — New Enrollments',       value: art.new_enrollments },
+        { code: 'ART_CURRENTLY_ACTIVE',        label: 'ART — Currently Active',      value: art.currently_active },
+        { code: 'ART_TRANSFERRED_OUT',         label: 'ART — Transferred Out',       value: art.transferred_out },
+        { code: 'ART_LOST_TO_FOLLOWUP',        label: 'ART — Lost to Follow-up',     value: art.lost_to_followup },
+        { code: 'VL_TESTS_DONE',               label: 'Viral Load — Tests Done',     value: vl.tests_done },
+        { code: 'VL_SUPPRESSION_RATE',         label: 'Viral Load — Suppression Rate (%)', value: vlSuppressionRate },
+        { code: 'PMTCT_MOTHERS_ENROLLED',      label: 'PMTCT — Mothers Enrolled',    value: pmtctR.mothers_enrolled },
+        { code: 'PMTCT_DELIVERIES',            label: 'PMTCT — Deliveries',          value: pmtctR.deliveries },
+        { code: 'PMTCT_INFANT_POSITIVE',       label: 'PMTCT — Infants HIV+ (MTCT)', value: pmtctR.infant_positive },
+        { code: 'TB_SCREENED',                 label: 'TB — Screened',               value: tbR.screened },
+        { code: 'TB_PRESUMPTIVE',              label: 'TB — Presumptive Cases',      value: tbR.presumptive },
+        { code: 'TB_TREATMENT_STARTED',        label: 'TB — Treatment Started',      value: tbR.treatment_started },
       ];
 
       const validation = validateIndicators(indicators);
