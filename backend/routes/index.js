@@ -3,7 +3,7 @@
 'use strict';
 
 module.exports = function registerRoutes(app) {
-  const { query, pool, getNextReceiptNumber, getNextPoNumber, getNextGrnNumber, getNextReturnNumber } = require('../database/db');
+  const { query, pool, getNextReceiptNumber, getNextPoNumber, getNextGrnNumber, getNextReturnNumber, getNextAdrNumber } = require('../database/db');
   const { hash, compare }    = require('../core/password');
   const { sign }             = require('../core/jwt');
   const auth                 = require('../middleware/auth');
@@ -13,7 +13,7 @@ module.exports = function registerRoutes(app) {
   const { rateLimit }        = require('../utils/rateLimit');
 
   // Shared dependency bag passed to every module
-  const deps = { query, pool, getNextReceiptNumber, getNextPoNumber, getNextGrnNumber, getNextReturnNumber, hash, compare, sign, auth, can, validate, schemas, audit, rateLimit };
+  const deps = { query, pool, getNextReceiptNumber, getNextPoNumber, getNextGrnNumber, getNextReturnNumber, getNextAdrNumber, hash, compare, sign, auth, can, validate, schemas, audit, rateLimit };
 
   require('./system')(app, deps);
   require('./auth')(app, deps);
@@ -53,4 +53,5 @@ module.exports = function registerRoutes(app) {
 
   // DHIS2 integration
   require('./dhis2')(app, deps);       // HMIS/DHIS2 export reports
+  require('./pharmacovigilance')(app, deps); // NDA ADR/AEFI reporting
 };
