@@ -54,4 +54,5 @@ module.exports = function registerRoutes(app) {
   // DHIS2 integration
   require('./dhis2')(app, deps);       // HMIS/DHIS2 export reports
   require('./pharmacovigilance')(app, deps); // NDA ADR/AEFI reporting
+  require('./efris')(app, deps);        // EFRIS / URA e-invoicing (via aggregator)
 };
