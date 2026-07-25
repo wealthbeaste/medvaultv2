@@ -1706,6 +1706,48 @@ async function runMigrations() {
     )`,
 
     // =========================================================
+    // EFRIS SETTINGS — per-pharmacy URA e-invoicing config
+    // MedVault does NOT integrate with URA's raw EFRIS API directly.
+    // Each pharmacy signs up independently with an EFRIS-accredited
+    // aggregator (e.g. EFRISBuddy at efris.dev) and pastes their own
+    // API credentials here. MedVault only stores/uses those credentials
+    // to submit invoices on that pharmacy's behalf — it is never a
+    // party to the pharmacy's URA/aggregator contract or billing.
+    // =========================================================
+    `CREATE TABLE IF NOT EXISTS efris_settings (
+      id             SERIAL PRIMARY KEY,
+      pharmacy_id    INTEGER NOT NULL UNIQUE REFERENCES pharmacies(id) ON DELETE CASCADE,
+      provider       VARCHAR(50) NOT NULL DEFAULT 'efrisbuddy',
+      environment    VARCHAR(20) NOT NULL DEFAULT 'sandbox',
+      api_key_enc    TEXT,
+      client_id      VARCHAR(255),
+      tin            VARCHAR(50),
+      device_no      VARCHAR(100),
+      is_active      BOOLEAN NOT NULL DEFAULT false,
+      updated_by     INTEGER REFERENCES users(id),
+      updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
+
+    // Log of every invoice submission attempt — needed for reconciliation
+    // if URA/aggregator confirms an invoice MedVault's own sales table
+    // shows differently, and to avoid double-submitting the same sale.
+    `CREATE TABLE IF NOT EXISTS efris_submissions (
+      id            SERIAL PRIMARY KEY,
+      pharmacy_id   INTEGER NOT NULL REFERENCES pharmacies(id) ON DELETE CASCADE,
+      sale_id       INTEGER REFERENCES sales(id) ON DELETE SET NULL,
+      status        VARCHAR(20) NOT NULL DEFAULT 'pending',
+      fdn           VARCHAR(100),
+      invoice_id    VARCHAR(100),
+      qr_code_url   TEXT,
+      request_payload  JSONB,
+      response_payload JSONB,
+      error         TEXT,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_efris_sub_pharmacy ON efris_submissions(pharmacy_id, created_at DESC)`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_efris_sub_sale ON efris_submissions(sale_id) WHERE sale_id IS NOT NULL`,
+
+    // =========================================================
     // ADR REPORTS — NDA Pharmacovigilance (Uganda)
     // Structured capture matching the official NDA ADR/AEFI
     // reporting form (Appendix 3, DPS/GDL/013). No public NDA
