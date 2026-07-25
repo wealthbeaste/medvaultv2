@@ -1703,7 +1703,54 @@ async function runMigrations() {
       is_active         BOOLEAN NOT NULL DEFAULT false,
       updated_by        INTEGER REFERENCES users(id),
       updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`
+    )`,
+
+    // =========================================================
+    // ADR REPORTS — NDA Pharmacovigilance (Uganda)
+    // Structured capture matching the official NDA ADR/AEFI
+    // reporting form (Appendix 3, DPS/GDL/013). No public NDA
+    // API exists yet, so submission stays manual — this table
+    // backs an in-app form + generated PDF matching that layout.
+    // =========================================================
+    `CREATE TABLE IF NOT EXISTS adr_reports (
+      id                     SERIAL PRIMARY KEY,
+      pharmacy_id            INTEGER NOT NULL REFERENCES pharmacies(id) ON DELETE CASCADE,
+      report_number          VARCHAR(50),
+      report_type            VARCHAR(20) NOT NULL DEFAULT 'initial',
+      seriousness            VARCHAR(20) NOT NULL DEFAULT 'not_serious',
+      product_type           VARCHAR(20) NOT NULL DEFAULT 'drug',
+      patient_initials       VARCHAR(10),
+      patient_gender         VARCHAR(10),
+      patient_weight_kg      NUMERIC(6,2),
+      pregnancy_status       VARCHAR(10),
+      patient_dob            DATE,
+      patient_age_at_onset   VARCHAR(20),
+      medical_history        TEXT,
+      medicines              JSONB NOT NULL DEFAULT '[]',
+      reaction_description   TEXT,
+      onset_date             DATE,
+      onset_time             VARCHAR(20),
+      stopped_date           DATE,
+      lab_results             TEXT,
+      seriousness_reason     JSONB NOT NULL DEFAULT '[]',
+      action_taken           VARCHAR(30),
+      outcome                VARCHAR(30),
+      causality              VARCHAR(30),
+      reporter_name          VARCHAR(100),
+      reporter_contact       VARCHAR(100),
+      reporter_designation   VARCHAR(50),
+      institution             VARCHAR(255),
+      district               VARCHAR(50),
+      status                 VARCHAR(20) NOT NULL DEFAULT 'draft',
+      created_by             INTEGER REFERENCES users(id),
+      created_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at             TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
+
+    `CREATE INDEX IF NOT EXISTS idx_adr_pharmacy ON adr_reports(pharmacy_id, created_at DESC)`,
+    `CREATE INDEX IF NOT EXISTS idx_adr_status ON adr_reports(pharmacy_id, status)`,
+
+    `ALTER TABLE pharmacies ADD COLUMN IF NOT EXISTS adr_counter INTEGER NOT NULL DEFAULT 0`
 
   ];
 
@@ -1868,6 +1915,16 @@ async function getNextWarehouseTransferNumber(pharmacyId) {
   return `WTR-${new Date().getFullYear()}-${String(n).padStart(4, '0')}`;
 }
 
+async function getNextAdrNumber(pharmacyId) {
+  const r = await query(
+    `UPDATE pharmacies SET adr_counter = adr_counter + 1 WHERE id = $1 RETURNING adr_counter`,
+    [pharmacyId]
+  );
+  if (!r.rows.length) return `ADR-${new Date().getFullYear()}-${Date.now().toString(36).toUpperCase()}`;
+  const n = r.rows[0].adr_counter;
+  return `ADR-${new Date().getFullYear()}-${String(n).padStart(4, '0')}`;
+}
+
 async function getNextMktOrderNumber(pharmacyId) {
   const r = await query(
     `UPDATE pharmacies SET mkt_order_counter = mkt_order_counter + 1 WHERE id = $1 RETURNING mkt_order_counter`,
@@ -1890,4 +1947,5 @@ module.exports = {
   getNextReturnNumber,
   getNextWarehouseTransferNumber,
   getNextMktOrderNumber,
+  getNextAdrNumber,
 };
