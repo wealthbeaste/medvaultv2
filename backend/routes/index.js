@@ -53,6 +53,7 @@ module.exports = function registerRoutes(app) {
 
   // DHIS2 integration
   require('./dhis2')(app, deps);       // HMIS/DHIS2 export reports
+  require('./hiv-tb')(app, deps);       // HIV/ART, PMTCT, TB program data entry (DHIS2 phase 4)
   require('./pharmacovigilance')(app, deps); // NDA ADR/AEFI reporting
   require('./efris')(app, deps);        // EFRIS / URA e-invoicing (via aggregator)
 };
