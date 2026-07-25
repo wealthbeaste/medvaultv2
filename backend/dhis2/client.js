@@ -11,5 +11,5 @@ const dhis2Client = axios.create({
   }
 });
 
-module.exports = dhis2Client;O
+module.exports = dhis2Client;
 
