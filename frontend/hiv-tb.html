@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MedVault — HIV/ART, PMTCT &amp; TB Program</title>
+<style>
+  :root { --bg:#0b0f14; --s1:#131a22; --border:#232c37; --text:#e8edf2; --muted:#8b98a5; --accent:#3aa6ff; --good:#2ecc71; --warn:#f5a623; --bad:#e74c3c; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,Segoe UI,Roboto,sans-serif; padding:24px; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  .sub { color:var(--muted); font-size:13px; margin-bottom:20px; }
+  .bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:20px; }
+  .bar button { background:var(--accent); border:none; color:#04101c; font-weight:600; padding:9px 16px; border-radius:8px; cursor:pointer; font-size:13px; }
+  .bar button.secondary { background:transparent; border:1px solid var(--border); color:var(--text); }
+  .bar button.danger { background:var(--bad); color:#fff; }
+  table { width:100%; border-collapse:collapse; background:var(--s1); border:1px solid var(--border); border-radius:12px; overflow:hidden; margin-bottom:20px; }
+  th, td { text-align:left; padding:10px 12px; font-size:13px; border-bottom:1px solid var(--border); }
+  th { color:var(--muted); font-weight:600; }
+  tr:last-child td { border-bottom:none; }
+  .pill { display:inline-block; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:600; }
+  .pill.active { background:rgba(46,204,113,.15); color:var(--good); }
+  .pill.inactive, .pill.stopped, .pill.transferred_out { background:rgba(231,76,60,.15); color:var(--bad); }
+  .pill.suppressed { background:rgba(46,204,113,.15); color:var(--good); }
+  .pill.unsuppressed { background:rgba(231,76,60,.15); color:var(--bad); }
+  .pill.presumptive { background:rgba(245,166,35,.15); color:var(--warn); }
+  .section-title { font-size:14px; font-weight:700; margin:24px 0 10px; color:var(--text); }
+  .msg { font-size:13px; color:var(--warn); background:rgba(245,166,35,.1); border:1px solid rgba(245,166,35,.3); padding:10px 12px; border-radius:8px; margin-bottom:16px; }
+  .msg.good { color:var(--good); background:rgba(46,204,113,.1); border-color:rgba(46,204,113,.3); }
+  a.login-link { color:var(--accent); }
+  .card { background:var(--s1); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:16px; }
+  .formgrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; }
+  .formgrid label { font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px; }
+  .formgrid input, .formgrid select, .formgrid textarea {
+    background:var(--bg); border:1px solid var(--border); color:var(--text); padding:8px; border-radius:8px; font-size:13px; font-family:inherit;
+  }
+  .formgrid textarea { min-height:60px; resize:vertical; }
+  .full { grid-column:1/-1; }
+  .checkgroup { display:flex; flex-wrap:wrap; gap:12px; font-size:12px; color:var(--muted); }
+  .checkgroup label { display:flex; align-items:center; gap:4px; }
+  .actions button { font-size:12px; padding:5px 10px; }
+  #formPanel { display:none; }
+  .tabbar { display:flex; gap:8px; margin-bottom:20px; border-bottom:1px solid var(--border); padding-bottom:0; }
+  .tab-btn { padding:9px 16px; border-radius:8px 8px 0 0; border:none; background:transparent; color:var(--muted); font-weight:600; font-size:13px; cursor:pointer; }
+  .tab-btn.active { background:var(--s1); color:var(--accent); border:1px solid var(--border); border-bottom:1px solid var(--s1); margin-bottom:-1px; }
+  .tabpane { display:none; }
+  .tabpane.active { display:block; }
+  .expand-row td { background:var(--bg); padding:0; }
+  .expand-wrap { padding:12px 20px; border-left:2px solid var(--accent); }
+  .expand-toggle { cursor:pointer; color:var(--accent); background:none; border:none; font-size:13px; padding:4px 8px; }
+  .searchwrap { position:relative; }
+  .searchdrop { display:none; position:absolute; top:100%; left:0; right:0; background:var(--s1); border:1px solid var(--border); border-radius:8px; z-index:999; max-height:220px; overflow-y:auto; box-shadow:0 8px 30px rgba(0,0,0,.4); }
+  .searchdrop div { padding:9px 12px; cursor:pointer; font-size:13px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; }
+  .searchdrop div:hover { background:var(--bg); }
+  .searchdrop div:last-child { border-bottom:none; }
+</style>
+</head>
+<body>
+
+<h1>HIV/ART, PMTCT &amp; TB Program</h1>
+<div class="sub">ART enrollment and viral load monitoring, PMTCT (mother-to-child) tracking, and TB screening — feeds the national ART Cohort, PMTCT, and TB DHIS2/NDW exports.</div>
+
+<div id="authMsg"></div>
+
+<div class="tabbar">
+  <button class="tab-btn active" onclick="switchTab('art', this)">💊 ART Enrollments</button>
+  <button class="tab-btn" onclick="switchTab('pmtct', this)">🤰 PMTCT</button>
+  <button class="tab-btn" onclick="switchTab('tb', this)">🫁 TB Screening</button>
+</div>
+
+<!-- ═══════════════════ ART ENROLLMENTS ═══════════════════ -->
+<div class="tabpane active" id="pane-art">
+  <div class="bar">
+    <button onclick="showArtForm()">+ New ART Enrollment</button>
+    <button class="secondary" onclick="loadArtEnrollments()">Refresh List</button>
+  </div>
+  <div id="artWrap">Loading…</div>
+
+  <div id="artFormPanel" class="card">
+    <div class="section-title" style="margin-top:0;">New / Edit ART Enrollment</div>
+    <div class="formgrid">
+      <label class="full searchwrap">Patient *
+        <input id="art_patient_search" placeholder="Search by name or phone…" autocomplete="off" oninput="searchPatients(this.value,'art')">
+        <input type="hidden" id="art_patient_id">
+        <div class="searchdrop" id="art_patient_drop"></div>
+      </label>
+      <label>ART number <input id="art_art_number"></label>
+      <label>Regimen <input id="art_regimen" placeholder="e.g. TDF/3TC/DTG"></label>
+      <label>Regimen line
+        <select id="art_regimen_line">
+          <option value="first_line">First line</option>
+          <option value="second_line">Second line</option>
+          <option value="third_line">Third line</option>
+        </select>
+      </label>
+      <label>Start date <input type="date" id="art_start_date"></label>
+      <label>Status
+        <select id="art_status">
+          <option value="active">Active</option>
+          <option value="stopped">Stopped</option>
+          <option value="transferred_out">Transferred out</option>
+          <option value="deceased">Deceased</option>
+          <option value="lost_to_followup">Lost to follow-up</option>
+        </select>
+      </label>
+      <label>Status date <input type="date" id="art_status_date"></label>
+      <label>Transfer facility <input id="art_transfer_facility"></label>
+      <label class="full">Notes <textarea id="art_notes"></textarea></label>
+    </div>
+    <div id="artFormMsg" style="margin-top:12px;"></div>
+    <div class="bar" style="margin-top:12px;">
+      <button onclick="saveArtEnrollment()">Save Enrollment</button>
+      <button class="secondary" onclick="hideArtForm()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ PMTCT ═══════════════════ -->
+<div class="tabpane" id="pane-pmtct">
+  <div class="bar">
+    <button onclick="showPmtctForm()">+ New PMTCT Enrollment</button>
+    <button class="secondary" onclick="loadPmtctEnrollments()">Refresh List</button>
+  </div>
+  <div id="pmtctWrap">Loading…</div>
+
+  <div id="pmtctFormPanel" class="card">
+    <div class="section-title" style="margin-top:0;">New / Edit PMTCT Enrollment</div>
+    <div class="formgrid">
+      <label class="full searchwrap">Mother *
+        <input id="pmtct_mother_search" placeholder="Search by name or phone…" autocomplete="off" oninput="searchPatients(this.value,'pmtct_mother')">
+        <input type="hidden" id="pmtct_mother_patient_id">
+        <div class="searchdrop" id="pmtct_mother_drop"></div>
+      </label>
+      <label>HIV status
+        <select id="pmtct_hiv_status">
+          <option value="">—</option>
+          <option value="positive">Positive</option>
+          <option value="negative">Negative</option>
+          <option value="unknown">Unknown</option>
+        </select>
+      </label>
+      <label>LMP date <input type="date" id="pmtct_lmp_date"></label>
+      <label>EDD <input type="date" id="pmtct_edd_date"></label>
+      <label>Delivery date <input type="date" id="pmtct_delivery_date"></label>
+      <label class="full searchwrap">Infant (if delivered)
+        <input id="pmtct_infant_search" placeholder="Search by name or phone…" autocomplete="off" oninput="searchPatients(this.value,'pmtct_infant')">
+        <input type="hidden" id="pmtct_infant_patient_id">
+        <div class="searchdrop" id="pmtct_infant_drop"></div>
+      </label>
+      <label>Infant prophylaxis <input id="pmtct_infant_prophylaxis" placeholder="e.g. NVP 6 weeks"></label>
+      <label>Infant test result
+        <select id="pmtct_infant_test_result">
+          <option value="">—</option>
+          <option value="positive">Positive</option>
+          <option value="negative">Negative</option>
+          <option value="pending">Pending</option>
+        </select>
+      </label>
+      <label>Status
+        <select id="pmtct_status">
+          <option value="active">Active</option>
+          <option value="completed">Completed</option>
+          <option value="lost_to_followup">Lost to follow-up</option>
+        </select>
+      </label>
+      <label class="full">Notes <textarea id="pmtct_notes"></textarea></label>
+    </div>
+    <div id="pmtctFormMsg" style="margin-top:12px;"></div>
+    <div class="bar" style="margin-top:12px;">
+      <button onclick="savePmtctEnrollment()">Save Enrollment</button>
+      <button class="secondary" onclick="hidePmtctForm()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ TB SCREENING ═══════════════════ -->
+<div class="tabpane" id="pane-tb">
+  <div class="bar">
+    <button onclick="showTbForm()">+ New TB Screening</button>
+    <button class="secondary" onclick="loadTbScreenings()">Refresh List</button>
+  </div>
+  <div id="tbWrap">Loading…</div>
+
+  <div id="tbFormPanel" class="card">
+    <div class="section-title" style="margin-top:0;">New / Edit TB Screening</div>
+    <div class="formgrid">
+      <label class="full searchwrap">Patient *
+        <input id="tb_patient_search" placeholder="Search by name or phone…" autocomplete="off" oninput="searchPatients(this.value,'tb')">
+        <input type="hidden" id="tb_patient_id">
+        <div class="searchdrop" id="tb_patient_drop"></div>
+      </label>
+      <label>Screening date <input type="date" id="tb_screening_date"></label>
+      <label>Test result
+        <select id="tb_test_result">
+          <option value="">—</option>
+          <option value="positive">Positive</option>
+          <option value="negative">Negative</option>
+          <option value="pending">Pending</option>
+        </select>
+      </label>
+      <label class="full">Symptoms
+        <div class="checkgroup" id="tb_symptoms">
+          <label><input type="checkbox" value="cough_over_2_weeks"> Cough &gt; 2 weeks</label>
+          <label><input type="checkbox" value="fever"> Fever</label>
+          <label><input type="checkbox" value="night_sweats"> Night sweats</label>
+          <label><input type="checkbox" value="weight_loss"> Weight loss</label>
+          <label><input type="checkbox" value="haemoptysis"> Haemoptysis</label>
+        </div>
+      </label>
+      <label style="flex-direction:row;align-items:center;gap:6px;"><input type="checkbox" id="tb_presumptive_tb"> Presumptive TB</label>
+      <label style="flex-direction:row;align-items:center;gap:6px;"><input type="checkbox" id="tb_referred_for_test"> Referred for test</label>
+      <label style="flex-direction:row;align-items:center;gap:6px;"><input type="checkbox" id="tb_treatment_started"> Treatment started</label>
+      <label class="full">Notes <textarea id="tb_notes"></textarea></label>
+    </div>
+    <div id="tbFormMsg" style="margin-top:12px;"></div>
+    <div class="bar" style="margin-top:12px;">
+      <button onclick="saveTbScreening()">Save Screening</button>
+      <button class="secondary" onclick="hideTbForm()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const BASE = window.location.origin;
+let artEditingId = null, pmtctEditingId = null, tbEditingId = null;
+let artEnrollmentsCache = [];
+let expandedArtId = null;
+
+function authHeaders() {
+  const token = localStorage.getItem('mv_token');
+  return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (token || '') };
+}
+
+function requireAuth() {
+  const token = localStorage.getItem('mv_token');
+  const el = document.getElementById('authMsg');
+  if (!token) {
+    el.innerHTML = '<div class="msg">Not logged in. <a class="login-link" href="./app.html">Log in to MedVault</a>, then come back to this page.</div>';
+    return false;
+  }
+  el.innerHTML = '';
+  return true;
+}
+
+function switchTab(tab, el) {
+  document.querySelectorAll('.tabpane').forEach(p => p.classList.remove('active'));
+  document.getElementById('pane-' + tab).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  if (tab === 'art') loadArtEnrollments();
+  if (tab === 'pmtct') loadPmtctEnrollments();
+  if (tab === 'tb') loadTbScreenings();
+}
+
+// ─── Shared patient search (used by ART / PMTCT mother+infant / TB) ───
+async function searchPatients(q, prefix) {
+  const drop = document.getElementById(prefix + '_patient_drop') || document.getElementById(prefix + '_mother_drop') || document.getElementById(prefix + '_infant_drop');
+  const dropId = prefix === 'pmtct_mother' ? 'pmtct_mother_drop' : prefix === 'pmtct_infant' ? 'pmtct_infant_drop' : prefix + '_patient_drop';
+  const el = document.getElementById(dropId);
+  if (!q || q.length < 2) { el.style.display = 'none'; return; }
+  try {
+    const r = await fetch(BASE + '/api/clinic/patients?search=' + encodeURIComponent(q) + '&limit=8', { headers: authHeaders() });
+    const d = await r.json();
+    if (!d?.patients?.length) { el.style.display = 'none'; return; }
+    el.innerHTML = d.patients.map(p =>
+      `<div onmousedown="selectPatient('${prefix}',${p.id},'${(p.name||'').replace(/'/g,"\\x27")}','${p.patient_number||''}')">
+         <span style="font-weight:500">${p.name}</span>
+         <span style="color:var(--accent);font-size:11px">${p.patient_number||''} · ${p.phone||'—'}</span>
+       </div>`
+    ).join('');
+    el.style.display = 'block';
+  } catch (e) {}
+}
+
+function selectPatient(prefix, id, name, num) {
+  const idFieldMap = { art: 'art_patient_id', pmtct_mother: 'pmtct_mother_patient_id', pmtct_infant: 'pmtct_infant_patient_id', tb: 'tb_patient_id' };
+  const searchFieldMap = { art: 'art_patient_search', pmtct_mother: 'pmtct_mother_search', pmtct_infant: 'pmtct_infant_search', tb: 'tb_patient_search' };
+  const dropFieldMap = { art: 'art_patient_drop', pmtct_mother: 'pmtct_mother_drop', pmtct_infant: 'pmtct_infant_drop', tb: 'tb_patient_drop' };
+  document.getElementById(idFieldMap[prefix]).value = id;
+  document.getElementById(searchFieldMap[prefix]).value = name + ' (' + num + ')';
+  document.getElementById(dropFieldMap[prefix]).style.display = 'none';
+}
+
+// ═══════════════════ ART ENROLLMENTS ═══════════════════
+
+function showArtForm(enr) {
+  if (!requireAuth()) return;
+  document.getElementById('artFormPanel').style.display = 'block';
+  artEditingId = enr ? enr.id : null;
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v ?? ''; };
+  if (enr) {
+    document.getElementById('art_patient_id').value = enr.patient_id;
+    document.getElementById('art_patient_search').value = (enr.patient_name || '') + ' (' + (enr.patient_number || '') + ')';
+    set('art_art_number', enr.art_number);
+    set('art_regimen', enr.regimen);
+    set('art_regimen_line', enr.regimen_line || 'first_line');
+    set('art_start_date', enr.start_date ? enr.start_date.slice(0,10) : '');
+    set('art_status', enr.status || 'active');
+    set('art_status_date', enr.status_date ? enr.status_date.slice(0,10) : '');
+    set('art_transfer_facility', enr.transfer_facility);
+    set('art_notes', enr.notes);
+  } else {
+    document.querySelectorAll('#artFormPanel input, #artFormPanel select, #artFormPanel textarea').forEach(el => el.value = '');
+    document.getElementById('art_regimen_line').value = 'first_line';
+    document.getElementById('art_status').value = 'active';
+  }
+  document.getElementById('artFormPanel').scrollIntoView({ behavior: 'smooth' });
+}
+
+function hideArtForm() {
+  document.getElementById('artFormPanel').style.display = 'none';
+  artEditingId = null;
+}
+
+async function saveArtEnrollment() {
+  if (!requireAuth()) return;
+  const msg = document.getElementById('artFormMsg');
+  const patientId = document.getElementById('art_patient_id').value;
+  const startDate = document.getElementById('art_start_date').value;
+  if (!patientId || !startDate) { msg.innerHTML = '<div class="msg">Patient and start date are required.</div>'; return; }
+  msg.innerHTML = 'Saving…';
+  const body = {
+    patient_id: patientId,
+    art_number: document.getElementById('art_art_number').value || null,
+    regimen: document.getElementById('art_regimen').value || null,
+    regimen_line: document.getElementById('art_regimen_line').value,
+    start_date: startDate,
+    status: document.getElementById('art_status').value,
+    status_date: document.getElementById('art_status_date').value || null,
+    transfer_facility: document.getElementById('art_transfer_facility').value || null,
+    notes: document.getElementById('art_notes').value || null,
+  };
+  try {
+    const url = artEditingId ? BASE + '/api/hiv/art-enrollments/' + artEditingId : BASE + '/api/hiv/art-enrollments';
+    const method = artEditingId ? 'PUT' : 'POST';
+    const r = await fetch(url, { method, headers: authHeaders(), body: JSON.stringify(body) });
+    const d = await r.json();
+    if (!r.ok) { msg.innerHTML = '<div class="msg">' + (d.error || 'Failed to save') + '</div>'; return; }
+    msg.innerHTML = '<div class="msg good">Saved.</div>';
+    setTimeout(() => { hideArtForm(); loadArtEnrollments(); }, 700);
+  } catch (e) {
+    msg.innerHTML = '<div class="msg">Network error saving enrollment.</div>';
+  }
+}
+
+async function loadArtEnrollments() {
+  if (!requireAuth()) return;
+  const wrap = document.getElementById('artWrap');
+  wrap.innerHTML = 'Loading…';
+  try {
+    const r = await fetch(BASE + '/api/hiv/art-enrollments', { headers: authHeaders() });
+    const d = await r.json();
+    if (!r.ok) { wrap.innerHTML = '<div class="msg">' + (d.error || 'Failed to load enrollments') + '</div>'; return; }
+    artEnrollmentsCache = d.enrollments || [];
+    if (!artEnrollmentsCache.length) { wrap.innerHTML = '<div class="msg">No ART enrollments yet.</div>'; return; }
+    wrap.innerHTML = `<table>
+      <tr><th>Patient</th><th>ART #</th><th>Regimen</th><th>Line</th><th>Start</th><th>Status</th><th></th></tr>
+      ${artEnrollmentsCache.map(e => `
+        <tr>
+          <td>${e.patient_name || '—'} <span style="color:var(--muted);font-size:11px">${e.patient_number || ''}</span></td>
+          <td>${e.art_number || '—'}</td>
+          <td>${e.regimen || '—'}</td>
+          <td>${(e.regimen_line || '').replace('_', ' ')}</td>
+          <td>${e.start_date ? e.start_date.slice(0,10) : '—'}</td>
+          <td><span class="pill ${e.status}">${(e.status || '').replace('_', ' ')}</span></td>
+          <td class="actions" style="display:flex;gap:6px;">
+            <button class="secondary" onclick='showArtForm(${JSON.stringify(e)})'>Edit</button>
+            <button class="expand-toggle" onclick="toggleViralLoad(${e.id})">${expandedArtId === e.id ? 'Hide' : 'Viral Load'}</button>
+          </td>
+        </tr>
+        ${expandedArtId === e.id ? `<tr class="expand-row"><td colspan="7"><div class="expand-wrap" id="vl-wrap-${e.id}">Loading…</div></td></tr>` : ''}
+      `).join('')}
+    </table>`;
+    if (expandedArtId) loadViralLoad(expandedArtId);
+  } catch (e) {
+    wrap.innerHTML = '<div class="msg">Network error loading enrollments.</div>';
+  }
+}
+
+function toggleViralLoad(enrollmentId) {
+  expandedArtId = expandedArtId === enrollmentId ? null : enrollmentId;
+  loadArtEnrollments();
+}
+
+async function loadViralLoad(enrollmentId) {
+  const wrap = document.getElementById('vl-wrap-' + enrollmentId);
+  if (!wrap) return;
+  try {
+    const r = await fetch(BASE + '/api/hiv/viral-load/' + enrollmentId, { headers: authHeaders() });
+    const d = await r.json();
+    const results = d.results || [];
+    wrap.innerHTML = `
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">Viral load results</div>
+      ${results.length ? `<table style="margin-bottom:12px;">
+        <tr><th>Sample date</th><th>Result date</th><th>Copies/mL</th><th>Suppressed</th><th>Notes</th></tr>
+        ${results.map(v => `
+          <tr>
+            <td>${v.sample_date ? v.sample_date.slice(0,10) : '—'}</td>
+            <td>${v.result_date ? v.result_date.slice(0,10) : '—'}</td>
+            <td>${v.copies_per_ml ?? '—'}</td>
+            <td>${v.is_suppressed === true ? '<span class="pill suppressed">Suppressed</span>' : v.is_suppressed === false ? '<span class="pill unsuppressed">Unsuppressed</span>' : '—'}</td>
+            <td>${v.notes || '—'}</td>
+          </tr>
+        `).join('')}
+      </table>` : '<div class="msg">No viral load results yet.</div>'}
+      <div class="formgrid" style="margin-bottom:8px;">
+        <label>Sample date <input type="date" id="vl_sample_date_${enrollmentId}"></label>
+        <label>Result date <input type="date" id="vl_result_date_${enrollmentId}"></label>
+        <label>Copies/mL <input type="number" id="vl_copies_${enrollmentId}"></label>
+        <label class="full">Notes <input id="vl_notes_${enrollmentId}"></label>
+      </div>
+      <div id="vlMsg-${enrollmentId}"></div>
+      <button onclick="saveViralLoad(${enrollmentId})">Add Viral Load Result</button>
+    `;
+  } catch (e) {
+    wrap.innerHTML = '<div class="msg">Network error loading viral load results.</div>';
+  }
+}
+
+async function saveViralLoad(enrollmentId) {
+  const msg = document.getElementById('vlMsg-' + enrollmentId);
+  const sampleDate = document.getElementById('vl_sample_date_' + enrollmentId).value;
+  if (!sampleDate) { msg.innerHTML = '<div class="msg">Sample date is required.</div>'; return; }
+  const body = {
+    art_enrollment_id: enrollmentId,
+    sample_date: sampleDate,
+    result_date: document.getElementById('vl_result_date_' + enrollmentId).value || null,
+    copies_per_ml: document.getElementById('vl_copies_' + enrollmentId).value || null,
+    notes: document.getElementById('vl_notes_' + enrollmentId).value || null,
+  };
+  try {
+    const r = await fetch(BASE + '/api/hiv/viral-load', { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) });
+    const d = await r.json();
+    if (!r.ok) { msg.innerHTML = '<div class="msg">' + (d.error || 'Failed to save') + '</div>'; return; }
+    loadViralLoad(enrollmentId);
+  } catch (e) {
+    msg.innerHTML = '<div class="msg">Network error saving result.</div>';
+  }
+}
+
+// ═══════════════════ PMTCT ═══════════════════
+
+function showPmtctForm(enr) {
+  if (!requireAuth()) return;
+  document.getElementById('pmtctFormPanel').style.display = 'block';
+  pmtctEditingId = enr ? enr.id : null;
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v ?? ''; };
+  if (enr) {
+    document.getElementById('pmtct_mother_patient_id').value = enr.mother_patient_id;
+    document.getElementById('pmtct_mother_search').value = (enr.mother_name || '') + '';
+    set('pmtct_hiv_status', enr.hiv_status);
+    set('pmtct_lmp_date', enr.lmp_date ? enr.lmp_date.slice(0,10) : '');
+    set('pmtct_edd_date', enr.edd_date ? enr.edd_date.slice(0,10) : '');
+    set('pmtct_delivery_date', enr.delivery_date ? enr.delivery_date.slice(0,10) : '');
+    document.getElementById('pmtct_infant_patient_id').value = enr.infant_patient_id || '';
+    set('pmtct_infant_prophylaxis', enr.infant_prophylaxis);
+    set('pmtct_infant_test_result', enr.infant_test_result);
+    set('pmtct_status', enr.status || 'active');
+    set('pmtct_notes', enr.notes);
+  } else {
+    document.querySelectorAll('#pmtctFormPanel input, #pmtctFormPanel select, #pmtctFormPanel textarea').forEach(el => el.value = '');
+    document.getElementById('pmtct_status').value = 'active';
+  }
+  document.getElementById('pmtctFormPanel').scrollIntoView({ behavior: 'smooth' });
+}
+
+function hidePmtctForm() {
+  document.getElementById('pmtctFormPanel').style.display = 'none';
+  pmtctEditingId = null;
+}
+
+async function savePmtctEnrollment() {
+  if (!requireAuth()) return;
+  const msg = document.getElementById('pmtctFormMsg');
+  const motherId = document.getElementById('pmtct_mother_patient_id').value;
+  if (!motherId) { msg.innerHTML = '<div class="msg">Mother is required.</div>'; return; }
+  msg.innerHTML = 'Saving…';
+  const body = {
+    mother_patient_id: motherId,
+    hiv_status: document.getElementById('pmtct_hiv_status').value || null,
+    lmp_date: document.getElementById('pmtct_lmp_date').value || null,
+    edd_date: document.getElementById('pmtct_edd_date').value || null,
+    delivery_date: document.getElementById('pmtct_delivery_date').value || null,
+    infant_patient_id: document.getElementById('pmtct_infant_patient_id').value || null,
+    infant_prophylaxis: document.getElementById('pmtct_infant_prophylaxis').value || null,
+    infant_test_result: document.getElementById('pmtct_infant_test_result').value || null,
+    status: document.getElementById('pmtct_status').value,
+    notes: document.getElementById('pmtct_notes').value || null,
+  };
+  try {
+    const url = pmtctEditingId ? BASE + '/api/pmtct/enrollments/' + pmtctEditingId : BASE + '/api/pmtct/enrollments';
+    const method = pmtctEditingId ? 'PUT' : 'POST';
+    const r = await fetch(url, { method, headers: authHeaders(), body: JSON.stringify(body) });
+    const d = await r.json();
+    if (!r.ok) { msg.innerHTML = '<div class="msg">' + (d.error || 'Failed to save') + '</div>'; return; }
+    msg.innerHTML = '<div class="msg good">Saved.</div>';
+    setTimeout(() => { hidePmtctForm(); loadPmtctEnrollments(); }, 700);
+  } catch (e) {
+    msg.innerHTML = '<div class="msg">Network error saving enrollment.</div>';
+  }
+}
+
+async function loadPmtctEnrollments() {
+  if (!requireAuth()) return;
+  const wrap = document.getElementById('pmtctWrap');
+  wrap.innerHTML = 'Loading…';
+  try {
+    const r = await fetch(BASE + '/api/pmtct/enrollments', { headers: authHeaders() });
+    const d = await r.json();
+    if (!r.ok) { wrap.innerHTML = '<div class="msg">' + (d.error || 'Failed to load enrollments') + '</div>'; return; }
+    const rows = d.enrollments || [];
+    if (!rows.length) { wrap.innerHTML = '<div class="msg">No PMTCT enrollments yet.</div>'; return; }
+    wrap.innerHTML = `<table>
+      <tr><th>Mother</th><th>HIV status</th><th>EDD</th><th>Delivery</th><th>Infant result</th><th>Status</th><th></th></tr>
+      ${rows.map(e => `
+        <tr>
+          <td>${e.mother_name || '—'}</td>
+          <td>${e.hiv_status || '—'}</td>
+          <td>${e.edd_date ? e.edd_date.slice(0,10) : '—'}</td>
+          <td>${e.delivery_date ? e.delivery_date.slice(0,10) : '—'}</td>
+          <td>${e.infant_test_result || '—'}</td>
+          <td><span class="pill ${e.status}">${(e.status || '').replace('_', ' ')}</span></td>
+          <td><button class="secondary" onclick='showPmtctForm(${JSON.stringify(e)})'>Edit</button></td>
+        </tr>
+      `).join('')}
+    </table>`;
+  } catch (e) {
+    wrap.innerHTML = '<div class="msg">Network error loading enrollments.</div>';
+  }
+}
+
+// ═══════════════════ TB SCREENING ═══════════════════
+
+function showTbForm(scr) {
+  if (!requireAuth()) return;
+  document.getElementById('tbFormPanel').style.display = 'block';
+  tbEditingId = scr ? scr.id : null;
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v ?? ''; };
+  document.querySelectorAll('#tb_symptoms input').forEach(c => c.checked = false);
+  if (scr) {
+    document.getElementById('tb_patient_id').value = scr.patient_id;
+    document.getElementById('tb_patient_search').value = (scr.patient_name || '');
+    set('tb_screening_date', scr.screening_date ? scr.screening_date.slice(0,10) : '');
+    set('tb_test_result', scr.test_result);
+    set('tb_notes', scr.notes);
+    document.getElementById('tb_presumptive_tb').checked = !!scr.presumptive_tb;
+    document.getElementById('tb_referred_for_test').checked = !!scr.referred_for_test;
+    document.getElementById('tb_treatment_started').checked = !!scr.treatment_started;
+    (scr.symptoms || []).forEach(s => {
+      document.querySelectorAll('#tb_symptoms input').forEach(c => { if (c.value === s) c.checked = true; });
+    });
+  } else {
+    document.querySelectorAll('#tbFormPanel input[type=text], #tbFormPanel input[type=date], #tbFormPanel select, #tbFormPanel textarea').forEach(el => el.value = '');
+    document.getElementById('tb_patient_search').value = '';
+    document.getElementById('tb_patient_id').value = '';
+    document.getElementById('tb_presumptive_tb').checked = false;
+    document.getElementById('tb_referred_for_test').checked = false;
+    document.getElementById('tb_treatment_started').checked = false;
+    document.getElementById('tb_screening_date').value = new Date().toISOString().slice(0,10);
+  }
+  document.getElementById('tbFormPanel').scrollIntoView({ behavior: 'smooth' });
+}
+
+function hideTbForm() {
+  document.getElementById('tbFormPanel').style.display = 'none';
+  tbEditingId = null;
+}
+
+async function saveTbScreening() {
+  if (!requireAuth()) return;
+  const msg = document.getElementById('tbFormMsg');
+  const patientId = document.getElementById('tb_patient_id').value;
+  if (!patientId) { msg.innerHTML = '<div class="msg">Patient is required.</div>'; return; }
+  msg.innerHTML = 'Saving…';
+  const symptoms = Array.from(document.querySelectorAll('#tb_symptoms input:checked')).map(c => c.value);
+  const body = {
+    patient_id: patientId,
+    screening_date: document.getElementById('tb_screening_date').value || null,
+    symptoms,
+    presumptive_tb: document.getElementById('tb_presumptive_tb').checked,
+    referred_for_test: document.getElementById('tb_referred_for_test').checked,
+    test_result: document.getElementById('tb_test_result').value || null,
+    treatment_started: document.getElementById('tb_treatment_started').checked,
+    notes: document.getElementById('tb_notes').value || null,
+  };
+  try {
+    const url = tbEditingId ? BASE + '/api/tb/screenings/' + tbEditingId : BASE + '/api/tb/screenings';
+    const method = tbEditingId ? 'PUT' : 'POST';
+    const r = await fetch(url, { method, headers: authHeaders(), body: JSON.stringify(body) });
+    const d = await r.json();
+    if (!r.ok) { msg.innerHTML = '<div class="msg">' + (d.error || 'Failed to save') + '</div>'; return; }
+    msg.innerHTML = '<div class="msg good">Saved.</div>';
+    setTimeout(() => { hideTbForm(); loadTbScreenings(); }, 700);
+  } catch (e) {
+    msg.innerHTML = '<div class="msg">Network error saving screening.</div>';
+  }
+}
+
+async function loadTbScreenings() {
+  if (!requireAuth()) return;
+  const wrap = document.getElementById('tbWrap');
+  wrap.innerHTML = 'Loading…';
+  try {
+    const r = await fetch(BASE + '/api/tb/screenings', { headers: authHeaders() });
+    const d = await r.json();
+    if (!r.ok) { wrap.innerHTML = '<div class="msg">' + (d.error || 'Failed to load screenings') + '</div>'; return; }
+    const rows = d.screenings || [];
+    if (!rows.length) { wrap.innerHTML = '<div class="msg">No TB screenings yet.</div>'; return; }
+    wrap.innerHTML = `<table>
+      <tr><th>Patient</th><th>Date</th><th>Presumptive</th><th>Referred</th><th>Result</th><th>Treatment</th><th></th></tr>
+      ${rows.map(s => `
+        <tr>
+          <td>${s.patient_name || '—'}</td>
+          <td>${s.screening_date ? s.screening_date.slice(0,10) : '—'}</td>
+          <td>${s.presumptive_tb ? '<span class="pill presumptive">Yes</span>' : 'No'}</td>
+          <td>${s.referred_for_test ? 'Yes' : 'No'}</td>
+          <td>${s.test_result || '—'}</td>
+          <td>${s.treatment_started ? 'Started' : '—'}</td>
+          <td><button class="secondary" onclick='showTbForm(${JSON.stringify(s)})'>Edit</button></td>
+        </tr>
+      `).join('')}
+    </table>`;
+  } catch (e) {
+    wrap.innerHTML = '<div class="msg">Network error loading screenings.</div>';
+  }
+}
+
+// ─── Init ───
+if (requireAuth()) loadArtEnrollments();
+</script>
+</body>
+</html>
