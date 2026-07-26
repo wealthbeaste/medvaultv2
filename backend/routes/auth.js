@@ -28,7 +28,10 @@ module.exports = function registerAuthRoutes(app, { query, pool, hash, compare, 
         const selectedPlan = plan || 'single';
         // NGO/Screening accounts require manual admin approval before login works —
         // see middleware/auth.js, which blocks access while is_active is false.
-        const orgIsActive = selectedPlan !== 'ngo_screening';
+        // referral_partner (hospitals/clinics that only issue e-prescriptions,
+        // no pharmacy subscription) also requires manual admin approval —
+        // same is_active=false gate as ngo_screening, checked in middleware/auth.js.
+        const orgIsActive = selectedPlan !== 'ngo_screening' && selectedPlan !== 'referral_partner';
 
         await client.query('BEGIN');
 

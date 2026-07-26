@@ -20,16 +20,45 @@ module.exports = function registerErxRoutes(app, { query, auth, can, audit, gene
     if (!Array.isArray(b.items) || !b.items.length) return err(res, 400, 'VALIDATION_INVALID', 'At least one prescribed item is required.');
 
     try {
+      // Optional: doctor suggests a real dispensing pharmacy. Suggestion only —
+      // fulfillment stays open to any pharmacy — but if it's a valid MedVault
+      // pharmacy, that pharmacy will see this show up as a pending referral.
+      let recommendedPharmacyId = null;
+      if (b.recommended_pharmacy_id) {
+        const pharmCheck = await query(`SELECT id FROM pharmacies WHERE id = $1`, [b.recommended_pharmacy_id]);
+        if (!pharmCheck.rows.length) {
+          return err(res, 400, 'VALIDATION_INVALID_PHARMACY', 'recommended_pharmacy_id does not match a known pharmacy.', 'recommended_pharmacy_id');
+        }
+        recommendedPharmacyId = b.recommended_pharmacy_id;
+      }
+
       const code = await generateUniqueErxCode();
       const r = await query(
         `INSERT INTO e_prescriptions (code, org_id, pharmacy_id, patient_id, prescription_id, patient_display_name,
-           doctor_name, doctor_license_no, items, created_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+           doctor_name, doctor_license_no, items, created_by, recommended_pharmacy_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
         [code, orgId, pharmacyId, b.patient_id || null, b.prescription_id || null, b.patient_display_name,
-         b.doctor_name || null, b.doctor_license_no || null, JSON.stringify(b.items), userId || null]
+         b.doctor_name || null, b.doctor_license_no || null, JSON.stringify(b.items), userId || null, recommendedPharmacyId]
       );
       if (audit) await audit(query, { req, action: 'erx.create', entity: 'e_prescription', entityId: r.rows[0].id, payload: { code } });
       res.json({ success: true, prescription: r.rows[0], verifyUrl: `${APP_URL}/rx/${code}` });
+    } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
+  });
+
+  // ── Pending referrals recommended to THIS pharmacy, not yet filled ──
+  // Lets pharmacy staff see incoming referrals from hospitals before the
+  // patient physically arrives, so they can check stock ahead of time.
+  app.get('/api/erx/pending-referrals', auth, can('patients:read'), async (req, res) => {
+    const { pharmacyId } = req.user;
+    try {
+      const r = await query(
+        `SELECT rx.*, p.name AS issuing_org_pharmacy_name FROM e_prescriptions rx
+         LEFT JOIN pharmacies p ON p.id = rx.pharmacy_id
+         WHERE rx.recommended_pharmacy_id = $1 AND rx.status != 'filled'
+         ORDER BY rx.created_at DESC LIMIT 100`,
+        [pharmacyId]
+      );
+      res.json({ referrals: r.rows });
     } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
   });
 

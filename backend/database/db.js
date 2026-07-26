@@ -1899,6 +1899,15 @@ async function runMigrations() {
     // Counter for atomic, short, unguessable-enough code generation
     `ALTER TABLE pharmacies ADD COLUMN IF NOT EXISTS erx_counter INTEGER NOT NULL DEFAULT 0`,
 
+    // Referral hospitals (org plan = 'referral_partner') issue prescriptions
+    // through their own placeholder pharmacy row (pharmacy_id, required),
+    // but can additionally suggest a REAL dispensing pharmacy for the
+    // patient. This is a suggestion only — fulfillment stays open to any
+    // pharmacy — but a MedVault pharmacy that's recommended can see it as
+    // a pending referral before the patient arrives.
+    `ALTER TABLE e_prescriptions ADD COLUMN IF NOT EXISTS recommended_pharmacy_id INTEGER REFERENCES pharmacies(id) ON DELETE SET NULL`,
+    `CREATE INDEX IF NOT EXISTS idx_erx_recommended_pharmacy ON e_prescriptions(recommended_pharmacy_id, status)`,
+
     // =========================================================
     // SICKLE CELL SCREENING — paid add-on module (gated by
     // subscriptions.modules->>'sicklecell'). Covers both newborn

@@ -135,7 +135,7 @@ module.exports = function registerAdminRoutes(app, { query, auth, can, hash, aud
   app.post('/api/admin/orgs/:id/convert-trial', auth, adminOnly, async (req, res) => {
     const { plan } = req.body;
     if (!plan) return err(res, 400, 'VALIDATION_REQUIRED', 'Plan is required', 'plan');
-    const planAmounts = { drug_shop: 20000, basic: 20000, single: 50000, pro: 50000, multi: 80000, enterprise: 150000, ngo_screening: 0 };
+    const planAmounts = { drug_shop: 20000, basic: 20000, single: 50000, pro: 50000, multi: 80000, enterprise: 150000, ngo_screening: 0, referral_partner: 0 };
     const amount = (plan in planAmounts) ? planAmounts[plan] : 50000;
     try {
       await query(`UPDATE subscriptions SET status='active',plan=$1,amount_ugx=$2,next_billing=NOW()+INTERVAL '30 days' WHERE organisation_id=$3`, [plan || 'pro', amount, req.params.id]);
@@ -156,7 +156,7 @@ module.exports = function registerAdminRoutes(app, { query, auth, can, hash, aud
   app.patch('/api/admin/orgs/:id/plan', auth, adminOnly, async (req, res) => {
     const { plan } = req.body;
     if (!plan) return err(res, 400, 'VALIDATION_REQUIRED', 'Plan is required', 'plan');
-    const planAmounts = { drug_shop: 20000, basic: 20000, single: 50000, pro: 50000, multi: 80000, enterprise: 150000, ngo_screening: 0 };
+    const planAmounts = { drug_shop: 20000, basic: 20000, single: 50000, pro: 50000, multi: 80000, enterprise: 150000, ngo_screening: 0, referral_partner: 0 };
     const amount = planAmounts[plan];
     if (amount === undefined) return err(res, 400, 'VALIDATION_INVALID', 'Invalid plan name', 'plan');
     try {
@@ -183,7 +183,7 @@ module.exports = function registerAdminRoutes(app, { query, auth, can, hash, aud
   // List orgs pending approval (ngo_screening signups not yet approved).
   app.get('/api/admin/orgs/pending', auth, adminOnly, async (req, res) => {
     try {
-      const r = await query(`SELECT id, name, owner_name, email, phone, plan, created_at FROM organisations WHERE plan='ngo_screening' AND is_active=false ORDER BY created_at DESC`);
+      const r = await query(`SELECT id, name, owner_name, email, phone, plan, created_at FROM organisations WHERE plan IN ('ngo_screening','referral_partner') AND is_active=false ORDER BY created_at DESC`);
       res.json({ orgs: r.rows });
     } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
   });
