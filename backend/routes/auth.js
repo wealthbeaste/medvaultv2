@@ -26,12 +26,15 @@ module.exports = function registerAuthRoutes(app, { query, pool, hash, compare, 
 
         const pwHash = await hash(password);
         const selectedPlan = plan || 'single';
+        // NGO/Screening accounts require manual admin approval before login works —
+        // see middleware/auth.js, which blocks access while is_active is false.
+        const orgIsActive = selectedPlan !== 'ngo_screening';
 
         await client.query('BEGIN');
 
         const org = await client.query(
-          `INSERT INTO organisations (name,owner_name,email,phone,plan) VALUES ($1,$2,$3,$4,$5) RETURNING id`,
-          [orgName, ownerName, email.toLowerCase(), phone, selectedPlan]
+          `INSERT INTO organisations (name,owner_name,email,phone,plan,is_active) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+          [orgName, ownerName, email.toLowerCase(), phone, selectedPlan, orgIsActive]
         );
         const orgId = org.rows[0].id;
 

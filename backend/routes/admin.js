@@ -169,6 +169,25 @@ module.exports = function registerAdminRoutes(app, { query, auth, can, hash, aud
   // Toggle a paid add-on module for an org, e.g. { "modules": { "sicklecell": true } }.
   // Merges into the existing modules JSON rather than replacing it, so
   // enabling one add-on never accidentally disables another.
+  // Approve a pending org (currently used for ngo_screening signups, which
+  // default to is_active=false at registration — see routes/auth.js).
+  app.patch('/api/admin/orgs/:id/approve', auth, adminOnly, async (req, res) => {
+    try {
+      await query(`UPDATE organisations SET is_active=true WHERE id=$1`, [req.params.id]);
+      await query(`UPDATE users SET is_active=true WHERE organisation_id=$1`, [req.params.id]);
+      await query(`UPDATE subscriptions SET status='active' WHERE organisation_id=$1 AND status != 'active'`, [req.params.id]);
+      res.json({ success: true });
+    } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
+  });
+
+  // List orgs pending approval (ngo_screening signups not yet approved).
+  app.get('/api/admin/orgs/pending', auth, adminOnly, async (req, res) => {
+    try {
+      const r = await query(`SELECT id, name, owner_name, email, phone, plan, created_at FROM organisations WHERE plan='ngo_screening' AND is_active=false ORDER BY created_at DESC`);
+      res.json({ orgs: r.rows });
+    } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
+  });
+
   app.patch('/api/admin/orgs/:id/modules', auth, adminOnly, async (req, res) => {
     const { modules } = req.body || {};
     if (!modules || typeof modules !== 'object') return err(res, 400, 'VALIDATION_REQUIRED', 'modules object is required', 'modules');
