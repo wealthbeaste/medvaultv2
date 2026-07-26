@@ -3,17 +3,15 @@
     {
       "source": "/api/:path*",
       "destination": "https://medvaultv2-production.up.railway.app/api/:path*"
-    }
-  ],
-  "routes": [
-    { "src": "/app",             "dest": "/app.html" },
-    { "src": "/rx/(.*)",          "dest": "/rx-verify.html" },
-    { "src": "/order",           "dest": "/order.html" },
-    { "src": "/admin",           "dest": "/login.html" },
-    { "src": "/ai",              "dest": "/ai.html" },
-    { "src": "/suppliers",       "dest": "/suppliers.html" },
-    { "src": "/supplier-portal", "dest": "/supplier-portal.html" },
-    { "src": "/supplier",        "dest": "/supplier-portal.html" }
+    },
+    { "source": "/app",             "destination": "/app.html" },
+    { "source": "/rx/:code*",       "destination": "/rx-verify.html" },
+    { "source": "/order",           "destination": "/order.html" },
+    { "source": "/admin",           "destination": "/login.html" },
+    { "source": "/ai",              "destination": "/ai.html" },
+    { "source": "/suppliers",       "destination": "/suppliers.html" },
+    { "source": "/supplier-portal", "destination": "/supplier-portal.html" },
+    { "source": "/supplier",        "destination": "/supplier-portal.html" }
   ],
   "headers": [
     {
