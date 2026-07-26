@@ -60,7 +60,7 @@ module.exports = async function authMiddleware(req, res, next) {
         success: false,
         error: 'Your NGO/Screening account is pending approval.',
         lockReason: 'pending_approval',
-        contact: { whatsapp: '0759327843', call: '0780621060', email: 'samkagino@gmail.com' },
+        contact: { name: 'Sam', whatsapp: '0759327843', call: '0780621061', email: 'samkagino@gmail.com' },
       });
     }
 
@@ -73,7 +73,7 @@ module.exports = async function authMiddleware(req, res, next) {
           success: false,
           error: 'Your trial and grace period have ended. Please contact us to continue using MedVault.',
           lockReason: 'trial_expired',
-          contact: { whatsapp: '0759327843', call: '0780621060', email: 'samkagino@gmail.com' },
+          contact: { name: 'Sam', whatsapp: '0759327843', call: '0780621061', email: 'samkagino@gmail.com' },
         });
       }
     }
@@ -84,7 +84,7 @@ module.exports = async function authMiddleware(req, res, next) {
         success: false,
         error: 'Your account is suspended. Please contact us to reactivate it.',
         lockReason: 'suspended',
-        contact: { whatsapp: '0759327843', call: '0780621060', email: 'samkagino@gmail.com' },
+        contact: { name: 'Sam', whatsapp: '0759327843', call: '0780621061', email: 'samkagino@gmail.com' },
       });
     }
 
