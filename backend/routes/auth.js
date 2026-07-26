@@ -47,10 +47,10 @@ module.exports = function registerAuthRoutes(app, { query, pool, hash, compare, 
         );
         const user = userRes.rows[0];
 
-        const prices = { drug_shop: 20000, single: 50000, branch: 40000, chain: 30000, enterprise: 20000 };
+        const prices = { drug_shop: 20000, single: 50000, branch: 40000, chain: 30000, enterprise: 20000, ngo_screening: 0 };
         await client.query(
           `INSERT INTO subscriptions (organisation_id,plan,branch_count,amount_ugx,status) VALUES ($1,$2,$3,$4,$5)`,
-          [orgId, selectedPlan, 1, prices[selectedPlan] || 50000, 'trial']
+          [orgId, selectedPlan, 1, (selectedPlan in prices) ? prices[selectedPlan] : 50000, 'trial']
         );
 
         await client.query('COMMIT');

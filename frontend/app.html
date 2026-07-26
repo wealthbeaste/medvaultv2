@@ -1345,11 +1345,11 @@ img,svg,video{max-width:100%;}
     <div class="nav-item" id="navForecast" onclick="go('forecast',this)"><span class="nav-icon">🌧️</span>Demand Forecast</div>
     <div class="nav-item" id="navExpiryIntel" onclick="go('expiry-intel',this)"><span class="nav-icon">⚡</span>Expiry Intel</div>
     <div class="nav-item" id="navNDA" onclick="go('nda-report',this)"><span class="nav-icon">🏥</span>NDA Reports</div>
-    <div class="nav-item" onclick="window.location.href='./dhis2.html'"><span class="nav-icon">🌍</span>DHIS2 / MOH Export</div>
-    <div class="nav-item" onclick="window.location.href='./pharmacovigilance.html'"><span class="nav-icon">⚠️</span>Pharmacovigilance (ADR)</div>
-    <div class="nav-item" onclick="window.location.href='./hiv-tb.html'"><span class="nav-icon">🧬</span>HIV/ART, PMTCT & TB</div>
-    <div class="nav-item" onclick="window.location.href='./sicklecell.html'"><span class="nav-icon">🩸</span>Sickle Cell Screening</div>
-    <div class="nav-item" onclick="window.location.href='./efris.html'"><span class="nav-icon">🧾</span>EFRIS / URA E-Invoicing</div>
+    <div class="nav-item" id="navDhis2" onclick="window.location.href='./dhis2.html'"><span class="nav-icon">🌍</span>DHIS2 / MOH Export</div>
+    <div class="nav-item" id="navPharmacovigilance" onclick="window.location.href='./pharmacovigilance.html'"><span class="nav-icon">⚠️</span>Pharmacovigilance (ADR)</div>
+    <div class="nav-item" id="navHivTb" onclick="window.location.href='./hiv-tb.html'"><span class="nav-icon">🧬</span>HIV/ART, PMTCT & TB</div>
+    <div class="nav-item" id="navSicklecell" onclick="window.location.href='./sicklecell.html'"><span class="nav-icon">🩸</span>Sickle Cell Screening</div>
+    <div class="nav-item" id="navEfris" onclick="window.location.href='./efris.html'"><span class="nav-icon">🧾</span>EFRIS / URA E-Invoicing</div>
     <div class="nav-item" id="navTax" onclick="go('tax-report',this)"><span class="nav-icon">📋</span>URA Tax Report</div>
     <div class="nav-item" id="navCashier" onclick="go('cashier',this)"><span class="nav-icon">🧮</span>Cashier Session</div>
     <div class="nav-item" id="navInvoices" onclick="go('invoices',this)"><span class="nav-icon">📄</span>Invoices</div>
@@ -4314,6 +4314,11 @@ function canSee(page) {
     'ap-ledger':       ['owner','manager'],
     'price-levels':    ['owner','manager'],
     'returns':          ['owner','manager'],
+    'dhis2-export':     ['owner','manager','pharmacist'],
+    'pharmacovigilance':['owner','manager','pharmacist'],
+    'hiv-tb':           ['owner','manager','pharmacist'],
+    'sicklecell':       ['owner','manager','pharmacist'],
+    'efris':            ['owner','manager'],
   };
   const roleOk = (allow[page] || ['owner']).includes(role);
   if (!roleOk) return false;
@@ -4328,6 +4333,11 @@ function canSee(page) {
   // Branches: Enterprise plan only
   if (page === 'branches') {
     return plan === 'enterprise' || role === 'super_admin';
+  }
+  // NGO/Screening-only plan: hide pharmacy operations, keep clinical/reporting tools
+  const ngoHidden = ['inventory','sales','orders','customers','whatsapp','credit','variance','tax-report','cashier','forecast','expiry-intel','invoices','purchase-orders','warehouse','grn','loyalty','margins','purchasing','ap-ledger','price-levels','returns','suppliers','nda-report','efris'];
+  if (plan === 'ngo_screening' && ngoHidden.includes(page)) {
+    return role === 'super_admin';
   }
   return true;
 }
@@ -4385,6 +4395,11 @@ function applyRoleUI() {
     'offline-settings':'navOfflineSettings',
   'suppliers':'navSuppliers',
   'daily-summary':'navDailySummary',
+  'dhis2-export':'navDhis2',
+  'pharmacovigilance':'navPharmacovigilance',
+  'hiv-tb':'navHivTb',
+  'sicklecell':'navSicklecell',
+  'efris':'navEfris',
   };
   Object.entries(nav).forEach(([page,id]) => {
     const el = document.getElementById(id);

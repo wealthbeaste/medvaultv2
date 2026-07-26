@@ -78,7 +78,7 @@ module.exports = function registerAdminRoutes(app, { query, auth, can, hash, aud
     if (!email) return err(res, 400, 'VALIDATION_REQUIRED', 'Email is required', 'email');
     if (!phone) return err(res, 400, 'VALIDATION_REQUIRED', 'Phone is required', 'phone');
     const planAmounts = { drug_shop: 20000, basic: 20000, single: 50000, pro: 50000, multi: 80000, branch: 40000, chain: 30000, enterprise: 150000 };
-    const amount = planAmounts[plan] || 50000;
+    const amount = (plan in planAmounts) ? planAmounts[plan] : 50000;
     try {
       const tempPw = name.replace(/\s+/g, '').slice(0, 4) + phone.slice(-4) + '!';
       const pwHash = await hash(tempPw);
@@ -135,8 +135,8 @@ module.exports = function registerAdminRoutes(app, { query, auth, can, hash, aud
   app.post('/api/admin/orgs/:id/convert-trial', auth, adminOnly, async (req, res) => {
     const { plan } = req.body;
     if (!plan) return err(res, 400, 'VALIDATION_REQUIRED', 'Plan is required', 'plan');
-    const planAmounts = { drug_shop: 20000, basic: 20000, single: 50000, pro: 50000, multi: 80000, enterprise: 150000 };
-    const amount = planAmounts[plan] || 50000;
+    const planAmounts = { drug_shop: 20000, basic: 20000, single: 50000, pro: 50000, multi: 80000, enterprise: 150000, ngo_screening: 0 };
+    const amount = (plan in planAmounts) ? planAmounts[plan] : 50000;
     try {
       await query(`UPDATE subscriptions SET status='active',plan=$1,amount_ugx=$2,next_billing=NOW()+INTERVAL '30 days' WHERE organisation_id=$3`, [plan || 'pro', amount, req.params.id]);
       await query(`UPDATE organisations SET is_active=true,plan=$1 WHERE id=$2`, [plan || 'pro', req.params.id]);
@@ -156,9 +156,9 @@ module.exports = function registerAdminRoutes(app, { query, auth, can, hash, aud
   app.patch('/api/admin/orgs/:id/plan', auth, adminOnly, async (req, res) => {
     const { plan } = req.body;
     if (!plan) return err(res, 400, 'VALIDATION_REQUIRED', 'Plan is required', 'plan');
-    const planAmounts = { drug_shop: 20000, basic: 20000, single: 50000, pro: 50000, multi: 80000, enterprise: 150000 };
+    const planAmounts = { drug_shop: 20000, basic: 20000, single: 50000, pro: 50000, multi: 80000, enterprise: 150000, ngo_screening: 0 };
     const amount = planAmounts[plan];
-    if (!amount) return err(res, 400, 'VALIDATION_INVALID', 'Invalid plan name', 'plan');
+    if (amount === undefined) return err(res, 400, 'VALIDATION_INVALID', 'Invalid plan name', 'plan');
     try {
       await query(`UPDATE subscriptions SET plan=$1,amount_ugx=$2 WHERE organisation_id=$3`, [plan, amount, req.params.id]);
       await query(`UPDATE organisations SET plan=$1 WHERE id=$2`, [plan, req.params.id]);
@@ -279,6 +279,10 @@ module.exports = function registerAdminRoutes(app, { query, auth, can, hash, aud
       for (const org of orgs.rows) {
         let msg = '';
 
+        if (message_type === 'payment_reminder' && org.plan === 'ngo_screening') {
+          results.push({ org_id: org.id, name: org.name, phone: org.phone, success: false, error: 'Skipped — free plan, no payment due' });
+          continue;
+        }
         if (message_type === 'payment_reminder') {
           const amount = org.amount_ugx || planAmounts[org.plan] || 50000;
           const due = org.next_billing ? new Date(org.next_billing).toLocaleDateString('en-UG') : 'soon';
