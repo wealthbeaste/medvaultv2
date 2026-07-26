@@ -3570,7 +3570,9 @@ Or open: https://app.medvault.ug</div>
       <div style="font-weight:600;margin-bottom:14px">Issue New Prescription</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
         <div><label class="flbl">Patient Name *</label><input class="finp" id="erxPatientName" placeholder="e.g. Jane Doe"></div>
+        <div><label class="flbl">Patient Phone (for WhatsApp, optional)</label><input class="finp" id="erxPatientPhone" placeholder="e.g. 0759327843"></div>
         <div><label class="flbl">Doctor Name</label><input class="finp" id="erxDoctorName" placeholder="e.g. Dr. Sarah Nakato"></div>
+        <div><label class="flbl">Doctor Phone</label><input class="finp" id="erxDoctorPhone" placeholder="e.g. 0759327843"></div>
         <div><label class="flbl">Doctor License No.</label><input class="finp" id="erxDoctorLicense" placeholder="Optional"></div>
         <div style="position:relative">
           <label class="flbl">Recommended Pharmacy (optional)</label>
@@ -3618,6 +3620,7 @@ Or open: https://app.medvault.ug</div>
       <div style="font-size:13px;margin-bottom:4px" id="erxQrPatient"></div>
       <div style="font-size:11px;color:var(--muted);word-break:break-all;margin-bottom:14px" id="erxQrUrl"></div>
       <button class="btn btn-ghost" onclick="printErxSlip(document.getElementById('erxQrCode').textContent, document.getElementById('erxQrPatient')?.textContent || '')">Print Slip</button>
+      <button class="btn btn-ghost" style="background:rgba(37,211,102,0.12);color:#25d366;border:1px solid rgba(37,211,102,0.2)" onclick="sendErxWhatsApp(document.getElementById('erxQrCode').textContent, erxLastPhone)">💬 Send WhatsApp</button>
       <button class="btn btn-primary" onclick="closeErxQrModal()">Close</button>
     </div>
   </div>
@@ -10591,6 +10594,7 @@ async function requestJSON(path, options = {}) {
 let erxItemCounter = 0;
 let erxSelectedPharmacy = null;
 let erxSearchDebounce = null;
+let erxLastPhone = '';
 
 function addErxItemRow() {
   erxItemCounter++;
@@ -10640,6 +10644,8 @@ async function submitErxPrescription() {
   const patient_display_name = document.getElementById('erxPatientName').value.trim();
   const doctor_name = document.getElementById('erxDoctorName').value.trim();
   const doctor_license_no = document.getElementById('erxDoctorLicense').value.trim();
+  const patient_phone = document.getElementById('erxPatientPhone').value.trim();
+  const doctor_phone = document.getElementById('erxDoctorPhone').value.trim();
 
   if (!patient_display_name) { msg.textContent = 'Patient name is required'; msg.style.color = 'var(--danger,#dc2626)'; return; }
 
@@ -10663,15 +10669,20 @@ async function submitErxPrescription() {
       body: {
         patient_display_name, doctor_name, doctor_license_no,
         recommended_pharmacy_id: erxSelectedPharmacy,
+        patient_phone: patient_phone || null,
+        doctor_phone: doctor_phone || null,
         items,
       }
     });
     msg.textContent = '✅ Issued: ' + r.prescription.code;
+    erxLastPhone = patient_phone;
     showErxQR(r.prescription.code, patient_display_name);
     msg.style.color = 'var(--success,#16a34a)';
     document.getElementById('erxPatientName').value = '';
+    document.getElementById('erxPatientPhone').value = '';
     document.getElementById('erxDoctorName').value = '';
     document.getElementById('erxDoctorLicense').value = '';
+    document.getElementById('erxDoctorPhone').value = '';
     document.getElementById('erxPharmacySearch').value = '';
     document.getElementById('erxPharmacySelected').textContent = '';
     document.getElementById('erxItemsList').innerHTML = '';
@@ -10695,7 +10706,7 @@ async function loadErx() {
         <td>${p.patient_display_name || '—'}</td>
         <td>${p.status}</td>
         <td>${new Date(p.issued_at).toLocaleDateString()}</td>
-        <td><button class="btn btn-ghost" onclick="copyErxLink('${p.code}')">Copy Link</button> <button class="btn btn-ghost" onclick="showErxQR('${p.code}')">QR</button> <button class="btn btn-ghost" onclick="printErxSlip('${p.code}','${(p.patient_display_name||'').replace(/'/g,"")}')">Print Slip</button></td>
+        <td><button class="btn btn-ghost" onclick="copyErxLink('${p.code}')">Copy Link</button> <button class="btn btn-ghost" onclick="showErxQR('${p.code}')">QR</button> <button class="btn btn-ghost" onclick="printErxSlip('${p.code}','${(p.patient_display_name||'').replace(/'/g,"")}')">Print Slip</button> <button class="btn btn-ghost" style="background:rgba(37,211,102,0.12);color:#25d366;border:1px solid rgba(37,211,102,0.2)" onclick="sendErxWhatsApp('${p.code}','')">💬 WA</button></td>
       </tr>`).join('');
   } catch (e) {
     console.error('Load erx:', e);
@@ -10715,6 +10726,16 @@ function showErxQR(code, patientName) {
   document.getElementById('erxQrPatient').textContent = patientName || '';
   document.getElementById('erxQrUrl').textContent = url;
   document.getElementById('erxQrModal').style.display = 'flex';
+}
+
+function sendErxWhatsApp(code, presetPhone) {
+  let phone = presetPhone;
+  if (!phone) phone = prompt('Enter patient phone number to send this prescription:');
+  if (!phone) return;
+  const digits = phone.replace(/^0/,'').replace(/\D/g,'');
+  const url = window.location.origin + '/rx/' + code;
+  const msg = 'Your MedVault e-prescription is ready.\n\nCode: ' + code + '\nShow this code at any pharmacy, or open: ' + url;
+  window.open('https://wa.me/256' + digits + '?text=' + encodeURIComponent(msg), '_blank');
 }
 
 function printErxSlip(code, patientName) {
@@ -10740,7 +10761,7 @@ function printErxSlip(code, patientName) {
       <p style="word-break:break-all">${url}</p>
       <div class="line"></div>
       <p>No smartphone? Keep this slip and show the code above at any pharmacy.</p>
-      <script>window.onload = () => window.print();</script>
+      <script>window.onload = () => window.print();<\/script>
     </body></html>
   `);
   win.document.close();
