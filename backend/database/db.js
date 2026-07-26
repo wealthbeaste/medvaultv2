@@ -2153,6 +2153,21 @@ async function getNextAdrNumber(pharmacyId) {
   return `ADR-${new Date().getFullYear()}-${String(n).padStart(4, '0')}`;
 }
 
+// ── generateUniqueErxCode — random (NOT sequential) code for
+// e-prescriptions. Sequential codes are enumerable — anyone could
+// try RX-0001, RX-0002... and pull up other patients' prescriptions
+// via the public verify endpoint. Random + a uniqueness check avoids that.
+const crypto = require('crypto');
+async function generateUniqueErxCode() {
+  for (let i = 0; i < 5; i++) {
+    const code = 'RX-' + crypto.randomBytes(5).toString('hex').toUpperCase();
+    const existing = await query(`SELECT id FROM e_prescriptions WHERE code = $1`, [code]);
+    if (!existing.rows.length) return code;
+  }
+  // Extremely unlikely fallback after 5 collisions
+  return 'RX-' + Date.now().toString(36).toUpperCase();
+}
+
 async function getNextMktOrderNumber(pharmacyId) {
   const r = await query(
     `UPDATE pharmacies SET mkt_order_counter = mkt_order_counter + 1 WHERE id = $1 RETURNING mkt_order_counter`,
@@ -2176,4 +2191,5 @@ module.exports = {
   getNextWarehouseTransferNumber,
   getNextMktOrderNumber,
   getNextAdrNumber,
+  generateUniqueErxCode,
 };
