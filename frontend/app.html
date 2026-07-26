@@ -3615,7 +3615,9 @@ Or open: https://app.medvault.ug</div>
       <div style="font-weight:600;margin-bottom:10px">Prescription QR Code</div>
       <img id="erxQrImg" style="width:220px;height:220px;margin:0 auto 10px;display:block" src="">
       <div style="font-family:monospace;font-size:13px;margin-bottom:4px" id="erxQrCode"></div>
+      <div style="font-size:13px;margin-bottom:4px" id="erxQrPatient"></div>
       <div style="font-size:11px;color:var(--muted);word-break:break-all;margin-bottom:14px" id="erxQrUrl"></div>
+      <button class="btn btn-ghost" onclick="printErxSlip(document.getElementById('erxQrCode').textContent, document.getElementById('erxQrPatient')?.textContent || '')">Print Slip</button>
       <button class="btn btn-primary" onclick="closeErxQrModal()">Close</button>
     </div>
   </div>
@@ -10665,7 +10667,7 @@ async function submitErxPrescription() {
       }
     });
     msg.textContent = '✅ Issued: ' + r.prescription.code;
-    showErxQR(r.prescription.code);
+    showErxQR(r.prescription.code, patient_display_name);
     msg.style.color = 'var(--success,#16a34a)';
     document.getElementById('erxPatientName').value = '';
     document.getElementById('erxDoctorName').value = '';
@@ -10693,7 +10695,7 @@ async function loadErx() {
         <td>${p.patient_display_name || '—'}</td>
         <td>${p.status}</td>
         <td>${new Date(p.issued_at).toLocaleDateString()}</td>
-        <td><button class="btn btn-ghost" onclick="copyErxLink('${p.code}')">Copy Link</button> <button class="btn btn-ghost" onclick="showErxQR('${p.code}')">QR</button></td>
+        <td><button class="btn btn-ghost" onclick="copyErxLink('${p.code}')">Copy Link</button> <button class="btn btn-ghost" onclick="showErxQR('${p.code}')">QR</button> <button class="btn btn-ghost" onclick="printErxSlip('${p.code}','${(p.patient_display_name||'').replace(/'/g,"")}')">Print Slip</button></td>
       </tr>`).join('');
   } catch (e) {
     console.error('Load erx:', e);
@@ -10706,12 +10708,42 @@ function copyErxLink(code) {
   navigator.clipboard.writeText(url).then(() => alert('Link copied: ' + url));
 }
 
-function showErxQR(code) {
+function showErxQR(code, patientName) {
   const url = window.location.origin + '/rx/' + code;
   document.getElementById('erxQrImg').src = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(url);
   document.getElementById('erxQrCode').textContent = code;
+  document.getElementById('erxQrPatient').textContent = patientName || '';
   document.getElementById('erxQrUrl').textContent = url;
   document.getElementById('erxQrModal').style.display = 'flex';
+}
+
+function printErxSlip(code, patientName) {
+  const url = window.location.origin + '/rx/' + code;
+  const qrSrc = 'https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=' + encodeURIComponent(url);
+  const win = window.open('', '_blank');
+  win.document.write(`
+    <html><head><title>Prescription Slip - ${code}</title>
+    <style>
+      body{font-family:Arial,sans-serif;text-align:center;padding:20px;max-width:340px;margin:0 auto}
+      h2{margin-bottom:4px}
+      .code{font-family:monospace;font-size:18px;font-weight:bold;letter-spacing:1px;margin:10px 0}
+      img{margin:14px 0}
+      p{font-size:13px;color:#444;margin:6px 0}
+      .line{border-top:1px dashed #999;margin:16px 0}
+    </style>
+    </head><body>
+      <h2>MedVault E-Prescription</h2>
+      <p>${patientName ? 'Patient: ' + patientName : ''}</p>
+      <div class="code">${code}</div>
+      <img src="${qrSrc}" width="260" height="260">
+      <p>Any pharmacy can scan this code or visit:</p>
+      <p style="word-break:break-all">${url}</p>
+      <div class="line"></div>
+      <p>No smartphone? Keep this slip and show the code above at any pharmacy.</p>
+      <script>window.onload = () => window.print();</script>
+    </body></html>
+  `);
+  win.document.close();
 }
 function closeErxQrModal() {
   document.getElementById('erxQrModal').style.display = 'none';
