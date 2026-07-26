@@ -3761,6 +3761,59 @@ Or open: https://app.medvault.ug</div>
 <div class="toast" id="toast"><span id="toastMsg"></span></div>
 
 <script>
+// ── Account lockout interception ──────────────────────────────
+// Wraps window.fetch once, globally, so every existing fetch call
+// in this file gets checked for a 403 + lockReason (sent by
+// middleware/auth.js) without touching each call site individually.
+(function() {
+  const _fetch = window.fetch;
+  let lockoutShown = false;
+
+  window.fetch = async function(...args) {
+    const response = await _fetch.apply(this, args);
+    if (response.status === 403 && !lockoutShown) {
+      try {
+        const clone = response.clone();
+        const data = await clone.json();
+        if (data.lockReason) {
+          lockoutShown = true;
+          showLockoutScreen(data);
+        }
+      } catch (e) { /* not JSON or no lockReason — ignore */ }
+    }
+    return response;
+  };
+
+  function showLockoutScreen(data) {
+    const messages = {
+      pending_approval: { icon: '⏳', title: 'Account Pending Approval', body: data.error || 'Your NGO/Screening account is awaiting approval.' },
+      trial_expired:    { icon: '⌛', title: 'Trial Period Ended', body: data.error || 'Your trial and grace period have ended.' },
+      suspended:        { icon: '🔒', title: 'Account Suspended', body: data.error || 'Your account is currently suspended.' },
+      not_found:        { icon: '⚠️', title: 'Account Issue', body: 'We could not find your organisation. Please contact support.' },
+    };
+    const m = messages[data.lockReason] || { icon: '🔒', title: 'Access Restricted', body: data.error || 'Please contact support.' };
+    const c = data.contact || { name: 'Sam', whatsapp: '0759327843', call: '0780621061', email: 'samkagino@gmail.com' };
+
+    const overlay = document.createElement('div');
+    overlay.id = 'lockoutOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#0a0f1e;display:flex;align-items:center;justify-content:center;padding:24px;';
+    overlay.innerHTML = `
+      <div style="max-width:420px;width:100%;background:#111827;border:1px solid rgba(255,255,255,0.07);border-radius:16px;padding:32px 24px;text-align:center;">
+        <div style="font-size:48px;margin-bottom:12px;">${m.icon}</div>
+        <div style="font-family:'Syne',sans-serif;font-size:20px;font-weight:700;color:#f0f4ff;margin-bottom:8px;">${m.title}</div>
+        <div style="font-size:14px;color:#6b7a99;line-height:1.6;margin-bottom:24px;">${m.body}</div>
+        <div style="background:#1a2235;border-radius:12px;padding:16px;text-align:left;">
+          <div style="font-size:12px;color:#6b7a99;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">Contact ${c.name || 'Support'}</div>
+          <a href="https://wa.me/256${c.whatsapp.replace(/^0/,'')}" target="_blank" style="display:flex;align-items:center;gap:8px;color:#00d4aa;text-decoration:none;font-size:14px;padding:8px 0;">💬 WhatsApp ${c.whatsapp}</a>
+          <a href="tel:${c.call}" style="display:flex;align-items:center;gap:8px;color:#00d4aa;text-decoration:none;font-size:14px;padding:8px 0;">📞 Call ${c.call}</a>
+          <a href="mailto:${c.email}" style="display:flex;align-items:center;gap:8px;color:#00d4aa;text-decoration:none;font-size:14px;padding:8px 0;">✉️ ${c.email}</a>
+        </div>
+        <button onclick="localStorage.removeItem('mv_token');window.location.href='./index.html';" style="margin-top:20px;background:transparent;border:1px solid rgba(255,255,255,0.12);color:#6b7a99;padding:8px 16px;border-radius:8px;font-size:13px;cursor:pointer;">Log Out</button>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  }
+})();
 // ═══════════════════════════════════════════════════════════
 // OFFLINE ENGINE (inline — no import needed)
 // ═══════════════════════════════════════════════════════════
