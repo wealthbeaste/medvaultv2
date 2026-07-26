@@ -3,7 +3,7 @@
 'use strict';
 
 module.exports = function registerRoutes(app) {
-  const { query, pool, getNextReceiptNumber, getNextPoNumber, getNextGrnNumber, getNextReturnNumber, getNextAdrNumber } = require('../database/db');
+  const { query, pool, getNextReceiptNumber, getNextPoNumber, getNextGrnNumber, getNextReturnNumber, getNextAdrNumber, generateUniqueErxCode } = require('../database/db');
   const { hash, compare }    = require('../core/password');
   const { sign }             = require('../core/jwt');
   const auth                 = require('../middleware/auth');
@@ -15,7 +15,7 @@ module.exports = function registerRoutes(app) {
   const requireModule        = makeRequireModule(query);
 
   // Shared dependency bag passed to every module
-  const deps = { query, pool, getNextReceiptNumber, getNextPoNumber, getNextGrnNumber, getNextReturnNumber, getNextAdrNumber, hash, compare, sign, auth, can, validate, schemas, audit, rateLimit, requireModule };
+  const deps = { query, pool, getNextReceiptNumber, getNextPoNumber, getNextGrnNumber, getNextReturnNumber, getNextAdrNumber, generateUniqueErxCode, hash, compare, sign, auth, can, validate, schemas, audit, rateLimit, requireModule };
 
   require('./system')(app, deps);
   require('./auth')(app, deps);
@@ -59,4 +59,5 @@ module.exports = function registerRoutes(app) {
   require('./sicklecell')(app, deps);   // Sickle Cell screening — paid add-on module
   require('./pharmacovigilance')(app, deps); // NDA ADR/AEFI reporting
   require('./efris')(app, deps);        // EFRIS / URA e-invoicing (via aggregator)
+  require('./eprescriptions')(app, deps); // Portable QR e-prescriptions
 };
