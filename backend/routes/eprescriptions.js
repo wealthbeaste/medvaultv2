@@ -45,6 +45,35 @@ module.exports = function registerErxRoutes(app, { query, auth, can, audit, gene
     } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
   });
 
+  // ── List prescriptions issued by this org ──
+  app.get('/api/erx', auth, async (req, res) => {
+    try {
+      const r = await query(
+        `SELECT * FROM eprescriptions WHERE org_id = $1 ORDER BY created_at DESC LIMIT 50`,
+        [req.user.orgId]
+      );
+      res.json({ prescriptions: r.rows });
+    } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
+  });
+
+  // ── Pharmacy directory search — lets a doctor (any org, any role) find a
+  // real pharmacy by name/address to recommend, regardless of which org owns
+  // it. Deliberately minimal fields — no owner info, no financials, no NDA
+  // numbers — just enough to pick the right place.
+  app.get('/api/erx/pharmacy-directory', auth, async (req, res) => {
+    const q = (req.query.q || '').trim();
+    if (q.length < 2) return res.json({ pharmacies: [] });
+    try {
+      const r = await query(
+        `SELECT id, name, address, phone FROM pharmacies
+         WHERE name ILIKE $1 OR address ILIKE $1
+         ORDER BY name ASC LIMIT 20`,
+        [`%${q}%`]
+      );
+      res.json({ pharmacies: r.rows });
+    } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
+  });
+
   // ── Pending referrals recommended to THIS pharmacy, not yet filled ──
   // Lets pharmacy staff see incoming referrals from hospitals before the
   // patient physically arrives, so they can check stock ahead of time.

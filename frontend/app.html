@@ -1369,6 +1369,7 @@ img,svg,video{max-width:100%;}
     <div class="nav-item" id="navAppointments" onclick="go('appointments',this)"><span class="nav-icon">📅</span>Appointments</div>
     <div class="nav-item" id="navConsultations" onclick="go('consultations',this)"><span class="nav-icon">💊</span>Consultations</div>
     <div class="nav-item" id="navPrescriptions" onclick="go('prescriptions',this)"><span class="nav-icon">📝</span>Prescriptions</div>
+    <div class="nav-item" id="navErx" onclick="go('erx',this)"><span class="nav-icon">🔗</span>E-Prescriptions</div>
     <div class="nav-label">Laboratory</div>
     <div class="nav-item" id="navLabTests" onclick="go('lab-tests',this)"><span class="nav-icon">🧪</span>Lab Tests</div>
     <div class="nav-item" id="navLabRequests" onclick="go('lab-requests',this)"><span class="nav-icon">🔬</span>Lab Requests</div>
@@ -3558,6 +3559,44 @@ Or open: https://app.medvault.ug</div>
     <div class="card"><table class="tbl"><thead><tr><th>Name</th><th>Speciality</th><th>License #</th><th>Phone</th><th>Consultation Fee</th><th>Status</th><th>Actions</th></tr></thead><tbody id="doctorsBody"><tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted)">Loading…</td></tr></tbody></table></div>
   </div>
 
+  <!-- E-PRESCRIPTIONS: portable QR prescriptions, any pharmacy can fulfill -->
+  <div class="page" id="page-erx">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div><div style="font-family:'Syne',sans-serif;font-weight:700;font-size:20px">🔗 E-Prescriptions</div><div style="font-size:13px;color:var(--muted);margin-top:3px">Issue a portable, QR-coded prescription — fulfillable at any pharmacy</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px">
+      <div style="font-weight:600;margin-bottom:14px">Issue New Prescription</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        <div><label class="flbl">Patient Name *</label><input class="finp" id="erxPatientName" placeholder="e.g. Jane Doe"></div>
+        <div><label class="flbl">Doctor Name</label><input class="finp" id="erxDoctorName" placeholder="e.g. Dr. Sarah Nakato"></div>
+        <div><label class="flbl">Doctor License No.</label><input class="finp" id="erxDoctorLicense" placeholder="Optional"></div>
+        <div style="position:relative">
+          <label class="flbl">Recommended Pharmacy (optional)</label>
+          <input class="finp" id="erxPharmacySearch" placeholder="Search pharmacy by name…" autocomplete="off" oninput="searchErxPharmacy(this.value)">
+          <div id="erxPharmacyResults" style="display:none;position:absolute;z-index:10;background:var(--card,#fff);border:1px solid var(--border,#e5e7eb);border-radius:8px;width:100%;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.1)"></div>
+          <div id="erxPharmacySelected" style="font-size:12px;color:var(--muted);margin-top:4px"></div>
+        </div>
+      </div>
+
+      <div style="font-weight:600;margin:16px 0 8px">Prescribed Items</div>
+      <div id="erxItemsList"></div>
+      <button class="btn btn-ghost" style="margin-top:6px" onclick="addErxItemRow()">+ Add Item</button>
+
+      <div style="margin-top:18px;display:flex;gap:10px;align-items:center">
+        <button class="btn btn-primary" onclick="submitErxPrescription()">Issue Prescription</button>
+        <span id="erxSubmitMsg" style="font-size:13px"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="font-weight:600;margin-bottom:12px">Recently Issued</div>
+      <table class="tbl"><thead><tr><th>Code</th><th>Patient</th><th>Status</th><th>Issued</th><th>Actions</th></tr></thead>
+        <tbody id="erxListBody"><tr><td colspan="5" style="text-align:center;padding:30px;color:var(--muted)">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- APPOINTMENTS -->
   <div class="page" id="page-appointments">
     <div class="stats-grid" style="grid-template-columns:repeat(3,1fr)">
@@ -4372,6 +4411,7 @@ function canSee(page) {
     'hiv-tb':           ['owner','manager','pharmacist'],
     'sicklecell':       ['owner','manager','pharmacist'],
     'efris':            ['owner','manager'],
+    'erx':              ['owner','manager','pharmacist','staff'],
   };
   const roleOk = (allow[page] || ['owner']).includes(role);
   if (!roleOk) return false;
@@ -4453,6 +4493,7 @@ function applyRoleUI() {
   'hiv-tb':'navHivTb',
   'sicklecell':'navSicklecell',
   'efris':'navEfris',
+  'erx':'navErx',
   };
   Object.entries(nav).forEach(([page,id]) => {
     const el = document.getElementById(id);
@@ -5005,6 +5046,7 @@ const pageMeta = {
   'loyalty':           {t:'⭐ Loyalty Programme',         s:'Customer loyalty points and leaderboard'},
   'margins':           {t:'📈 Margin Report',             s:'Gross margin per drug and category'},
   'purchasing':        {t:'🏭 Purchasing Report',         s:'Supplier spend and PO turnaround'},
+  'erx':               {t:'🔗 E-Prescriptions',            s:'Portable QR prescriptions — fulfillable at any pharmacy'},
   'grn':               {t:'📥 Goods Received Notes',      s:'Receive deliveries — auto-updates stock & AP ledger'},
   'ap-ledger':         {t:'📒 Accounts Payable Ledger',   s:'Track supplier invoices & payments'},
   'price-levels':      {t:'💹 Price Levels',               s:'Customer pricing tiers — retail, wholesale, insurance'},
@@ -5077,6 +5119,7 @@ function loadPage(page) {
   // Phase 3
   if (page === 'patients')           loadPatients();
   if (page === 'doctors')            loadDoctors();
+  if (page === 'erx')                loadErx();
   if (page === 'appointments')       loadAppointments();
   if (page === 'consultations')      loadConsultations();
   if (page === 'prescriptions')      loadPrescriptions('');
@@ -10495,6 +10538,128 @@ async function requestJSON(path, options = {}) {
     throw new Error(msg);
   }
   return res.data;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// E-PRESCRIPTIONS
+// ═══════════════════════════════════════════════════════════════
+let erxItemCounter = 0;
+let erxSelectedPharmacy = null;
+let erxSearchDebounce = null;
+
+function addErxItemRow() {
+  erxItemCounter++;
+  const id = 'erxItem' + erxItemCounter;
+  const row = document.createElement('div');
+  row.id = id;
+  row.style.cssText = 'display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center';
+  row.innerHTML = `
+    <input class="finp" placeholder="Drug name *" data-field="drug_name">
+    <input class="finp" placeholder="Dosage" data-field="dosage">
+    <input class="finp" placeholder="Frequency" data-field="frequency">
+    <input class="finp" placeholder="Duration" data-field="duration">
+    <input class="finp" type="number" placeholder="Qty" data-field="quantity">
+    <button class="btn btn-ghost" onclick="document.getElementById('${id}').remove()">✕</button>
+  `;
+  document.getElementById('erxItemsList').appendChild(row);
+}
+
+function searchErxPharmacy(q) {
+  clearTimeout(erxSearchDebounce);
+  const box = document.getElementById('erxPharmacyResults');
+  if (!q || q.trim().length < 2) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  erxSearchDebounce = setTimeout(async () => {
+    try {
+      const r = await requestJSON('/api/erx/pharmacy-directory?q=' + encodeURIComponent(q));
+      const list = r?.pharmacies || [];
+      if (!list.length) { box.innerHTML = '<div style="padding:10px;color:var(--muted);font-size:13px">No matches</div>'; box.style.display = 'block'; return; }
+      box.innerHTML = list.map(p => `
+        <div style="padding:8px 10px;cursor:pointer;border-bottom:1px solid var(--border,#eee)" onclick='selectErxPharmacy(${p.id}, ${JSON.stringify(p.name)})'>
+          <div style="font-weight:500;font-size:13px">${p.name}</div>
+          <div style="font-size:12px;color:var(--muted)">${p.address || ''}</div>
+        </div>`).join('');
+      box.style.display = 'block';
+    } catch (e) { console.error('Pharmacy search:', e); }
+  }, 300);
+}
+
+function selectErxPharmacy(id, name) {
+  erxSelectedPharmacy = id;
+  document.getElementById('erxPharmacySearch').value = name;
+  document.getElementById('erxPharmacySelected').textContent = 'Selected: ' + name;
+  document.getElementById('erxPharmacyResults').style.display = 'none';
+}
+
+async function submitErxPrescription() {
+  const msg = document.getElementById('erxSubmitMsg');
+  const patient_display_name = document.getElementById('erxPatientName').value.trim();
+  const doctor_name = document.getElementById('erxDoctorName').value.trim();
+  const doctor_license_no = document.getElementById('erxDoctorLicense').value.trim();
+
+  if (!patient_display_name) { msg.textContent = 'Patient name is required'; msg.style.color = 'var(--danger,#dc2626)'; return; }
+
+  const items = Array.from(document.getElementById('erxItemsList').children).map(row => {
+    const get = f => row.querySelector(`[data-field="${f}"]`)?.value.trim() || '';
+    return {
+      drug_name: get('drug_name'),
+      dosage: get('dosage'),
+      frequency: get('frequency'),
+      duration: get('duration'),
+      quantity: Number(get('quantity')) || null,
+    };
+  }).filter(it => it.drug_name);
+
+  if (!items.length) { msg.textContent = 'Add at least one prescribed item'; msg.style.color = 'var(--danger,#dc2626)'; return; }
+
+  msg.textContent = 'Issuing…'; msg.style.color = 'var(--muted)';
+  try {
+    const r = await requestJSON('/api/erx', {
+      method: 'POST',
+      body: {
+        patient_display_name, doctor_name, doctor_license_no,
+        recommended_pharmacy_id: erxSelectedPharmacy,
+        items,
+      }
+    });
+    msg.textContent = '✅ Issued: ' + r.prescription.code;
+    msg.style.color = 'var(--success,#16a34a)';
+    document.getElementById('erxPatientName').value = '';
+    document.getElementById('erxDoctorName').value = '';
+    document.getElementById('erxDoctorLicense').value = '';
+    document.getElementById('erxPharmacySearch').value = '';
+    document.getElementById('erxPharmacySelected').textContent = '';
+    document.getElementById('erxItemsList').innerHTML = '';
+    erxSelectedPharmacy = null;
+    loadErx();
+  } catch (e) {
+    msg.textContent = '❌ ' + e.message;
+    msg.style.color = 'var(--danger,#dc2626)';
+  }
+}
+
+async function loadErx() {
+  const body = document.getElementById('erxListBody');
+  try {
+    const r = await requestJSON('/api/erx');
+    const list = r?.prescriptions || [];
+    if (!list.length) { body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--muted)">No prescriptions issued yet.</td></tr>'; return; }
+    body.innerHTML = list.map(p => `
+      <tr>
+        <td style="font-family:monospace">${p.code}</td>
+        <td>${p.patient_display_name || '—'}</td>
+        <td>${p.status}</td>
+        <td>${new Date(p.issued_at).toLocaleDateString()}</td>
+        <td><button class="btn btn-ghost" onclick="copyErxLink('${p.code}')">Copy Link</button></td>
+      </tr>`).join('');
+  } catch (e) {
+    console.error('Load erx:', e);
+    body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--danger,#dc2626)">Failed to load</td></tr>';
+  }
+}
+
+function copyErxLink(code) {
+  const url = window.location.origin + '/rx/' + code;
+  navigator.clipboard.writeText(url).then(() => alert('Link copied: ' + url));
 }
 
 // ═══════════════════════════════════════════════════════════════
