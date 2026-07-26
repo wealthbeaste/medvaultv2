@@ -49,7 +49,7 @@ module.exports = function registerErxRoutes(app, { query, auth, can, audit, gene
   app.get('/api/erx', auth, async (req, res) => {
     try {
       const r = await query(
-        `SELECT * FROM eprescriptions WHERE org_id = $1 ORDER BY created_at DESC LIMIT 50`,
+        `SELECT * FROM e_prescriptions WHERE org_id = $1 ORDER BY created_at DESC LIMIT 50`,
         [req.user.orgId]
       );
       res.json({ prescriptions: r.rows });
