@@ -1849,6 +1849,57 @@ async function runMigrations() {
     `ALTER TABLE pharmacies ADD COLUMN IF NOT EXISTS art_counter INTEGER NOT NULL DEFAULT 0`,
 
     // =========================================================
+    // E-PRESCRIPTIONS — portable, QR-coded prescriptions that any
+    // pharmacy can fulfill, whether or not they use MedVault. Not
+    // dependent on a national interoperability network (none exists
+    // operationally in Uganda yet) — this is a self-contained
+    // artifact: a PDF with a human-readable prescription plus a QR
+    // code encoding the same data as JSON, degrading gracefully to
+    // "any pharmacist can read this" when the receiving pharmacy has
+    // no software integration at all.
+    // =========================================================
+    `CREATE TABLE IF NOT EXISTS e_prescriptions (
+      id                  SERIAL PRIMARY KEY,
+      code                VARCHAR(20) UNIQUE NOT NULL,
+      org_id              INTEGER NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
+      pharmacy_id         INTEGER NOT NULL REFERENCES pharmacies(id) ON DELETE CASCADE,
+      patient_id          INTEGER REFERENCES patients(id) ON DELETE SET NULL,
+      prescription_id     INTEGER REFERENCES prescriptions(id) ON DELETE SET NULL,
+      patient_display_name VARCHAR(255) NOT NULL,
+      doctor_name         VARCHAR(255),
+      doctor_license_no   VARCHAR(100),
+      items               JSONB NOT NULL DEFAULT '[]',
+      status              VARCHAR(30) NOT NULL DEFAULT 'issued',
+      issued_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      expires_at          TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '6 months'),
+      created_by          INTEGER REFERENCES users(id),
+      created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_erx_pharmacy ON e_prescriptions(pharmacy_id, created_at DESC)`,
+    `CREATE INDEX IF NOT EXISTS idx_erx_code     ON e_prescriptions(code)`,
+    `CREATE INDEX IF NOT EXISTS idx_erx_status   ON e_prescriptions(status)`,
+
+    // Fulfillments — a prescription can be partially filled, and can be
+    // filled by a pharmacy OTHER than the one that issued it (that's the
+    // whole point). fulfilling_pharmacy_id is nullable + fulfilling_pharmacy_name
+    // is a free-text fallback for a non-MedVault pharmacy recording a
+    // fulfillment manually (e.g. via the public verify page).
+    `CREATE TABLE IF NOT EXISTS e_prescription_fulfillments (
+      id                       SERIAL PRIMARY KEY,
+      e_prescription_id        INTEGER NOT NULL REFERENCES e_prescriptions(id) ON DELETE CASCADE,
+      fulfilling_pharmacy_id   INTEGER REFERENCES pharmacies(id) ON DELETE SET NULL,
+      fulfilling_pharmacy_name VARCHAR(255),
+      fulfilled_items          JSONB NOT NULL DEFAULT '[]',
+      sale_id                  INTEGER REFERENCES sales(id) ON DELETE SET NULL,
+      fulfilled_by             INTEGER REFERENCES users(id),
+      fulfilled_at             TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_erxf_prescription ON e_prescription_fulfillments(e_prescription_id)`,
+
+    // Counter for atomic, short, unguessable-enough code generation
+    `ALTER TABLE pharmacies ADD COLUMN IF NOT EXISTS erx_counter INTEGER NOT NULL DEFAULT 0`,
+
+    // =========================================================
     // SICKLE CELL SCREENING — paid add-on module (gated by
     // subscriptions.modules->>'sicklecell'). Covers both newborn
     // and community screening, since NGOs running this program
