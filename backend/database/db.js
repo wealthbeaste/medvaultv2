@@ -1849,6 +1849,40 @@ async function runMigrations() {
     `ALTER TABLE pharmacies ADD COLUMN IF NOT EXISTS art_counter INTEGER NOT NULL DEFAULT 0`,
 
     // =========================================================
+    // SICKLE CELL SCREENING — paid add-on module (gated by
+    // subscriptions.modules->>'sicklecell'). Covers both newborn
+    // and community screening, since NGOs running this program
+    // typically do both from the same intake form.
+    // =========================================================
+    `CREATE TABLE IF NOT EXISTS sicklecell_screenings (
+      id                       SERIAL PRIMARY KEY,
+      org_id                   INTEGER NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
+      pharmacy_id              INTEGER NOT NULL REFERENCES pharmacies(id) ON DELETE CASCADE,
+      patient_id               INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+      screening_type           VARCHAR(20) NOT NULL DEFAULT 'community',
+      screening_date           DATE NOT NULL DEFAULT CURRENT_DATE,
+      test_method              VARCHAR(30),
+      genotype_result           VARCHAR(20),
+      symptomatic               BOOLEAN NOT NULL DEFAULT false,
+      family_history            TEXT,
+      counseling_given          BOOLEAN NOT NULL DEFAULT false,
+      referred_for_management   BOOLEAN NOT NULL DEFAULT false,
+      referral_facility         VARCHAR(255),
+      follow_up_date            DATE,
+      notes                     TEXT,
+      created_by                INTEGER REFERENCES users(id),
+      created_at                TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at                TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_sicklecell_pharmacy ON sicklecell_screenings(pharmacy_id, screening_date DESC)`,
+    `CREATE INDEX IF NOT EXISTS idx_sicklecell_patient  ON sicklecell_screenings(patient_id)`,
+
+    // Per-org feature-module entitlements (paid add-ons like Sickle
+    // Cell that aren't included in every base subscription). Empty
+    // object = no add-ons; e.g. '{"sicklecell": true}' enables it.
+    `ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS modules JSONB NOT NULL DEFAULT '{}'`,
+
+    // =========================================================
     // ADR REPORTS — NDA Pharmacovigilance (Uganda)
     // Structured capture matching the official NDA ADR/AEFI
     // reporting form (Appendix 3, DPS/GDL/013). No public NDA

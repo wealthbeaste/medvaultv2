@@ -166,6 +166,26 @@ module.exports = function registerAdminRoutes(app, { query, auth, can, hash, aud
     } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
   });
 
+  // Toggle a paid add-on module for an org, e.g. { "modules": { "sicklecell": true } }.
+  // Merges into the existing modules JSON rather than replacing it, so
+  // enabling one add-on never accidentally disables another.
+  app.patch('/api/admin/orgs/:id/modules', auth, adminOnly, async (req, res) => {
+    const { modules } = req.body || {};
+    if (!modules || typeof modules !== 'object') return err(res, 400, 'VALIDATION_REQUIRED', 'modules object is required', 'modules');
+    try {
+      const r = await query(`SELECT modules FROM subscriptions WHERE organisation_id=$1 ORDER BY created_at DESC LIMIT 1`, [req.params.id]);
+      if (!r.rows.length) return err(res, 404, 'NOT_FOUND', 'No subscription found for this organisation.');
+      const merged = { ...(r.rows[0].modules || {}), ...modules };
+      await query(
+        `UPDATE subscriptions SET modules=$1 WHERE organisation_id=$2 AND id = (
+           SELECT id FROM subscriptions WHERE organisation_id=$2 ORDER BY created_at DESC LIMIT 1
+         )`,
+        [JSON.stringify(merged), req.params.id]
+      );
+      res.json({ success: true, modules: merged });
+    } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
+  });
+
   app.post('/api/admin/users/:id/suspend', auth, adminOnly, async (req, res) => {
     try {
       await query(`UPDATE users SET is_active=false WHERE id=$1`, [req.params.id]);

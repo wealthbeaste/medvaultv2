@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MedVault — Sickle Cell Screening</title>
+<style>
+  :root { --bg:#0b0f14; --s1:#131a22; --border:#232c37; --text:#e8edf2; --muted:#8b98a5; --accent:#3aa6ff; --good:#2ecc71; --warn:#f5a623; --bad:#e74c3c; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,Segoe UI,Roboto,sans-serif; padding:24px; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  .sub { color:var(--muted); font-size:13px; margin-bottom:20px; }
+  .bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:20px; }
+  .bar button { background:var(--accent); border:none; color:#04101c; font-weight:600; padding:9px 16px; border-radius:8px; cursor:pointer; font-size:13px; }
+  .bar button.secondary { background:transparent; border:1px solid var(--border); color:var(--text); }
+  table { width:100%; border-collapse:collapse; background:var(--s1); border:1px solid var(--border); border-radius:12px; overflow:hidden; margin-bottom:20px; }
+  th, td { text-align:left; padding:10px 12px; font-size:13px; border-bottom:1px solid var(--border); }
+  th { color:var(--muted); font-weight:600; }
+  tr:last-child td { border-bottom:none; }
+  .pill { display:inline-block; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:600; }
+  .pill.AA { background:rgba(46,204,113,.15); color:var(--good); }
+  .pill.AS, .pill.AC { background:rgba(245,166,35,.15); color:var(--warn); }
+  .pill.SS, .pill.SC { background:rgba(231,76,60,.15); color:var(--bad); }
+  .section-title { font-size:14px; font-weight:700; margin:24px 0 10px; color:var(--text); }
+  .msg { font-size:13px; color:var(--warn); background:rgba(245,166,35,.1); border:1px solid rgba(245,166,35,.3); padding:10px 12px; border-radius:8px; margin-bottom:16px; }
+  .msg.good { color:var(--good); background:rgba(46,204,113,.1); border-color:rgba(46,204,113,.3); }
+  .msg.locked { color:var(--muted); background:var(--s1); border-color:var(--border); }
+  a.login-link { color:var(--accent); }
+  .card { background:var(--s1); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:16px; }
+  .formgrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; }
+  .formgrid label { font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px; }
+  .formgrid input, .formgrid select, .formgrid textarea {
+    background:var(--bg); border:1px solid var(--border); color:var(--text); padding:8px; border-radius:8px; font-size:13px; font-family:inherit;
+  }
+  .formgrid textarea { min-height:60px; resize:vertical; }
+  .full { grid-column:1/-1; }
+  #formPanel { display:none; }
+  .searchwrap { position:relative; }
+  .searchdrop { display:none; position:absolute; top:100%; left:0; right:0; background:var(--s1); border:1px solid var(--border); border-radius:8px; z-index:999; max-height:220px; overflow-y:auto; box-shadow:0 8px 30px rgba(0,0,0,.4); }
+  .searchdrop div { padding:9px 12px; cursor:pointer; font-size:13px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; }
+  .searchdrop div:hover { background:var(--bg); }
+  .searchdrop div:last-child { border-bottom:none; }
+  .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; margin-bottom:20px; }
+  .stat { background:var(--s1); border:1px solid var(--border); border-radius:10px; padding:12px; }
+  .stat .num { font-size:22px; font-weight:700; }
+  .stat .lbl { font-size:11px; color:var(--muted); }
+</style>
+</head>
+<body>
+
+<h1>Sickle Cell Screening</h1>
+<div class="sub">Newborn and community screening, genotype results, counseling, and referral tracking.</div>
+
+<div id="authMsg"></div>
+<div id="content" style="display:none;">
+
+  <div class="stats" id="statsWrap"></div>
+
+  <div class="bar">
+    <button onclick="showForm()">+ New Screening</button>
+    <button class="secondary" onclick="loadScreenings()">Refresh List</button>
+  </div>
+  <div id="listWrap">Loading…</div>
+
+  <div id="formPanel" class="card">
+    <div class="section-title" style="margin-top:0;">New / Edit Screening</div>
+    <div class="formgrid">
+      <label class="full searchwrap">Patient *
+        <input id="f_patient_search" placeholder="Search by name or phone…" autocomplete="off" oninput="searchPatients(this.value)">
+        <input type="hidden" id="f_patient_id">
+        <div class="searchdrop" id="patient_drop"></div>
+      </label>
+      <label>Screening type
+        <select id="f_screening_type">
+          <option value="community">Community</option>
+          <option value="newborn">Newborn</option>
+        </select>
+      </label>
+      <label>Screening date <input type="date" id="f_screening_date"></label>
+      <label>Test method
+        <select id="f_test_method">
+          <option value="">—</option>
+          <option value="solubility_test">Solubility test (rapid)</option>
+          <option value="electrophoresis">Hemoglobin electrophoresis</option>
+          <option value="hplc">HPLC</option>
+          <option value="isoelectric_focusing">Isoelectric focusing</option>
+          <option value="other">Other</option>
+        </select>
+      </label>
+      <label>Genotype result
+        <select id="f_genotype_result">
+          <option value="">—</option>
+          <option value="AA">AA — Normal</option>
+          <option value="AS">AS — Trait (carrier)</option>
+          <option value="SS">SS — Sickle cell disease</option>
+          <option value="SC">SC — Sickle cell disease (HbSC)</option>
+          <option value="AC">AC — Trait (HbC carrier)</option>
+          <option value="other">Other</option>
+          <option value="pending">Pending</option>
+        </select>
+      </label>
+      <label style="flex-direction:row;align-items:center;gap:6px;"><input type="checkbox" id="f_symptomatic"> Symptomatic</label>
+      <label style="flex-direction:row;align-items:center;gap:6px;"><input type="checkbox" id="f_counseling_given"> Counseling given</label>
+      <label style="flex-direction:row;align-items:center;gap:6px;"><input type="checkbox" id="f_referred"> Referred for management</label>
+      <label>Referral facility <input id="f_referral_facility"></label>
+      <label>Follow-up date <input type="date" id="f_follow_up_date"></label>
+      <label class="full">Family history <input id="f_family_history" placeholder="e.g. sibling with SS, mother AS"></label>
+      <label class="full">Notes <textarea id="f_notes"></textarea></label>
+    </div>
+    <div id="formMsg" style="margin-top:12px;"></div>
+    <div class="bar" style="margin-top:12px;">
+      <button onclick="saveScreening()">Save Screening</button>
+      <button class="secondary" onclick="hideForm()">Cancel</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const BASE = window.location.origin;
+let editingId = null;
+
+function authHeaders() {
+  const token = localStorage.getItem('mv_token');
+  return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (token || '') };
+}
+
+function requireAuth() {
+  const token = localStorage.getItem('mv_token');
+  const el = document.getElementById('authMsg');
+  if (!token) {
+    el.innerHTML = '<div class="msg">Not logged in. <a class="login-link" href="./app.html">Log in to MedVault</a>, then come back to this page.</div>';
+    return false;
+  }
+  el.innerHTML = '';
+  return true;
+}
+
+async function searchPatients(q) {
+  const el = document.getElementById('patient_drop');
+  if (!q || q.length < 2) { el.style.display = 'none'; return; }
+  try {
+    const r = await fetch(BASE + '/api/clinic/patients?search=' + encodeURIComponent(q) + '&limit=8', { headers: authHeaders() });
+    const d = await r.json();
+    if (!d?.patients?.length) { el.style.display = 'none'; return; }
+    el.innerHTML = d.patients.map(p =>
+      `<div onmousedown="selectPatient(${p.id},'${(p.name||'').replace(/'/g,"\\x27")}','${p.patient_number||''}')">
+         <span style="font-weight:500">${p.name}</span>
+         <span style="color:var(--accent);font-size:11px">${p.patient_number||''} · ${p.phone||'—'}</span>
+       </div>`
+    ).join('');
+    el.style.display = 'block';
+  } catch (e) {}
+}
+
+function selectPatient(id, name, num) {
+  document.getElementById('f_patient_id').value = id;
+  document.getElementById('f_patient_search').value = name + ' (' + num + ')';
+  document.getElementById('patient_drop').style.display = 'none';
+}
+
+function showForm(scr) {
+  document.getElementById('formPanel').style.display = 'block';
+  editingId = scr ? scr.id : null;
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v ?? ''; };
+  if (scr) {
+    document.getElementById('f_patient_id').value = scr.patient_id;
+    document.getElementById('f_patient_search').value = (scr.patient_name || '') + ' (' + (scr.patient_number || '') + ')';
+    set('f_screening_type', scr.screening_type || 'community');
+    set('f_screening_date', scr.screening_date ? scr.screening_date.slice(0,10) : '');
+    set('f_test_method', scr.test_method);
+    set('f_genotype_result', scr.genotype_result);
+    document.getElementById('f_symptomatic').checked = !!scr.symptomatic;
+    document.getElementById('f_counseling_given').checked = !!scr.counseling_given;
+    document.getElementById('f_referred').checked = !!scr.referred_for_management;
+    set('f_referral_facility', scr.referral_facility);
+    set('f_follow_up_date', scr.follow_up_date ? scr.follow_up_date.slice(0,10) : '');
+    set('f_family_history', scr.family_history);
+    set('f_notes', scr.notes);
+  } else {
+    document.querySelectorAll('#formPanel input[type=text], #formPanel input:not([type]), #formPanel input[type=date], #formPanel select, #formPanel textarea').forEach(el => el.value = '');
+    document.getElementById('f_patient_search').value = '';
+    document.getElementById('f_patient_id').value = '';
+    document.getElementById('f_symptomatic').checked = false;
+    document.getElementById('f_counseling_given').checked = false;
+    document.getElementById('f_referred').checked = false;
+    document.getElementById('f_screening_type').value = 'community';
+    document.getElementById('f_screening_date').value = new Date().toISOString().slice(0,10);
+  }
+  document.getElementById('formPanel').scrollIntoView({ behavior: 'smooth' });
+}
+
+function hideForm() {
+  document.getElementById('formPanel').style.display = 'none';
+  editingId = null;
+}
+
+async function saveScreening() {
+  const msg = document.getElementById('formMsg');
+  const patientId = document.getElementById('f_patient_id').value;
+  if (!patientId) { msg.innerHTML = '<div class="msg">Patient is required.</div>'; return; }
+  msg.innerHTML = 'Saving…';
+  const body = {
+    patient_id: patientId,
+    screening_type: document.getElementById('f_screening_type').value,
+    screening_date: document.getElementById('f_screening_date').value || null,
+    test_method: document.getElementById('f_test_method').value || null,
+    genotype_result: document.getElementById('f_genotype_result').value || null,
+    symptomatic: document.getElementById('f_symptomatic').checked,
+    family_history: document.getElementById('f_family_history').value || null,
+    counseling_given: document.getElementById('f_counseling_given').checked,
+    referred_for_management: document.getElementById('f_referred').checked,
+    referral_facility: document.getElementById('f_referral_facility').value || null,
+    follow_up_date: document.getElementById('f_follow_up_date').value || null,
+    notes: document.getElementById('f_notes').value || null,
+  };
+  try {
+    const url = editingId ? BASE + '/api/sicklecell/screenings/' + editingId : BASE + '/api/sicklecell/screenings';
+    const method = editingId ? 'PUT' : 'POST';
+    const r = await fetch(url, { method, headers: authHeaders(), body: JSON.stringify(body) });
+    const d = await r.json();
+    if (!r.ok) { msg.innerHTML = '<div class="msg">' + (d.error || 'Failed to save') + '</div>'; return; }
+    msg.innerHTML = '<div class="msg good">Saved.</div>';
+    setTimeout(() => { hideForm(); loadScreenings(); }, 700);
+  } catch (e) {
+    msg.innerHTML = '<div class="msg">Network error saving screening.</div>';
+  }
+}
+
+function renderStats(rows) {
+  const counts = { AA: 0, AS: 0, SS: 0, SC: 0, AC: 0, other: 0 };
+  rows.forEach(r => { if (counts.hasOwnProperty(r.genotype_result)) counts[r.genotype_result]++; });
+  const stats = [
+    { lbl: 'Total Screened', num: rows.length },
+    { lbl: 'AA (Normal)', num: counts.AA },
+    { lbl: 'AS (Trait)', num: counts.AS },
+    { lbl: 'SS (Disease)', num: counts.SS },
+    { lbl: 'SC (Disease)', num: counts.SC },
+    { lbl: 'Referred', num: rows.filter(r => r.referred_for_management).length },
+  ];
+  document.getElementById('statsWrap').innerHTML = stats.map(s => `<div class="stat"><div class="num">${s.num}</div><div class="lbl">${s.lbl}</div></div>`).join('');
+}
+
+async function loadScreenings() {
+  const wrap = document.getElementById('listWrap');
+  wrap.innerHTML = 'Loading…';
+  try {
+    const r = await fetch(BASE + '/api/sicklecell/screenings', { headers: authHeaders() });
+    if (r.status === 403) {
+      const d = await r.json();
+      document.getElementById('content').style.display = 'none';
+      document.getElementById('authMsg').innerHTML =
+        `<div class="msg locked">🔒 ${d.error || 'This module is not included in your subscription.'} Contact MedVault to add the Sickle Cell Screening add-on.</div>`;
+      return;
+    }
+    document.getElementById('content').style.display = 'block';
+    const d = await r.json();
+    if (!r.ok) { wrap.innerHTML = '<div class="msg">' + (d.error || 'Failed to load screenings') + '</div>'; return; }
+    const rows = d.screenings || [];
+    renderStats(rows);
+    if (!rows.length) { wrap.innerHTML = '<div class="msg">No screenings recorded yet.</div>'; return; }
+    wrap.innerHTML = `<table>
+      <tr><th>Patient</th><th>Type</th><th>Date</th><th>Method</th><th>Genotype</th><th>Referred</th><th></th></tr>
+      ${rows.map(s => `
+        <tr>
+          <td>${s.patient_name || '—'} <span style="color:var(--muted);font-size:11px">${s.patient_number || ''}</span></td>
+          <td>${s.screening_type || '—'}</td>
+          <td>${s.screening_date ? s.screening_date.slice(0,10) : '—'}</td>
+          <td>${(s.test_method || '—').replace(/_/g, ' ')}</td>
+          <td>${s.genotype_result ? `<span class="pill ${s.genotype_result}">${s.genotype_result}</span>` : '—'}</td>
+          <td>${s.referred_for_management ? 'Yes' : 'No'}</td>
+          <td><button class="secondary" onclick='showForm(${JSON.stringify(s)})'>Edit</button></td>
+        </tr>
+      `).join('')}
+    </table>`;
+  } catch (e) {
+    wrap.innerHTML = '<div class="msg">Network error loading screenings.</div>';
+  }
+}
+
+// ─── Init ───
+if (requireAuth()) loadScreenings();
+</script>
+</body>
+</html>

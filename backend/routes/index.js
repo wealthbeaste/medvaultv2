@@ -11,9 +11,11 @@ module.exports = function registerRoutes(app) {
   const { validate, schemas }= require('../middleware/validate');
   const { audit }            = require('../utils/audit');
   const { rateLimit }        = require('../utils/rateLimit');
+  const makeRequireModule    = require('../middleware/moduleAccess');
+  const requireModule        = makeRequireModule(query);
 
   // Shared dependency bag passed to every module
-  const deps = { query, pool, getNextReceiptNumber, getNextPoNumber, getNextGrnNumber, getNextReturnNumber, getNextAdrNumber, hash, compare, sign, auth, can, validate, schemas, audit, rateLimit };
+  const deps = { query, pool, getNextReceiptNumber, getNextPoNumber, getNextGrnNumber, getNextReturnNumber, getNextAdrNumber, hash, compare, sign, auth, can, validate, schemas, audit, rateLimit, requireModule };
 
   require('./system')(app, deps);
   require('./auth')(app, deps);
@@ -54,6 +56,7 @@ module.exports = function registerRoutes(app) {
   // DHIS2 integration
   require('./dhis2')(app, deps);       // HMIS/DHIS2 export reports
   require('./hiv-tb')(app, deps);       // HIV/ART, PMTCT, TB program data entry (DHIS2 phase 4)
+  require('./sicklecell')(app, deps);   // Sickle Cell screening — paid add-on module
   require('./pharmacovigilance')(app, deps); // NDA ADR/AEFI reporting
   require('./efris')(app, deps);        // EFRIS / URA e-invoicing (via aggregator)
 };
