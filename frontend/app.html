@@ -2695,6 +2695,7 @@ Or open: https://app.medvault.ug</div>
       <button class="btn btn-sm bar-tab active" id="barTabBtn-tables" onclick="switchBarTab('tables')">🪑 Tables</button>
       <button class="btn btn-sm bar-tab" id="barTabBtn-orders" onclick="switchBarTab('orders')">🧾 Orders</button>
       <button class="btn btn-sm bar-tab" id="barTabBtn-kitchen" onclick="switchBarTab('kitchen')">🍳 Kitchen</button>
+      <button class="btn btn-sm bar-tab" id="barTabBtn-menu" onclick="switchBarTab('menu')" style="display:none">📋 Menu</button>
     </div>
 
     <div id="barTablesView">
@@ -2719,6 +2720,19 @@ Or open: https://app.medvault.ug</div>
 
     <div id="barKitchenView" style="display:none">
       <div id="barKitchenGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px"></div>
+    </div>
+
+    <div id="barMenuView" style="display:none">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
+        <button class="btn btn-primary" id="barAddMenuItemBtn" style="display:none" onclick="openAddMenuItemModal()">+ Add Menu Item</button>
+      </div>
+      <div class="card">
+        <div class="ch"><div class="ct">Menu Catalog</div></div>
+        <table class="tbl">
+          <thead><tr><th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="barMenuItemsBody"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -6401,6 +6415,11 @@ let barTablesCache = [];
 function showBarFeatures() {
   const nav = document.getElementById('navBar');
   if (nav) nav.style.display = 'flex';
+  const canManageMenu = currentUser && ['owner', 'manager', 'super_admin'].includes(currentUser.role);
+  const menuTabBtn = document.getElementById('barTabBtn-menu');
+  if (menuTabBtn) menuTabBtn.style.display = canManageMenu ? '' : 'none';
+  const addMenuItemBtn = document.getElementById('barAddMenuItemBtn');
+  if (addMenuItemBtn) addMenuItemBtn.style.display = canManageMenu ? '' : 'none';
 }
 
 function loadBarPage() {
@@ -6409,7 +6428,7 @@ function loadBarPage() {
 
 function switchBarTab(tab) {
   barCurrentTab = tab;
-  const views = { tables: 'barTablesView', orders: 'barOrdersView', kitchen: 'barKitchenView' };
+  const views = { tables: 'barTablesView', orders: 'barOrdersView', kitchen: 'barKitchenView', menu: 'barMenuView' };
   Object.keys(views).forEach(t => {
     const view = document.getElementById(views[t]);
     if (view) view.style.display = (t === tab) ? '' : 'none';
@@ -6419,6 +6438,183 @@ function switchBarTab(tab) {
   if (tab === 'tables') loadBarTables();
   if (tab === 'orders') loadBarOrders();
   if (tab === 'kitchen') loadBarKitchen();
+  if (tab === 'menu') loadBarMenuItems();
+}
+
+// ── MENU CATALOG ────────────────────────────────────────────
+let barMenuItemsCache = [];
+
+async function loadBarMenuItems() {
+  const body = document.getElementById('barMenuItemsBody');
+  if (!body) return;
+  body.innerHTML = '<tr><td colspan="6" style="color:var(--muted);font-size:13px;padding:20px;text-align:center">Loading menu...</td></tr>';
+  const canManageMenu = currentUser && ['owner', 'manager', 'super_admin'].includes(currentUser.role);
+  try {
+    const res = await fetch(API() + '/api/bar/menu-items', { headers: H() });
+    const data = await res.json();
+    barMenuItemsCache = data.items || [];
+    if (!barMenuItemsCache.length) {
+      body.innerHTML = '<tr><td colspan="6" style="color:var(--muted);font-size:13px;padding:20px;text-align:center">No menu items yet.</td></tr>';
+      return;
+    }
+    body.innerHTML = barMenuItemsCache.map(item => {
+      const stockQty = (item.quantity_on_hand !== null && item.quantity_on_hand !== undefined) ? item.quantity_on_hand : '—';
+      const statusLabel = item.active ? '<span style="color:var(--accent)">Active</span>' : '<span style="color:var(--muted)">Inactive</span>';
+      const actions = canManageMenu
+        ? '<button class="btn btn-sm" onclick="openEditMenuItemModal(' + item.id + ')" style="padding:4px 10px;font-size:12px">Edit</button> ' +
+          '<button class="btn btn-sm" onclick="openAdjustStockModal(' + item.id + ')" style="padding:4px 10px;font-size:12px">Adjust Stock</button>'
+        : '';
+      return '<tr>' +
+        '<td>' + item.name + '</td>' +
+        '<td>' + (item.category || '—') + '</td>' +
+        '<td>' + Number(item.price).toLocaleString() + '</td>' +
+        '<td>' + stockQty + '</td>' +
+        '<td>' + statusLabel + '</td>' +
+        '<td>' + actions + '</td>' +
+        '</tr>';
+    }).join('');
+  } catch (e) { body.innerHTML = '<tr><td colspan="6" style="color:var(--danger);font-size:13px;padding:20px;text-align:center">Failed to load menu.</td></tr>'; }
+}
+
+function openAddMenuItemModal() {
+  showGenericModal(
+    '<div style="font-family:var(--display);font-weight:700;font-size:18px;margin-bottom:18px">+ Add Menu Item</div>' +
+    '<div style="display:flex;flex-direction:column;gap:12px">' +
+      '<div><label style="font-size:12px;color:var(--muted)">Name</label>' +
+      '<input type="text" id="barMenuItemName" class="input" placeholder="e.g. Nile Special" style="width:100%"></div>' +
+      '<div><label style="font-size:12px;color:var(--muted)">Category</label>' +
+      '<input type="text" id="barMenuItemCategory" class="input" placeholder="e.g. Beers" style="width:100%"></div>' +
+      '<div><label style="font-size:12px;color:var(--muted)">Price</label>' +
+      '<input type="number" id="barMenuItemPrice" class="input" placeholder="e.g. 8000" style="width:100%"></div>' +
+      '<div><label style="font-size:12px;color:var(--muted)">Initial Stock</label>' +
+      '<input type="number" id="barMenuItemInitialStock" class="input" value="0" style="width:100%"></div>' +
+      '<div><label style="font-size:12px;color:var(--muted)">Low Stock Threshold</label>' +
+      '<input type="number" id="barMenuItemLowStock" class="input" value="0" style="width:100%"></div>' +
+    '</div>' +
+    '<div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end">' +
+      '<button class="btn btn-ghost" onclick="closeGenericModal()">Cancel</button>' +
+      '<button class="btn btn-primary" id="barAddMenuItemSubmitBtn" onclick="submitAddMenuItem()">Add Item</button>' +
+    '</div>'
+  );
+}
+
+async function submitAddMenuItem() {
+  const name = document.getElementById('barMenuItemName').value.trim();
+  const category = document.getElementById('barMenuItemCategory').value.trim();
+  const price = parseFloat(document.getElementById('barMenuItemPrice').value);
+  const initialStock = parseInt(document.getElementById('barMenuItemInitialStock').value) || 0;
+  const lowStock = parseInt(document.getElementById('barMenuItemLowStock').value) || 0;
+  if (!name) { showToast('Name is required'); return; }
+  if (isNaN(price) || price < 0) { showToast('Valid price is required'); return; }
+  const btn = document.getElementById('barAddMenuItemSubmitBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Adding...'; }
+  try {
+    const res = await fetch(API() + '/api/bar/menu-items', {
+      method: 'POST', headers: H(),
+      body: JSON.stringify({ name, category: category || null, price, initial_quantity: initialStock, low_stock_threshold: lowStock })
+    });
+    const data = await res.json();
+    if (!res.ok) { showToast(data.message || 'Failed to add item'); if (btn) { btn.disabled = false; btn.textContent = 'Add Item'; } return; }
+    showToast('✅ Menu item added!');
+    closeGenericModal();
+    loadBarMenuItems();
+  } catch (e) { showToast('Failed to add item'); if (btn) { btn.disabled = false; btn.textContent = 'Add Item'; } }
+}
+
+function openEditMenuItemModal(itemId) {
+  const item = barMenuItemsCache.find(x => x.id === itemId);
+  if (!item) return;
+  showGenericModal(
+    '<div style="font-family:var(--display);font-weight:700;font-size:18px;margin-bottom:18px">Edit Menu Item</div>' +
+    '<div style="display:flex;flex-direction:column;gap:12px">' +
+      '<div><label style="font-size:12px;color:var(--muted)">Name</label>' +
+      '<input type="text" id="barEditMenuItemName" class="input" value="' + item.name.replace(/"/g, '&quot;') + '" style="width:100%"></div>' +
+      '<div><label style="font-size:12px;color:var(--muted)">Category</label>' +
+      '<input type="text" id="barEditMenuItemCategory" class="input" value="' + (item.category || '').replace(/"/g, '&quot;') + '" style="width:100%"></div>' +
+      '<div><label style="font-size:12px;color:var(--muted)">Price</label>' +
+      '<input type="number" id="barEditMenuItemPrice" class="input" value="' + item.price + '" style="width:100%"></div>' +
+      '<div><label style="font-size:12px;color:var(--muted)">Status</label>' +
+      '<select id="barEditMenuItemActive" class="input" style="width:100%">' +
+        '<option value="true"' + (item.active ? ' selected' : '') + '>Active</option>' +
+        '<option value="false"' + (!item.active ? ' selected' : '') + '>Inactive</option>' +
+      '</select></div>' +
+    '</div>' +
+    '<div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end">' +
+      '<button class="btn btn-ghost" onclick="closeGenericModal()">Cancel</button>' +
+      '<button class="btn btn-primary" id="barEditMenuItemSubmitBtn" onclick="submitEditMenuItem(' + item.id + ')">Save Changes</button>' +
+    '</div>'
+  );
+}
+
+async function submitEditMenuItem(itemId) {
+  const name = document.getElementById('barEditMenuItemName').value.trim();
+  const category = document.getElementById('barEditMenuItemCategory').value.trim();
+  const price = parseFloat(document.getElementById('barEditMenuItemPrice').value);
+  const active = document.getElementById('barEditMenuItemActive').value === 'true';
+  if (!name) { showToast('Name is required'); return; }
+  if (isNaN(price) || price < 0) { showToast('Valid price is required'); return; }
+  const btn = document.getElementById('barEditMenuItemSubmitBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+  try {
+    const res = await fetch(API() + '/api/bar/menu-items/' + itemId, {
+      method: 'PATCH', headers: H(),
+      body: JSON.stringify({ name, category: category || null, price, active })
+    });
+    const data = await res.json();
+    if (!res.ok) { showToast(data.message || 'Failed to save changes'); if (btn) { btn.disabled = false; btn.textContent = 'Save Changes'; } return; }
+    showToast('✅ Menu item updated!');
+    closeGenericModal();
+    loadBarMenuItems();
+  } catch (e) { showToast('Failed to save changes'); if (btn) { btn.disabled = false; btn.textContent = 'Save Changes'; } }
+}
+
+function openAdjustStockModal(itemId) {
+  const item = barMenuItemsCache.find(x => x.id === itemId);
+  if (!item) return;
+  showGenericModal(
+    '<div style="font-family:var(--display);font-weight:700;font-size:18px;margin-bottom:18px">Adjust Stock — ' + item.name + '</div>' +
+    '<div style="display:flex;flex-direction:column;gap:12px">' +
+      '<div style="font-size:13px;color:var(--muted)">Current: ' + (item.quantity_on_hand !== null && item.quantity_on_hand !== undefined ? item.quantity_on_hand : '—') + '</div>' +
+      '<div><label style="font-size:12px;color:var(--muted)">Set Exact Quantity</label>' +
+      '<input type="number" id="barStockNewQuantity" class="input" placeholder="Leave blank to use adjustment below" style="width:100%"></div>' +
+      '<div><label style="font-size:12px;color:var(--muted)">Or Adjust By (+/-)</label>' +
+      '<input type="number" id="barStockAdjustment" class="input" placeholder="e.g. -5 or 10" style="width:100%"></div>' +
+      '<div><label style="font-size:12px;color:var(--muted)">Low Stock Threshold</label>' +
+      '<input type="number" id="barStockLowThreshold" class="input" value="' + (item.low_stock_threshold || 0) + '" style="width:100%"></div>' +
+    '</div>' +
+    '<div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end">' +
+      '<button class="btn btn-ghost" onclick="closeGenericModal()">Cancel</button>' +
+      '<button class="btn btn-primary" id="barStockAdjustSubmitBtn" onclick="submitStockAdjustment(' + item.id + ')">Save</button>' +
+    '</div>'
+  );
+}
+
+async function submitStockAdjustment(itemId) {
+  const newQtyRaw = document.getElementById('barStockNewQuantity').value;
+  const adjRaw = document.getElementById('barStockAdjustment').value;
+  const lowThreshold = parseInt(document.getElementById('barStockLowThreshold').value);
+  const payload = { low_stock_threshold: isNaN(lowThreshold) ? undefined : lowThreshold };
+  if (newQtyRaw !== '') {
+    payload.quantity_on_hand = parseInt(newQtyRaw);
+  } else if (adjRaw !== '') {
+    payload.adjustment = parseInt(adjRaw);
+  } else {
+    showToast('Enter a quantity or an adjustment');
+    return;
+  }
+  const btn = document.getElementById('barStockAdjustSubmitBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+  try {
+    const res = await fetch(API() + '/api/bar/stock/' + itemId, {
+      method: 'PATCH', headers: H(),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok) { showToast(data.message || 'Failed to adjust stock'); if (btn) { btn.disabled = false; btn.textContent = 'Save'; } return; }
+    showToast('✅ Stock updated!');
+    closeGenericModal();
+    loadBarMenuItems();
+  } catch (e) { showToast('Failed to adjust stock'); if (btn) { btn.disabled = false; btn.textContent = 'Save'; } }
 }
 
 // ── TABLES ──────────────────────────────────────────────────
@@ -6531,7 +6727,7 @@ async function loadBarOrders() {
         '<td>UGX ' + Number(o.total_amount || 0).toLocaleString() + '</td>' +
         '<td>' + new Date(o.opened_at).toLocaleTimeString() + '</td>' +
         '<td>' +
-          '<button class="btn btn-sm" style="padding:4px 10px;font-size:11px" onclick="openAddItemModal(' + o.id + ')">+ Item</button> ' +
+          '<button class="btn btn-sm" style="padding:4px 10px;font-size:11px" onclick="openBarPosModal(' + o.id + ')">+ Item</button> ' +
           '<button class="btn btn-sm" style="padding:4px 10px;font-size:11px" onclick="closeBarOrder(' + o.id + ')">💳 Close</button>' +
         '</td>' +
       '</tr>';
@@ -6579,6 +6775,137 @@ async function submitAddItem(orderId) {
     }
   } catch (e) { showToast('Failed to add item', 'warn'); btn.textContent = 'Add Item'; btn.disabled = false; }
 }
+
+// ── BAR POS (tap-grid order entry) ──────────────────────────
+let barPosCart = [];
+let barPosOrderId = null;
+let barPosMenuItems = [];
+let barPosCustomOpen = false;
+
+async function openBarPosModal(orderId) {
+  barPosOrderId = orderId;
+  barPosCart = [];
+  barPosCustomOpen = false;
+  showGenericModal('<div style="padding:20px;text-align:center;color:var(--muted)">Loading menu...</div>');
+  try {
+    const res = await fetch(API() + '/api/bar/menu-items', { headers: H() });
+    const data = await res.json();
+    barPosMenuItems = (data.items || []).filter(i => i.active);
+  } catch (e) { barPosMenuItems = []; }
+  renderBarPosModal();
+}
+
+function barPosCartTotal() {
+  return barPosCart.reduce((s,c) => s + c.unit_price * c.quantity, 0);
+}
+
+function renderBarPosCartHtml() {
+  if (!barPosCart.length) return '<div class="cempty">No items yet. Tap items above to add.</div>';
+  return barPosCart.map((c,i) =>
+    '<div class="citem">' +
+      '<div><div class="cinm">' + c.name + '</div><div class="ciup">UGX ' + Number(c.unit_price).toLocaleString() + ' each</div></div>' +
+      '<div class="qctrl"><button class="qbtn" onclick="barPosQty(' + i + ',-1)">−</button><div class="qnum">' + c.quantity + '</div><button class="qbtn" onclick="barPosQty(' + i + ',1)">+</button></div>' +
+      '<div class="citot">UGX ' + (c.unit_price*c.quantity).toLocaleString() + '</div>' +
+      '<div class="cirm" onclick="barPosRemove(' + i + ')">✕</div>' +
+    '</div>'
+  ).join('');
+}
+
+function renderBarPosModal() {
+  const cats = {};
+  barPosMenuItems.forEach(i => { const c = i.category || 'Other'; (cats[c] = cats[c] || []).push(i); });
+  const gridHtml = Object.keys(cats).map(cat =>
+    '<div style="font-size:11px;color:var(--muted);font-weight:600;margin:10px 0 6px;text-transform:uppercase">' + cat + '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-bottom:8px">' +
+      cats[cat].map(i => '<button class="btn btn-sm" style="padding:10px 6px;display:flex;flex-direction:column;gap:2px;height:auto" onclick="barPosAddCatalogItem(' + i.id + ')"><span style="font-weight:600">' + String(i.name).replace(/"/g,'&quot;') + '</span><span style="font-size:11px;color:var(--muted)">UGX ' + Number(i.price).toLocaleString() + '</span></button>').join('') +
+    '</div>'
+  ).join('') || '<div class="cempty">No active menu items. Add some in the Menu tab.</div>';
+
+  showGenericModal(
+    '<div style="font-family:var(--display);font-weight:700;font-size:18px;margin-bottom:14px">Add Items to Order</div>' +
+    '<div style="max-height:220px;overflow-y:auto;margin-bottom:14px">' + gridHtml + '</div>' +
+    '<div style="border-top:1px solid var(--border);padding-top:12px;margin-bottom:10px">' +
+      '<div id="barPosCartList">' + renderBarPosCartHtml() + '</div>' +
+      '<div style="display:flex;justify-content:space-between;font-weight:700;margin-top:8px"><span>Total</span><span>UGX ' + barPosCartTotal().toLocaleString() + '</span></div>' +
+    '</div>' +
+    '<div id="barPosCustomSection" style="display:' + (barPosCustomOpen ? 'block' : 'none') + ';border-top:1px solid var(--border);padding-top:12px;margin-bottom:12px">' +
+      '<div style="display:flex;gap:8px">' +
+        '<input type="text" id="barPosCustomName" class="input" placeholder="Item name" style="flex:2">' +
+        '<input type="number" id="barPosCustomQty" class="input" value="1" style="flex:1">' +
+        '<input type="number" id="barPosCustomPrice" class="input" placeholder="Price" style="flex:1">' +
+      '</div>' +
+      '<button class="btn btn-sm" style="margin-top:8px" onclick="barPosAddCustomItem()">Add Custom Item</button>' +
+    '</div>' +
+    '<div style="display:flex;gap:10px;justify-content:space-between;align-items:center">' +
+      '<button class="btn btn-ghost btn-sm" onclick="barPosToggleCustom()">+ Custom Item</button>' +
+      '<div style="display:flex;gap:10px">' +
+        '<button class="btn btn-ghost" onclick="closeGenericModal()">Cancel</button>' +
+        '<button class="btn btn-primary" id="barPosSendBtn" onclick="submitBarPosOrder()"' + (barPosCart.length ? '' : ' disabled') + '>Send Order</button>' +
+      '</div>' +
+    '</div>'
+  );
+}
+
+function barPosAddCatalogItem(menuItemId) {
+  const item = barPosMenuItems.find(i => i.id === menuItemId);
+  if (!item) return;
+  const ex = barPosCart.find(c => c.menu_item_id === menuItemId);
+  if (ex) ex.quantity++;
+  else barPosCart.push({ menu_item_id: menuItemId, name: item.name, unit_price: item.price, quantity: 1 });
+  renderBarPosModal();
+}
+
+function barPosAddCustomItem() {
+  const name = document.getElementById('barPosCustomName').value.trim();
+  const quantity = parseInt(document.getElementById('barPosCustomQty').value) || 1;
+  const unit_price = parseFloat(document.getElementById('barPosCustomPrice').value) || 0;
+  if (!name) { showToast('Item name is required', 'warn'); return; }
+  barPosCart.push({ menu_item_id: null, name, unit_price, quantity });
+  barPosCustomOpen = false;
+  renderBarPosModal();
+}
+
+function barPosToggleCustom() {
+  barPosCustomOpen = !barPosCustomOpen;
+  renderBarPosModal();
+}
+
+function barPosQty(i, d) {
+  barPosCart[i].quantity += d;
+  if (barPosCart[i].quantity <= 0) barPosCart.splice(i, 1);
+  renderBarPosModal();
+}
+
+function barPosRemove(i) {
+  barPosCart.splice(i, 1);
+  renderBarPosModal();
+}
+
+async function submitBarPosOrder() {
+  if (!barPosCart.length) return;
+  const btn = document.getElementById('barPosSendBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Sending...'; }
+  try {
+    for (const c of barPosCart) {
+      const payload = c.menu_item_id
+        ? { menu_item_id: c.menu_item_id, quantity: c.quantity }
+        : { item_name: c.name, quantity: c.quantity, unit_price: c.unit_price };
+      const res = await fetch(API() + '/api/bar/orders/' + barPosOrderId + '/items', {
+        method: 'POST', headers: H(), body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!data.success) { showToast(data.message || 'Failed to add ' + c.name, 'warn'); if (btn) { btn.disabled = false; btn.textContent = 'Send Order'; } return; }
+    }
+    showToast('✅ Order updated!');
+    closeGenericModal();
+    loadBarOrders();
+  } catch (e) {
+    showToast('Failed to send order', 'warn');
+    if (btn) { btn.disabled = false; btn.textContent = 'Send Order'; }
+  }
+}
+
+
 
 async function closeBarOrder(orderId) {
   if (!confirm('Close and settle this order?')) return;
