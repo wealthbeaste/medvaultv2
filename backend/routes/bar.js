@@ -89,15 +89,35 @@ module.exports = function registerBarRoutes(app, { query, auth, can, audit, requ
     } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
   });
 
-  // Add an item to an order — this is what feeds the Kitchen view below
+  // Add an item to an order — this is what feeds the Kitchen view below.
+  // Supports either a catalog menu_item_id (preferred — auto-fills name/price
+  // and decrements stock) or legacy free-typed item_name/unit_price.
   app.post('/api/bar/orders/:id/items', auth, can('bar:write'), gate, async (req, res) => {
     const b = req.body || {};
-    if (!b.item_name) return err(res, 400, 'VALIDATION_INVALID', 'item_name is required.');
+    const quantity = b.quantity || 1;
+    let item_name = b.item_name;
+    let unit_price = b.unit_price || 0;
     try {
+      if (b.menu_item_id) {
+        const mi = await query(`SELECT * FROM bar_menu_items WHERE id=$1 AND active=true`, [b.menu_item_id]);
+        if (!mi.rows.length) return err(res, 404, 'NOT_FOUND', 'Menu item not found or inactive.');
+        item_name = mi.rows[0].name;
+        unit_price = mi.rows[0].price;
+      }
+      if (!item_name) return err(res, 400, 'VALIDATION_INVALID', 'item_name or menu_item_id is required.');
+
       const r = await query(
-        `INSERT INTO bar_order_items (order_id, item_name, quantity, unit_price) VALUES ($1,$2,$3,$4) RETURNING *`,
-        [req.params.id, b.item_name, b.quantity || 1, b.unit_price || 0]
+        `INSERT INTO bar_order_items (order_id, item_name, quantity, unit_price, menu_item_id) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+        [req.params.id, item_name, quantity, unit_price, b.menu_item_id || null]
       );
+
+      if (b.menu_item_id) {
+        await query(
+          `UPDATE bar_stock SET quantity_on_hand = GREATEST(quantity_on_hand - $1, 0), updated_at=NOW() WHERE menu_item_id=$2`,
+          [quantity, b.menu_item_id]
+        );
+      }
+
       await query(
         `UPDATE bar_orders SET total_amount = (
            SELECT COALESCE(SUM(quantity * unit_price),0) FROM bar_order_items WHERE order_id=$1
@@ -156,6 +176,98 @@ module.exports = function registerBarRoutes(app, { query, auth, can, audit, requ
       );
       if (!r.rows.length) return err(res, 404, 'NOT_FOUND', 'Order item not found.');
       res.json({ success: true, item: r.rows[0] });
+    } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
+  });
+
+  // ── MENU CATALOG ──────────────────────────────────────────
+  // Everyone taking orders needs to see the menu.
+  app.get('/api/bar/menu-items', auth, can('bar:read'), gate, async (req, res) => {
+    const { pharmacyId } = req.user;
+    if (!pharmacyId) return err(res, 400, 'AUTH_NO_PHARMACY', 'No pharmacy assigned.', 'pharmacyId');
+    try {
+      const r = await query(
+        `SELECT bmi.*, bs.quantity_on_hand, bs.low_stock_threshold
+         FROM bar_menu_items bmi
+         LEFT JOIN bar_stock bs ON bs.menu_item_id = bmi.id
+         WHERE bmi.pharmacy_id=$1
+         ORDER BY bmi.category, bmi.name`,
+        [pharmacyId]
+      );
+      res.json({ items: r.rows });
+    } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
+  });
+
+  // Only owner/manager/super_admin can edit the menu.
+  app.post('/api/bar/menu-items', auth, can('bar-menu:write'), gate, async (req, res) => {
+    const { pharmacyId, orgId } = req.user;
+    const b = req.body || {};
+    if (!b.name) return err(res, 400, 'VALIDATION_INVALID', 'name is required.', 'name');
+    if (b.price === undefined || b.price === null) return err(res, 400, 'VALIDATION_INVALID', 'price is required.', 'price');
+    try {
+      const r = await query(
+        `INSERT INTO bar_menu_items (org_id, pharmacy_id, name, category, price, active)
+         VALUES ($1,$2,$3,$4,$5,true) RETURNING *`,
+        [orgId, pharmacyId, b.name, b.category || null, b.price]
+      );
+      const menuItem = r.rows[0];
+      await query(
+        `INSERT INTO bar_stock (menu_item_id, quantity_on_hand, low_stock_threshold)
+         VALUES ($1,$2,$3)`,
+        [menuItem.id, b.initial_quantity || 0, b.low_stock_threshold || 0]
+      );
+      if (audit) await audit(query, { req, action: 'bar.menu_item.create', entity: 'bar_menu_item', entityId: menuItem.id, payload: b });
+      res.json({ success: true, item: menuItem });
+    } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
+  });
+
+  app.patch('/api/bar/menu-items/:id', auth, can('bar-menu:write'), gate, async (req, res) => {
+    const b = req.body || {};
+    const fields = [];
+    const values = [];
+    let i = 1;
+    if (b.name !== undefined) { fields.push(`name=${i++}`); values.push(b.name); }
+    if (b.category !== undefined) { fields.push(`category=${i++}`); values.push(b.category); }
+    if (b.price !== undefined) { fields.push(`price=${i++}`); values.push(b.price); }
+    if (b.active !== undefined) { fields.push(`active=${i++}`); values.push(b.active); }
+    if (!fields.length) return err(res, 400, 'VALIDATION_INVALID', 'No fields to update.');
+    fields.push(`updated_at=NOW()`);
+    values.push(req.params.id);
+    try {
+      const r = await query(
+        `UPDATE bar_menu_items SET ${fields.join(', ')} WHERE id=${i} RETURNING *`,
+        values
+      );
+      if (!r.rows.length) return err(res, 404, 'NOT_FOUND', 'Menu item not found.');
+      if (audit) await audit(query, { req, action: 'bar.menu_item.update', entity: 'bar_menu_item', entityId: r.rows[0].id, payload: b });
+      res.json({ success: true, item: r.rows[0] });
+    } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
+  });
+
+  // ── STOCK ADJUSTMENT ──────────────────────────────────────
+  app.patch('/api/bar/stock/:menuItemId', auth, can('bar-menu:write'), gate, async (req, res) => {
+    const b = req.body || {};
+    if (b.quantity_on_hand === undefined && b.adjustment === undefined) {
+      return err(res, 400, 'VALIDATION_INVALID', 'Provide quantity_on_hand (absolute) or adjustment (relative).');
+    }
+    try {
+      let r;
+      if (b.quantity_on_hand !== undefined) {
+        if (b.quantity_on_hand < 0) return err(res, 400, 'STOCK_INVALID_QUANTITY', 'quantity_on_hand cannot be negative.');
+        r = await query(
+          `UPDATE bar_stock SET quantity_on_hand=$1, low_stock_threshold=COALESCE($2, low_stock_threshold), updated_at=NOW()
+           WHERE menu_item_id=$3 RETURNING *`,
+          [b.quantity_on_hand, b.low_stock_threshold ?? null, req.params.menuItemId]
+        );
+      } else {
+        r = await query(
+          `UPDATE bar_stock SET quantity_on_hand = GREATEST(quantity_on_hand + $1, 0), updated_at=NOW()
+           WHERE menu_item_id=$2 RETURNING *`,
+          [b.adjustment, req.params.menuItemId]
+        );
+      }
+      if (!r.rows.length) return err(res, 404, 'NOT_FOUND', 'Stock record not found for this menu item.');
+      if (audit) await audit(query, { req, action: 'bar.stock.adjust', entity: 'bar_stock', entityId: r.rows[0].id, payload: b });
+      res.json({ success: true, stock: r.rows[0] });
     } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
   });
 };
