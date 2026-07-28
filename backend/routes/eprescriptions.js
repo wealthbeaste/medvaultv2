@@ -35,10 +35,10 @@ module.exports = function registerErxRoutes(app, { query, auth, can, audit, gene
       const code = await generateUniqueErxCode();
       const r = await query(
         `INSERT INTO e_prescriptions (code, org_id, pharmacy_id, patient_id, prescription_id, patient_display_name,
-           doctor_name, doctor_license_no, items, created_by, recommended_pharmacy_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+           doctor_name, doctor_license_no, items, created_by, recommended_pharmacy_id, patient_phone, doctor_phone)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
         [code, orgId, pharmacyId, b.patient_id || null, b.prescription_id || null, b.patient_display_name,
-         b.doctor_name || null, b.doctor_license_no || null, JSON.stringify(b.items), userId || null, recommendedPharmacyId]
+         b.doctor_name || null, b.doctor_license_no || null, JSON.stringify(b.items), userId || null, recommendedPharmacyId, b.patient_phone || null, b.doctor_phone || null]
       );
       if (audit) await audit(query, { req, action: 'erx.create', entity: 'e_prescription', entityId: r.rows[0].id, payload: { code } });
       res.json({ success: true, prescription: r.rows[0], verifyUrl: `${APP_URL}/rx/${code}` });

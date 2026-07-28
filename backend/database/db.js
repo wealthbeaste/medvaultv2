@@ -1992,7 +1992,10 @@ async function runMigrations() {
     `CREATE INDEX IF NOT EXISTS idx_adr_pharmacy ON adr_reports(pharmacy_id, created_at DESC)`,
     `CREATE INDEX IF NOT EXISTS idx_adr_status ON adr_reports(pharmacy_id, status)`,
 
-    `ALTER TABLE pharmacies ADD COLUMN IF NOT EXISTS adr_counter INTEGER NOT NULL DEFAULT 0`
+    `ALTER TABLE pharmacies ADD COLUMN IF NOT EXISTS adr_counter INTEGER NOT NULL DEFAULT 0`,
+
+    // MULTI-BUSINESS-TYPE SUPPORT (Phase 1)
+    `ALTER TABLE organisations ADD COLUMN IF NOT EXISTS business_type VARCHAR(50) NOT NULL DEFAULT 'pharmacy'`
 
   ];
 

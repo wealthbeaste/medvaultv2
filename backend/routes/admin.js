@@ -35,9 +35,9 @@ module.exports = function registerAdminRoutes(app, { query, auth, can, hash, aud
   app.get('/api/admin/orgs', auth, adminOnly, async (req, res) => {
     try {
       const result = await query(`
-        SELECT o.id,o.name,o.owner_name,o.email,o.phone,o.plan,o.is_active,o.created_at,
+        SELECT o.id,o.name,o.owner_name,o.email,o.phone,o.plan,o.is_active,o.created_at,o.business_type,
                ph.id AS pharmacy_id,ph.address AS location,ph.nda_number AS nda,ph.is_active AS pharmacy_active,
-               s.id AS sub_id,s.status AS sub_status,s.amount_ugx,s.trial_ends_at,s.next_billing,
+               s.id AS sub_id,s.status AS sub_status,s.amount_ugx,s.trial_ends_at,s.next_billing,s.modules,
                (SELECT COUNT(*) FROM pharmacies pp WHERE pp.organisation_id=o.id) AS branch_count,
                (SELECT COUNT(*) FROM users u WHERE u.organisation_id=o.id AND u.email!='admin@medvault.ug') AS user_count,
                (SELECT COUNT(*) FROM drugs d JOIN pharmacies pp ON pp.id=d.pharmacy_id WHERE pp.organisation_id=o.id) AS drug_count,
@@ -72,19 +72,32 @@ module.exports = function registerAdminRoutes(app, { query, auth, can, hash, aud
     }
   });
 
+  const BUSINESS_TYPES = ['pharmacy', 'supermarket', 'hotel', 'bar', 'hardware', 'retail_shop', 'wholesale_shop'];
+  const BUSINESS_TYPE_DEFAULT_MODULES = {
+    supermarket:    { supermarket: true },
+    hotel:          { hotel: true },
+    bar:            { bar: true },
+    hardware:       { hardware: true },
+    wholesale_shop: { wholesale: true },
+  };
+
   app.post('/api/admin/orgs', auth, adminOnly, async (req, res) => {
-    const { name, owner_name, email, phone, location, plan, nda } = req.body;
+    const { name, owner_name, email, phone, location, plan, nda, business_type } = req.body;
     if (!name)  return err(res, 400, 'VALIDATION_REQUIRED', 'Organisation name is required', 'name');
     if (!email) return err(res, 400, 'VALIDATION_REQUIRED', 'Email is required', 'email');
     if (!phone) return err(res, 400, 'VALIDATION_REQUIRED', 'Phone is required', 'phone');
+    const bizType = (business_type || 'pharmacy').toLowerCase();
+    if (!BUSINESS_TYPES.includes(bizType)) {
+      return err(res, 400, 'VALIDATION_INVALID', `business_type must be one of: ${BUSINESS_TYPES.join(', ')}`, 'business_type');
+    }
     const planAmounts = { drug_shop: 20000, basic: 20000, single: 50000, pro: 50000, multi: 80000, branch: 40000, chain: 30000, enterprise: 150000 };
     const amount = (plan in planAmounts) ? planAmounts[plan] : 50000;
     try {
       const tempPw = name.replace(/\s+/g, '').slice(0, 4) + phone.slice(-4) + '!';
       const pwHash = await hash(tempPw);
       const org = await query(
-        `INSERT INTO organisations (name,owner_name,email,phone,plan) VALUES ($1,$2,$3,$4,$5) RETURNING id`,
-        [name, owner_name || name, email.toLowerCase(), phone, plan || 'pro']
+        `INSERT INTO organisations (name,owner_name,email,phone,plan,business_type) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+        [name, owner_name || name, email.toLowerCase(), phone, plan || 'pro', bizType]
       );
       const orgId = org.rows[0].id;
       const ph = await query(
@@ -96,11 +109,12 @@ module.exports = function registerAdminRoutes(app, { query, auth, can, hash, aud
         `INSERT INTO users (organisation_id,pharmacy_id,name,email,password_hash,role) VALUES ($1,$2,$3,$4,$5,'owner')`,
         [orgId, pharmacyId, owner_name || name, email.toLowerCase(), pwHash]
       );
+      const defaultModules = BUSINESS_TYPE_DEFAULT_MODULES[bizType] || {};
       await query(
-        `INSERT INTO subscriptions (organisation_id,plan,amount_ugx,status,trial_ends_at) VALUES ($1,$2,$3,'trial',NOW()+INTERVAL '14 days')`,
-        [orgId, plan || 'pro', amount]
+        `INSERT INTO subscriptions (organisation_id,plan,amount_ugx,status,trial_ends_at,modules) VALUES ($1,$2,$3,'trial',NOW()+INTERVAL '14 days',$4)`,
+        [orgId, plan || 'pro', amount, JSON.stringify(defaultModules)]
       );
-      res.json({ success: true, org_id: orgId, pharmacy_id: pharmacyId, temp_password: tempPw });
+      res.json({ success: true, org_id: orgId, pharmacy_id: pharmacyId, temp_password: tempPw, business_type: bizType });
     } catch (e) {
       if (e.code === '23505') return err(res, 409, 'CONFLICT_EMAIL_EXISTS', 'Email already registered', 'email');
       return err(res, 500, 'SERVER_ERROR', e.message);
