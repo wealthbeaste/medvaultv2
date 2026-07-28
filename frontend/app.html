@@ -1331,6 +1331,7 @@ img,svg,video{max-width:100%;}
     <div class="nav-item" id="navInventory" onclick="go('inventory',this)"><span class="nav-icon">📦</span>Inventory<span class="nbadge w" id="lowBadge">0</span></div>
     <div class="nav-item" id="navSales" onclick="go('sales',this)"><span class="nav-icon">🧾</span>Sales & Receipts</div>
     <div class="nav-item" id="navOrders" onclick="go('orders',this)"><span class="nav-icon">🛒</span>Orders<span class="nbadge r" id="orderBadge">0</span></div>
+    <div class="nav-item" id="navBar" style="display:none" onclick="go('bar',this)"><span class="nav-icon">🍺</span>Bar</div>
     <div class="nav-item" id="navCustomers" onclick="go('customers',this)"><span class="nav-icon">👥</span>Customers</div>
     <div class="nav-label">Communication</div>
     <div class="nav-item" id="navWhatsapp" onclick="go('whatsapp',this)"><span class="nav-icon">💬</span>WhatsApp Reports</div>
@@ -2678,6 +2679,46 @@ Or open: https://app.medvault.ug</div>
         <thead><tr><th>From</th><th>To</th><th>Drug</th><th>Qty</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
         <tbody id="transfersBody"></tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- BAR MODULE PAGE (Phase 4) -->
+  <div class="page" id="page-bar">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div>
+        <div style="font-family:var(--display);font-weight:700;font-size:20px">🍺 Bar</div>
+        <div style="font-size:13px;color:var(--muted);margin-top:3px">Tables, orders & kitchen</div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-bottom:20px">
+      <button class="btn btn-sm bar-tab active" id="barTabBtn-tables" onclick="switchBarTab('tables')">🪑 Tables</button>
+      <button class="btn btn-sm bar-tab" id="barTabBtn-orders" onclick="switchBarTab('orders')">🧾 Orders</button>
+      <button class="btn btn-sm bar-tab" id="barTabBtn-kitchen" onclick="switchBarTab('kitchen')">🍳 Kitchen</button>
+    </div>
+
+    <div id="barTablesView">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
+        <button class="btn btn-primary" onclick="openAddTableModal()">+ Add Table</button>
+      </div>
+      <div id="barTablesGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px"></div>
+    </div>
+
+    <div id="barOrdersView" style="display:none">
+      <div class="card">
+        <div class="ch">
+          <div class="ct">Open Orders</div>
+          <button class="btn btn-sm" onclick="loadBarOrders()" style="padding:6px 14px;font-size:12px">🔄 Refresh</button>
+        </div>
+        <table class="tbl">
+          <thead><tr><th>Table</th><th>Items</th><th>Total</th><th>Opened</th><th>Actions</th></tr></thead>
+          <tbody id="barOrdersBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="barKitchenView" style="display:none">
+      <div id="barKitchenGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px"></div>
     </div>
   </div>
 
@@ -4479,6 +4520,7 @@ function canSee(page) {
     'efris':            ['owner','manager'],
     'erx':              ['owner','manager','pharmacist','staff'],
     'erx-referrals':    ['owner','manager','pharmacist','staff'],
+    'bar':              ['owner','manager','cashier','staff'],
   };
   const roleOk = (allow[page] || ['owner']).includes(role);
   if (!roleOk) return false;
@@ -5117,6 +5159,7 @@ const pageMeta = {
   'purchasing':        {t:'🏭 Purchasing Report',         s:'Supplier spend and PO turnaround'},
   'erx':               {t:'🔗 E-Prescriptions',            s:'Portable QR prescriptions — fulfillable at any pharmacy'},
   'erx-referrals':     {t:'📨 Referrals to Fulfill',       s:'Prescriptions recommended to this pharmacy'},
+  'bar':               {t:'🍺 Bar',                        s:'Tables, orders and kitchen'},
   'grn':               {t:'📥 Goods Received Notes',      s:'Receive deliveries — auto-updates stock & AP ledger'},
   'ap-ledger':         {t:'📒 Accounts Payable Ledger',   s:'Track supplier invoices & payments'},
   'price-levels':      {t:'💹 Price Levels',               s:'Customer pricing tiers — retail, wholesale, insurance'},
@@ -5191,6 +5234,7 @@ function loadPage(page) {
   if (page === 'doctors')            loadDoctors();
   if (page === 'erx')                loadErx();
   if (page === 'erx-referrals')      loadErxReferrals();
+  if (page === 'bar')                loadBarPage();
   if (page === 'appointments')       loadAppointments();
   if (page === 'consultations')      loadConsultations();
   if (page === 'prescriptions')      loadPrescriptions('');
@@ -6327,6 +6371,242 @@ function showToast(msg, type='') {
   clearTimeout(_tt); _tt=setTimeout(()=>t.classList.remove('show'),4000);
 }
 function toast(msg,type=''){showToast(msg,type);}
+
+// ═══════════════════════════════════════════════════════════
+// BAR MODULE (Phase 4) — Tables, Orders, Kitchen
+// ═══════════════════════════════════════════════════════════
+let barCurrentTab = 'tables';
+let barTablesCache = [];
+
+function showBarFeatures() {
+  const nav = document.getElementById('navBar');
+  if (nav) nav.style.display = 'flex';
+}
+
+function loadBarPage() {
+  switchBarTab(barCurrentTab);
+}
+
+function switchBarTab(tab) {
+  barCurrentTab = tab;
+  const views = { tables: 'barTablesView', orders: 'barOrdersView', kitchen: 'barKitchenView' };
+  Object.keys(views).forEach(t => {
+    const view = document.getElementById(views[t]);
+    if (view) view.style.display = (t === tab) ? '' : 'none';
+    const btn = document.getElementById('barTabBtn-' + t);
+    if (btn) btn.classList.toggle('active', t === tab);
+  });
+  if (tab === 'tables') loadBarTables();
+  if (tab === 'orders') loadBarOrders();
+  if (tab === 'kitchen') loadBarKitchen();
+}
+
+// ── TABLES ──────────────────────────────────────────────────
+async function loadBarTables() {
+  const grid = document.getElementById('barTablesGrid');
+  if (!grid) return;
+  grid.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:20px">Loading tables...</div>';
+  try {
+    const res = await fetch(API() + '/api/bar/tables', { headers: H() });
+    const data = await res.json();
+    barTablesCache = data.tables || [];
+    if (!barTablesCache.length) {
+      grid.innerHTML = '<div style="grid-column:1/-1;color:var(--muted);font-size:13px;padding:20px;text-align:center">No tables yet — add one to get started.</div>';
+      return;
+    }
+    grid.innerHTML = barTablesCache.map(t => {
+      const statusColor = t.status === 'occupied' ? 'var(--warn)' : (t.status === 'available' ? 'var(--accent)' : 'var(--muted)');
+      return '<div class="card" style="padding:16px;text-align:center;cursor:pointer" onclick="openNewOrderModal(' + t.id + ')">' +
+        '<div style="font-family:var(--display);font-weight:700;font-size:18px">Table ' + t.table_number + '</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin:4px 0">Seats ' + t.capacity + '</div>' +
+        '<div style="font-size:11px;font-weight:600;color:' + statusColor + ';text-transform:uppercase">' + t.status + '</div>' +
+        '</div>';
+    }).join('');
+  } catch (e) { grid.innerHTML = '<div style="color:var(--danger);font-size:13px;padding:20px">Failed to load tables.</div>'; }
+}
+
+function openAddTableModal() {
+  showGenericModal(
+    '<div style="font-family:var(--display);font-weight:700;font-size:18px;margin-bottom:18px">+ Add Table</div>' +
+    '<div style="display:flex;flex-direction:column;gap:12px">' +
+      '<div><label style="font-size:12px;color:var(--muted)">Table Number</label>' +
+      '<input type="text" id="barNewTableNumber" class="input" placeholder="e.g. 12" style="width:100%"></div>' +
+      '<div><label style="font-size:12px;color:var(--muted)">Capacity</label>' +
+      '<input type="number" id="barNewTableCapacity" class="input" value="4" style="width:100%"></div>' +
+    '</div>' +
+    '<div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end">' +
+      '<button class="btn btn-ghost" onclick="closeGenericModal()">Cancel</button>' +
+      '<button class="btn btn-primary" id="barAddTableSubmitBtn" onclick="submitAddTable()">Add Table</button>' +
+    '</div>'
+  );
+}
+
+async function submitAddTable() {
+  const table_number = document.getElementById('barNewTableNumber').value.trim();
+  const capacity = parseInt(document.getElementById('barNewTableCapacity').value) || 4;
+  if (!table_number) { showToast('Table number is required', 'warn'); return; }
+  const btn = document.getElementById('barAddTableSubmitBtn');
+  btn.textContent = '⏳ Adding...'; btn.disabled = true;
+  try {
+    const res = await fetch(API() + '/api/bar/tables', {
+      method: 'POST', headers: H(), body: JSON.stringify({ table_number, capacity })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('✅ Table added!'); closeGenericModal(); loadBarTables();
+    } else {
+      showToast(data.message || 'Failed to add table', 'warn');
+      btn.textContent = 'Add Table'; btn.disabled = false;
+    }
+  } catch (e) { showToast('Failed to add table', 'warn'); btn.textContent = 'Add Table'; btn.disabled = false; }
+}
+
+// ── ORDERS ──────────────────────────────────────────────────
+function openNewOrderModal(tableId) {
+  const t = barTablesCache.find(x => x.id === tableId);
+  const label = t ? t.table_number : '';
+  showGenericModal(
+    '<div style="font-family:var(--display);font-weight:700;font-size:18px;margin-bottom:18px">🧾 Open Order — Table ' + label + '</div>' +
+    '<div style="font-size:13px;color:var(--muted);margin-bottom:16px">This opens a new order for this table. You can add items after.</div>' +
+    '<div style="display:flex;gap:10px;justify-content:flex-end">' +
+      '<button class="btn btn-ghost" onclick="closeGenericModal()">Cancel</button>' +
+      '<button class="btn btn-primary" id="barNewOrderSubmitBtn" onclick="submitNewOrder(' + tableId + ')">Open Order</button>' +
+    '</div>'
+  );
+}
+
+async function submitNewOrder(tableId) {
+  const btn = document.getElementById('barNewOrderSubmitBtn');
+  if (btn) { btn.textContent = '⏳ Opening...'; btn.disabled = true; }
+  try {
+    const res = await fetch(API() + '/api/bar/orders', {
+      method: 'POST', headers: H(), body: JSON.stringify({ table_id: tableId })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('✅ Order opened!'); closeGenericModal(); switchBarTab('orders');
+    } else {
+      showToast(data.message || 'Failed to open order', 'warn');
+    }
+  } catch (e) { showToast('Failed to open order', 'warn'); }
+}
+
+async function loadBarOrders() {
+  const body = document.getElementById('barOrdersBody');
+  if (!body) return;
+  body.innerHTML = '<tr><td colspan="5" style="color:var(--muted);font-size:13px;padding:16px">Loading orders...</td></tr>';
+  try {
+    const res = await fetch(API() + '/api/bar/orders?status=open', { headers: H() });
+    const data = await res.json();
+    const orders = data.orders || [];
+    if (!orders.length) {
+      body.innerHTML = '<tr><td colspan="5" style="color:var(--muted);font-size:13px;padding:16px;text-align:center">No open orders.</td></tr>';
+      return;
+    }
+    body.innerHTML = orders.map(o => {
+      const itemCount = (o.items || []).length;
+      return '<tr>' +
+        '<td>' + (o.table_number ? 'Table ' + o.table_number : '—') + '</td>' +
+        '<td>' + itemCount + (itemCount === 1 ? ' item' : ' items') + '</td>' +
+        '<td>UGX ' + Number(o.total_amount || 0).toLocaleString() + '</td>' +
+        '<td>' + new Date(o.opened_at).toLocaleTimeString() + '</td>' +
+        '<td>' +
+          '<button class="btn btn-sm" style="padding:4px 10px;font-size:11px" onclick="openAddItemModal(' + o.id + ')">+ Item</button> ' +
+          '<button class="btn btn-sm" style="padding:4px 10px;font-size:11px" onclick="closeBarOrder(' + o.id + ')">💳 Close</button>' +
+        '</td>' +
+      '</tr>';
+    }).join('');
+  } catch (e) { body.innerHTML = '<tr><td colspan="5" style="color:var(--danger);font-size:13px;padding:16px">Failed to load orders.</td></tr>'; }
+}
+
+function openAddItemModal(orderId) {
+  showGenericModal(
+    '<div style="font-family:var(--display);font-weight:700;font-size:18px;margin-bottom:18px">+ Add Item</div>' +
+    '<div style="display:flex;flex-direction:column;gap:12px">' +
+      '<div><label style="font-size:12px;color:var(--muted)">Item Name</label>' +
+      '<input type="text" id="barItemName" class="input" placeholder="e.g. Waragi and Coke" style="width:100%"></div>' +
+      '<div style="display:flex;gap:10px">' +
+        '<div style="flex:1"><label style="font-size:12px;color:var(--muted)">Quantity</label>' +
+        '<input type="number" id="barItemQty" class="input" value="1" style="width:100%"></div>' +
+        '<div style="flex:1"><label style="font-size:12px;color:var(--muted)">Unit Price (UGX)</label>' +
+        '<input type="number" id="barItemPrice" class="input" placeholder="0" style="width:100%"></div>' +
+      '</div>' +
+    '</div>' +
+    '<div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end">' +
+      '<button class="btn btn-ghost" onclick="closeGenericModal()">Cancel</button>' +
+      '<button class="btn btn-primary" id="barAddItemSubmitBtn" onclick="submitAddItem(' + orderId + ')">Add Item</button>' +
+    '</div>'
+  );
+}
+
+async function submitAddItem(orderId) {
+  const item_name = document.getElementById('barItemName').value.trim();
+  const quantity = parseInt(document.getElementById('barItemQty').value) || 1;
+  const unit_price = parseFloat(document.getElementById('barItemPrice').value) || 0;
+  if (!item_name) { showToast('Item name is required', 'warn'); return; }
+  const btn = document.getElementById('barAddItemSubmitBtn');
+  btn.textContent = '⏳ Adding...'; btn.disabled = true;
+  try {
+    const res = await fetch(API() + '/api/bar/orders/' + orderId + '/items', {
+      method: 'POST', headers: H(), body: JSON.stringify({ item_name, quantity, unit_price })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('✅ Item added!'); closeGenericModal(); loadBarOrders();
+    } else {
+      showToast(data.message || 'Failed to add item', 'warn');
+      btn.textContent = 'Add Item'; btn.disabled = false;
+    }
+  } catch (e) { showToast('Failed to add item', 'warn'); btn.textContent = 'Add Item'; btn.disabled = false; }
+}
+
+async function closeBarOrder(orderId) {
+  if (!confirm('Close and settle this order?')) return;
+  try {
+    const res = await fetch(API() + '/api/bar/orders/' + orderId + '/close', { method: 'POST', headers: H() });
+    const data = await res.json();
+    if (data.success) { showToast('✅ Order closed!'); loadBarOrders(); }
+    else { showToast(data.message || 'Failed to close order', 'warn'); }
+  } catch (e) { showToast('Failed to close order', 'warn'); }
+}
+
+// ── KITCHEN ─────────────────────────────────────────────────
+async function loadBarKitchen() {
+  const grid = document.getElementById('barKitchenGrid');
+  if (!grid) return;
+  grid.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:20px">Loading kitchen queue...</div>';
+  try {
+    const res = await fetch(API() + '/api/bar/kitchen', { headers: H() });
+    const data = await res.json();
+    const items = data.items || [];
+    if (!items.length) {
+      grid.innerHTML = '<div style="grid-column:1/-1;color:var(--muted);font-size:13px;padding:20px;text-align:center">Nothing pending. 🎉</div>';
+      return;
+    }
+    const nextStatus = { pending: 'preparing', preparing: 'ready', ready: 'served' };
+    const nextLabel = { pending: 'Start Preparing', preparing: 'Mark Ready', ready: 'Mark Served' };
+    grid.innerHTML = items.map(i => {
+      const nxt = nextStatus[i.status];
+      const btnHtml = nxt ? '<button class="btn btn-sm btn-primary" style="width:100%" onclick="updateItemStatus(' + i.id + ', \'' + nxt + '\')">' + nextLabel[i.status] + '</button>' : '';
+      return '<div class="card" style="padding:16px">' +
+        '<div style="font-weight:700">' + i.item_name + '</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin:4px 0">Qty ' + i.quantity + ' · ' + (i.table_number ? 'Table ' + i.table_number : '—') + '</div>' +
+        '<div style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--warn);margin-bottom:10px">' + i.status + '</div>' +
+        btnHtml +
+      '</div>';
+    }).join('');
+  } catch (e) { grid.innerHTML = '<div style="color:var(--danger);font-size:13px;padding:20px">Failed to load kitchen queue.</div>'; }
+}
+
+async function updateItemStatus(itemId, status) {
+  try {
+    const res = await fetch(API() + '/api/bar/order-items/' + itemId, {
+      method: 'PATCH', headers: H(), body: JSON.stringify({ status })
+    });
+    const data = await res.json();
+    if (data.success) { loadBarKitchen(); } else { showToast(data.message || 'Failed to update item', 'warn'); }
+  } catch (e) { showToast('Failed to update item', 'warn'); }
+}
 
 // ═══════════════════════════════════════════════════════════
 // INIT
