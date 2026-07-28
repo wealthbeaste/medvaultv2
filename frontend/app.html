@@ -4431,6 +4431,25 @@ function moduleEnabled(name) {
 function getBusinessType() {
   return (currentUser && currentUser.businessType) || 'pharmacy';
 }
+
+// ── Nav blacklist: these nav items are pharmacy/clinical-specific and
+// should not appear for non-pharmacy business types (e.g. Bar, Hotel).
+// Additive/non-destructive: pharmacy orgs are completely unaffected.
+const PHARMACY_ONLY_NAV_IDS = [
+  'navInventory','navVariance','navForecast','navExpiryIntel','navNDA',
+  'navDhis2','navPharmacovigilance','navHivTb','navSicklecell','navEfris','navTax',
+  'navPurchaseOrders','navWarehouse','navMargins','navPurchasing','navGRN','navReturns',
+  'navSuppliers','navPatients','navDoctors','navAppointments','navConsultations',
+  'navPrescriptions','navErx','navErxReferrals','navLabTests','navLabRequests',
+  'navWards','navAdmissions','navInsurance'
+];
+function hideNonPharmacyNavItems() {
+  if (getBusinessType() === 'pharmacy') return;
+  PHARMACY_ONLY_NAV_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+}
 const MODULE_UI_HOOKS = {
   hotel:       'showHotelDashboard',
   bar:         'showBarFeatures',
@@ -4444,6 +4463,7 @@ function applyModuleUI() {
       try { window[fnName](); } catch (e) { console.error('Module UI hook ' + fnName + ' failed:', e); }
     }
   }
+  hideNonPharmacyNavItems();
 }
 
 // ── Pagination state ────────────────────────────────────────
