@@ -1542,7 +1542,7 @@ async function createPharmacy() {
     ['newPharmName','newOwner','newPhone','newEmail','newLocation','newNDA']
       .forEach(id=>document.getElementById(id).value='');
     document.getElementById('newBusinessType').value = 'pharmacy';
-    toast(`✅ ${name} created! Temp password: ${r.data.temp_password}`);
+    showCredentialModal(`✅ ${name} created — Owner Password`, r.data.temp_password);
     await boot();
     go('pharmacies', document.querySelectorAll('.ni')[2]);
   } else {
@@ -1642,12 +1642,7 @@ async function resetPassword(id, name) {
   if (!confirm(`Reset password for "${name}"? A new password will be generated.`)) return;
   const r = await api(`/api/admin/users/${id}/reset-password`, {method:'POST'});
   if (r&&r.ok) {
-    toast(`🔑 New password for ${name}: ${r.data.new_password}`);
-    alert(`New password for ${name}:
-
-${r.data.new_password}
-
-Share this with the user securely.`);
+    showCredentialModal(`🔑 New Password — ${name}`, r.data.new_password);
   } else { toast('❌ '+(r?.data?.error||'Failed'),'err'); }
 }
 
@@ -1817,6 +1812,40 @@ async function sendBulkMessages() {
 }
 function editPlan(plan)           { toast(`✏️ ${plan} plan editor coming soon`); }
 function closeModal(id)           { document.getElementById(id).classList.remove('open'); }
+
+// ═══════════════════════════════════════════
+// CREDENTIAL MODAL — persistent password display with copy button.
+// Replaces fragile toast/alert-based password reveals, which could
+// disappear before the admin had a chance to copy them.
+// ═══════════════════════════════════════════
+function showCredentialModal(title, password) {
+  let o = document.getElementById('credModal');
+  if (!o) {
+    o = document.createElement('div');
+    o.id = 'credModal';
+    o.className = 'overlay';
+    o.onclick = function(e) { if (e.target === o) closeModal('credModal'); };
+    document.body.appendChild(o);
+  }
+  o.innerHTML = `
+    <div class="modal">
+      <div class="modal-title">${title}</div>
+      <div class="modal-sub">Copy this password now — it will not be shown again.</div>
+      <div style="background:rgba(0,229,176,0.08);border:1px solid rgba(0,229,176,0.25);border-radius:10px;padding:16px;margin:16px 0;font-family:monospace;font-size:16px;font-weight:700;text-align:center;letter-spacing:1px;word-break:break-all" id="credModalPwText">${password}</div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('credModal')">Close</button>
+        <button class="btn btn-accent" onclick="copyCredModalPw()">📋 Copy Password</button>
+      </div>
+    </div>`;
+  o.classList.add('open');
+}
+
+function copyCredModalPw() {
+  const txt = document.getElementById('credModalPwText').textContent;
+  navigator.clipboard.writeText(txt)
+    .then(() => toast('📋 Password copied!'))
+    .catch(() => toast('Could not copy — please select and copy manually', 'warn'));
+}
 
 // ═══════════════════════════════════════════
 // TOAST
