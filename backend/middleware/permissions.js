@@ -133,6 +133,10 @@ const PERMISSIONS = {
 
   // ── DHIS2 / MOH Reporting ─────────────────────────────────
   'dhis2:read':               ['owner', 'manager', 'pharmacist', 'doctor', 'nurse'],
+
+  // ── Bar module (Phase 4) ──────────────────────────────────
+  'bar:read':                 ['owner', 'manager', 'cashier', 'staff'],
+  'bar:write':                ['owner', 'manager', 'cashier', 'staff'],
 };
 
 function can(permission) {

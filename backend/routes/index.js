@@ -58,6 +58,9 @@ module.exports = function registerRoutes(app) {
   require('./hiv-tb')(app, deps);       // HIV/ART, PMTCT, TB program data entry (DHIS2 phase 4)
   require('./sicklecell')(app, deps);   // Sickle Cell screening — paid add-on module
   require('./pharmacovigilance')(app, deps); // NDA ADR/AEFI reporting
+
+  // Phase 4 — Bar module (multi-business SaaS)
+  require('./bar')(app, deps);          // tables, orders, kitchen — gated by modules.bar
   require('./efris')(app, deps);        // EFRIS / URA e-invoicing (via aggregator)
   require('./eprescriptions')(app, deps); // Portable QR e-prescriptions
 };
