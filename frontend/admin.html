@@ -775,6 +775,15 @@ img,svg,video{max-width:100%;}
       <div class="fg"><label class="fl">Location</label><input class="fi" id="newLocation" placeholder="e.g. Kampala Road"/></div>
       <div class="fg"><label class="fl">Plan</label><select class="fsel" id="newPlan"><option value="basic">Basic — UGX 20K/mo</option><option value="pro" selected>Pro — UGX 50K/mo</option><option value="enterprise">Enterprise — UGX 150K/mo</option></select></div>
       <div class="fg full"><label class="fl">NDA Registration Number (optional)</label><input class="fi" id="newNDA" placeholder="NDA/PH/2024/XXX"/></div>
+      <div class="fg full"><label class="fl">Business Type</label><select class="fsel" id="newBusinessType">
+        <option value="pharmacy" selected>Pharmacy</option>
+        <option value="supermarket">Supermarket</option>
+        <option value="hotel">Hotel</option>
+        <option value="bar">Bar</option>
+        <option value="hardware">Hardware</option>
+        <option value="retail_shop">Retail Shop</option>
+        <option value="wholesale_shop">Wholesale Shop</option>
+      </select></div>
     </div>
     <div style="background:rgba(0,229,176,0.06);border:1px solid rgba(0,229,176,0.15);border-radius:8px;padding:12px;font-size:12px;color:var(--muted2);margin-bottom:4px">
       💡 System will auto-generate login credentials and send them to the pharmacy's phone via SMS.
@@ -1422,6 +1431,20 @@ function renderActivity() {
 // ═══════════════════════════════════════════
 // ORG DETAIL MODAL
 // ═══════════════════════════════════════════
+async function toggleModule(orgId, moduleName, enabled) {
+  const r = await api(`/api/admin/orgs/${orgId}/modules`, {
+    method: 'PATCH',
+    body: JSON.stringify({ modules: { [moduleName]: enabled } })
+  });
+  if (r && r.ok) {
+    toast(`✅ ${moduleName} ${enabled ? 'enabled' : 'disabled'}`);
+    const o = orgs.find(x=>x.id===orgId);
+    if (o) o.modules = r.data.modules;
+  } else {
+    toast('❌ Failed to update module', 'err');
+  }
+}
+
 function openOrgDetail(id) {
   const o = orgs.find(x=>x.id===id);
   if (!o) return;
@@ -1440,6 +1463,7 @@ function openOrgDetail(id) {
       <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">DRUGS IN STOCK</div><div style="font-size:13px">${o.drug_count||0} types</div></div>
       <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">USERS</div><div style="font-size:13px">${o.user_count||0} staff</div></div>
       <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">TOTAL SALES</div><div style="font-size:13px">${o.sale_count||0} transactions</div></div>
+      <div style="background:var(--s2);border-radius:8px;padding:12px"><div style="font-size:10px;color:var(--muted);margin-bottom:4px">BUSINESS TYPE</div><div style="font-size:13px;text-transform:capitalize">${(o.business_type||'pharmacy').replace('_',' ')}</div></div>
     </div>
     <div style="background:var(--s2);border-radius:8px;padding:12px;margin-bottom:8px">
       <div style="font-size:10px;color:var(--muted);margin-bottom:4px">NDA REGISTRATION</div>
@@ -1452,9 +1476,20 @@ function openOrgDetail(id) {
         o.trial_ends_at ? 'Trial ends ' + new Date(o.trial_ends_at).toLocaleDateString() : '—'
       }${days!==null&&days<0?' ('+Math.abs(days)+' days overdue)':days!==null?' ('+days+' days left)':''}</div>
     </div>
-    <div style="background:var(--s2);border-radius:8px;padding:12px">
+    <div style="background:var(--s2);border-radius:8px;padding:12px;margin-bottom:8px">
       <div style="font-size:10px;color:var(--muted);margin-bottom:4px">JOINED</div>
       <div style="font-size:13px">${new Date(o.created_at).toLocaleDateString()}</div>
+    </div>
+    <div style="background:var(--s2);border-radius:8px;padding:12px">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:8px">MODULES</div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px">
+        ${['hotel','bar','supermarket','hardware','wholesale'].map(m=>`
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+            <input type="checkbox" ${(o.modules&&o.modules[m])?'checked':''} onchange="toggleModule(${o.id},'${m}',this.checked)"/>
+            ${m.charAt(0).toUpperCase()+m.slice(1)}
+          </label>
+        `).join('')}
+      </div>
     </div>`;
 
   // Build action buttons based on current status
@@ -1498,6 +1533,7 @@ async function createPharmacy() {
       location: document.getElementById('newLocation').value.trim(),
       plan: document.getElementById('newPlan').value,
       nda: document.getElementById('newNDA').value.trim(),
+      business_type: document.getElementById('newBusinessType').value,
     })
   });
   btn.textContent='Create Account & Send Login'; btn.disabled=false;
@@ -1505,6 +1541,7 @@ async function createPharmacy() {
     closeModal('addModal');
     ['newPharmName','newOwner','newPhone','newEmail','newLocation','newNDA']
       .forEach(id=>document.getElementById(id).value='');
+    document.getElementById('newBusinessType').value = 'pharmacy';
     toast(`✅ ${name} created! Temp password: ${r.data.temp_password}`);
     await boot();
     go('pharmacies', document.querySelectorAll('.ni')[2]);
