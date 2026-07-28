@@ -4383,6 +4383,28 @@ let payMethod = 'cash';
 let currentPage = 'dashboard';
 let editingDrugId = null;
 
+// MODULE LOADING (Phase 2)
+function moduleEnabled(name) {
+  return !!(currentUser && currentUser.modules && currentUser.modules[name]);
+}
+function getBusinessType() {
+  return (currentUser && currentUser.businessType) || 'pharmacy';
+}
+const MODULE_UI_HOOKS = {
+  hotel:       'showHotelDashboard',
+  bar:         'showBarFeatures',
+  supermarket: 'showLoyaltyModule',
+  hardware:    'showHardwareModule',
+  wholesale:   'showWholesaleModule',
+};
+function applyModuleUI() {
+  for (const [flag, fnName] of Object.entries(MODULE_UI_HOOKS)) {
+    if (moduleEnabled(flag) && typeof window[fnName] === 'function') {
+      try { window[fnName](); } catch (e) { console.error('Module UI hook ' + fnName + ' failed:', e); }
+    }
+  }
+}
+
 // ── Pagination state ────────────────────────────────────────
 let invPage = 1;
 const INV_PAGE_SIZE = 20;
@@ -4703,6 +4725,7 @@ async function boot(data) {
 
   // ── 3. Apply role-based nav — now that user is in localStorage ──
   applyRoleUI();
+  applyModuleUI();
 
   // ── 4. Navigate based on role ───────────────────────────
   const role = getRole();

@@ -88,7 +88,7 @@ module.exports = function registerAuthRoutes(app, { query, pool, hash, compare, 
       try {
         const result = await query(
           `SELECT u.id,u.name,u.email,u.password_hash,u.role,u.organisation_id,u.pharmacy_id,u.is_active,
-                  o.name as org_name,o.plan,p.name as pharmacy_name
+                  o.name as org_name,o.plan,o.business_type,p.name as pharmacy_name
            FROM users u
            JOIN organisations o ON o.id=u.organisation_id
            LEFT JOIN pharmacies p ON p.id=u.pharmacy_id
@@ -125,12 +125,19 @@ module.exports = function registerAuthRoutes(app, { query, pool, hash, compare, 
         const role = (user.role || 'staff').toLowerCase();
         const token = sign({ userId: user.id, orgId: user.organisation_id, pharmacyId: resolvedPharmacyId, role });
 
+        const modResult = await query(
+          `SELECT modules FROM subscriptions WHERE organisation_id=$1 ORDER BY created_at DESC LIMIT 1`,
+          [user.organisation_id]
+        );
+        const modules = modResult.rows.length ? (modResult.rows[0].modules || {}) : {};
+
         res.json({
           token,
           user: {
             id: user.id, name: user.name, email: user.email, role,
             orgId: user.organisation_id, orgName: user.org_name,
             pharmacyId: resolvedPharmacyId, pharmacyName: resolvedPharmacyName, plan: user.plan,
+            businessType: user.business_type || 'pharmacy', modules,
           },
         });
       } catch (e) {
@@ -143,8 +150,8 @@ module.exports = function registerAuthRoutes(app, { query, pool, hash, compare, 
     try {
       const result = await query(
         `SELECT u.id,u.name,u.email,u.role,u.organisation_id,u.pharmacy_id,
-                o.name as org_name,o.plan,p.name as pharmacy_name,p.address,p.is_head_office,
-                s.status as sub_status,s.trial_ends_at
+                o.name as org_name,o.plan,o.business_type,p.name as pharmacy_name,p.address,p.is_head_office,
+                s.status as sub_status,s.trial_ends_at,s.modules
          FROM users u
          JOIN organisations o ON o.id=u.organisation_id
          LEFT JOIN pharmacies p ON p.id=u.pharmacy_id
@@ -156,6 +163,8 @@ module.exports = function registerAuthRoutes(app, { query, pool, hash, compare, 
       const row = result.rows[0];
       // FIX: normalise role in /me response too
       row.role = (row.role || 'staff').toLowerCase();
+      row.business_type = row.business_type || 'pharmacy';
+      row.modules = row.modules || {};
       res.json({ user: row });
     } catch (e) {
       return err(res, 500, 'SERVER_ERROR', e.message);
