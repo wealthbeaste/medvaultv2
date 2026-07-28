@@ -1440,7 +1440,7 @@ img,svg,video{max-width:100%;}
         </div>
       </div>
 
-      <button class="btn btn-primary" onclick="handleTopBtn()">+ Add Drug</button>
+      <button class="btn btn-primary" id="topActionBtn" onclick="handleTopBtn()">+ Add Drug</button>
     </div>
   </div>
 
@@ -4459,6 +4459,28 @@ const PHARMACY_ONLY_NAV_IDS = [
 ];
 function hideNonPharmacyNavItems() {
   if (getBusinessType() === 'pharmacy') return;
+
+  if (getBusinessType() === 'bar') {
+    const canManageMenu = currentUser && ['owner', 'manager', 'super_admin'].includes(currentUser.role);
+    const invNav = document.getElementById('navInventory');
+    if (invNav) {
+      if (canManageMenu) {
+        invNav.querySelector('.nav-icon').textContent = '🍺';
+        invNav.childNodes[invNav.childNodes.length - 1].textContent = 'Bar Stock';
+        const badge = document.getElementById('lowBadge');
+        if (badge) badge.remove();
+        invNav.setAttribute('onclick', "go('bar', this); setTimeout(function(){ switchBarTab('menu'); }, 0);");
+      } else {
+        invNav.remove();
+      }
+    }
+    PHARMACY_ONLY_NAV_IDS.filter(id => id !== 'navInventory').forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.remove();
+    });
+    return;
+  }
+
   PHARMACY_ONLY_NAV_IDS.forEach(id => {
     const el = document.getElementById(id);
     if (el) el.remove();
@@ -5245,6 +5267,7 @@ function go(page, el) {
       : `<span class="pt-text">${part.trim()}</span>`
   ).join('');
   document.getElementById('tbTitle').innerHTML = `<div class="page-title">${titleHTML}</div><div class="page-sub">${m.s}</div>`;
+  updateTopActionBtn(page);
   loadPage(page);
 }
 
@@ -5287,7 +5310,11 @@ function loadPage(page) {
 }
 
 function handleTopBtn() {
-  if (currentPage === 'sales') {
+  if (currentPage === 'bar') {
+    const canManageMenu = currentUser && ['owner', 'manager', 'super_admin'].includes(currentUser.role);
+    if (!canManageMenu) { showToast('⛔ Not allowed', 'warn'); return; }
+    openAddMenuItemModal();
+  } else if (currentPage === 'sales') {
     document.getElementById('drugSrch').focus();
   } else if (currentPage === 'inventory') {
     if (!canManageDrugs()) { showToast('⛔ Not allowed', 'warn'); return; }
@@ -5295,6 +5322,21 @@ function handleTopBtn() {
   } else {
     go('inventory', document.querySelectorAll('.nav-item')[1]);
     if (canManageDrugs()) setTimeout(openAddDrugModal, 300);
+  }
+}
+
+function updateTopActionBtn(page) {
+  const btn = document.getElementById('topActionBtn');
+  if (!btn) return;
+  if (page === 'bar') {
+    const canManageMenu = currentUser && ['owner', 'manager', 'super_admin'].includes(currentUser.role);
+    btn.style.display = canManageMenu ? '' : 'none';
+    btn.textContent = '+ Add Menu Item';
+  } else if (page === 'inventory' && getBusinessType() === 'pharmacy') {
+    btn.style.display = '';
+    btn.textContent = '+ Add Drug';
+  } else {
+    btn.style.display = 'none';
   }
 }
 
@@ -5549,21 +5591,6 @@ function loadDashboard() {
     <tr><td><strong>${d.name}</strong></td><td>${d.quantity} units</td>
     <td><span class="pill ${d.stock_status}">${d.stock_status==='critical'?'Critical':'Low Stock'}</span></td></tr>
   `).join('') || '<tr><td colspan="3" style="text-align:center;padding:16px;color:var(--muted)">✅ All stock levels good!</td></tr>';
-}
-function handleTopBtn(){
-
-  const overlay = document.getElementById('addDrugOverlay');
-
-  if(overlay){
-    overlay.classList.add('open');
-  }else{
-    showToast('Add Drug modal not found','error');
-  }
-
-}
-function closeAddDrug(){
-  document.getElementById('addDrugOverlay')
-    ?.classList.remove('open');
 }
 // ═══════════════════════════════════════════════════════════
 // INVENTORY — reads from local storage
