@@ -4447,7 +4447,7 @@ function hideNonPharmacyNavItems() {
   if (getBusinessType() === 'pharmacy') return;
   PHARMACY_ONLY_NAV_IDS.forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.style.display = 'none';
+    if (el) el.remove();
   });
 }
 const MODULE_UI_HOOKS = {

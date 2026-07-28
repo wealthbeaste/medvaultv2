@@ -2037,7 +2037,35 @@ async function runMigrations() {
       status         VARCHAR(20) NOT NULL DEFAULT 'pending',
       created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`,
-    `CREATE INDEX IF NOT EXISTS idx_bar_order_items_order ON bar_order_items(order_id, status)`
+    `CREATE INDEX IF NOT EXISTS idx_bar_order_items_order ON bar_order_items(order_id, status)`,
+
+    // ── Bar menu catalog + stock (Phase 4, Step A) ──────────────
+    // Separate from bar_order_items.item_name (free text) so that
+    // orders can eventually reference a catalog item_id instead of
+    // typed text — matching how Toast/Square/Lightspeed structure
+    // menu catalog vs. stock tracking as two distinct concerns.
+    `CREATE TABLE IF NOT EXISTS bar_menu_items (
+      id             SERIAL PRIMARY KEY,
+      org_id         INTEGER NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
+      pharmacy_id    INTEGER NOT NULL REFERENCES pharmacies(id) ON DELETE CASCADE,
+      name           VARCHAR(255) NOT NULL,
+      category       VARCHAR(100),
+      price          NUMERIC(14,2) NOT NULL DEFAULT 0,
+      active         BOOLEAN NOT NULL DEFAULT true,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_bar_menu_items_pharmacy ON bar_menu_items(pharmacy_id, active)`,
+
+    `CREATE TABLE IF NOT EXISTS bar_stock (
+      id                  SERIAL PRIMARY KEY,
+      menu_item_id        INTEGER NOT NULL REFERENCES bar_menu_items(id) ON DELETE CASCADE,
+      quantity_on_hand    INTEGER NOT NULL DEFAULT 0,
+      low_stock_threshold INTEGER NOT NULL DEFAULT 5,
+      updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(menu_item_id)
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_bar_stock_menu_item ON bar_stock(menu_item_id)`
 
   ];
 

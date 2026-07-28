@@ -137,6 +137,7 @@ const PERMISSIONS = {
   // ── Bar module (Phase 4) ──────────────────────────────────
   'bar:read':                 ['owner', 'manager', 'cashier', 'staff'],
   'bar:write':                ['owner', 'manager', 'cashier', 'staff'],
+  'bar-menu:write':           ['owner', 'manager', 'super_admin'],
 };
 
 function can(permission) {
