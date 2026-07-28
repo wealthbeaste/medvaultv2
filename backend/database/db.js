@@ -1995,7 +1995,49 @@ async function runMigrations() {
     `ALTER TABLE pharmacies ADD COLUMN IF NOT EXISTS adr_counter INTEGER NOT NULL DEFAULT 0`,
 
     // MULTI-BUSINESS-TYPE SUPPORT (Phase 1)
-    `ALTER TABLE organisations ADD COLUMN IF NOT EXISTS business_type VARCHAR(50) NOT NULL DEFAULT 'pharmacy'`
+    `ALTER TABLE organisations ADD COLUMN IF NOT EXISTS business_type VARCHAR(50) NOT NULL DEFAULT 'pharmacy'`,
+
+    // =========================================================
+    // BAR MODULE (Phase 4) — gated by subscriptions.modules->>'bar'.
+    // Tables + Orders + Kitchen (kitchen is just order_items where
+    // status='pending', no separate table needed for that view).
+    // =========================================================
+    `CREATE TABLE IF NOT EXISTS bar_tables (
+      id             SERIAL PRIMARY KEY,
+      org_id         INTEGER NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
+      pharmacy_id    INTEGER NOT NULL REFERENCES pharmacies(id) ON DELETE CASCADE,
+      table_number   VARCHAR(20) NOT NULL,
+      capacity       INTEGER NOT NULL DEFAULT 4,
+      status         VARCHAR(20) NOT NULL DEFAULT 'available',
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_bar_tables_pharmacy ON bar_tables(pharmacy_id, status)`,
+
+    `CREATE TABLE IF NOT EXISTS bar_orders (
+      id             SERIAL PRIMARY KEY,
+      org_id         INTEGER NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
+      pharmacy_id    INTEGER NOT NULL REFERENCES pharmacies(id) ON DELETE CASCADE,
+      table_id       INTEGER REFERENCES bar_tables(id) ON DELETE SET NULL,
+      status         VARCHAR(20) NOT NULL DEFAULT 'open',
+      opened_by      INTEGER REFERENCES users(id),
+      opened_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      closed_at      TIMESTAMPTZ,
+      total_amount   NUMERIC(14,2) NOT NULL DEFAULT 0,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_bar_orders_pharmacy ON bar_orders(pharmacy_id, status)`,
+
+    `CREATE TABLE IF NOT EXISTS bar_order_items (
+      id             SERIAL PRIMARY KEY,
+      order_id       INTEGER NOT NULL REFERENCES bar_orders(id) ON DELETE CASCADE,
+      item_name      VARCHAR(255) NOT NULL,
+      quantity       INTEGER NOT NULL DEFAULT 1,
+      unit_price     NUMERIC(14,2) NOT NULL DEFAULT 0,
+      status         VARCHAR(20) NOT NULL DEFAULT 'pending',
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_bar_order_items_order ON bar_order_items(order_id, status)`
 
   ];
 
