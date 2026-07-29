@@ -245,16 +245,19 @@ async function sendDailyReports() {
 
   for (const pharmacy of pharmacies) {
     try {
-      const { drugs, todaySales, orders } = await getPharmacyReportData(pharmacy.id);
+      const { drugs, todaySales, orders, businessType, barOrdersToday, barLowStock, barOpenTabs } = await getPharmacyReportData(pharmacy.id);
+      pharmacy.businessType = businessType;
+      const isBar = businessType === 'bar';
+      const barRevenue = barOrdersToday.reduce((s,o) => s + parseFloat(o.total_amount||0), 0);
 
       const stats = {
-        revenueToday:      todaySales.reduce((s, x) => s + parseFloat(x.total_amount || 0), 0),
-        transactionsToday: todaySales.length,
-        pendingOrders:     orders.filter(o => o.order_status === 'pending').length,
+        revenueToday:      todaySales.reduce((s, x) => s + parseFloat(x.total_amount || 0), 0) + barRevenue,
+        transactionsToday: todaySales.length + barOrdersToday.length,
+        pendingOrders:     isBar ? barOpenTabs : orders.filter(o => o.order_status === 'pending').length,
       };
 
       const alerts = {
-        lowStock: drugs.filter(d => d.quantity <= d.threshold),
+        lowStock: isBar ? barLowStock : drugs.filter(d => d.quantity <= d.threshold),
         expiring: drugs.filter(d => {
           const days = Math.ceil((new Date(d.expiry_date) - new Date()) / 86400000);
           return days <= 30 && days >= 0;
@@ -265,7 +268,10 @@ async function sendDailyReports() {
       if (stats.revenueToday > 0 || alerts.lowStock.length > 0 || stats.pendingOrders > 0) {
         const msg = buildDailyReport(pharmacy, stats, alerts);
         const result = await sendWhatsApp(pharmacy.phone, msg);
-        if (result.success) sent++;
+        if (result.success) {
+          sent++;
+          await query(`INSERT INTO whatsapp_sends (pharmacy_id, type) VALUES ($1,'daily_report')`, [pharmacy.id]);
+        }
         else failed++;
       }
     } catch (err) {
@@ -283,12 +289,17 @@ async function sendLowStockAlerts() {
   const pharmacies = (await query(`SELECT * FROM pharmacies WHERE is_active=true`)).rows;
   let sent = 0;
   for (const pharmacy of pharmacies) {
-    const drugsRes = await query(`SELECT * FROM drugs WHERE pharmacy_id=$1`, [pharmacy.id]);
-    const critical = drugsRes.rows.filter(d => d.quantity <= d.threshold && d.quantity > 0);
+    const { drugs, businessType, barLowStock } = await getPharmacyReportData(pharmacy.id);
+    pharmacy.businessType = businessType;
+    const isBar = businessType === 'bar';
+    const critical = isBar ? barLowStock : drugs.filter(d => d.quantity <= d.threshold && d.quantity > 0);
     if (critical.length > 0) {
       const msg = buildLowStockAlert(pharmacy, critical);
       const result = await sendWhatsApp(pharmacy.phone, msg);
-      if (result.success) sent++;
+      if (result.success) {
+        sent++;
+        await query(`INSERT INTO whatsapp_sends (pharmacy_id, type) VALUES ($1,'low_stock')`, [pharmacy.id]);
+      }
     }
   }
   console.log(`✅ Low stock alerts: ${sent} sent`);
@@ -312,7 +323,10 @@ async function sendPaymentReminders() {
       const prices = { basic: 20000, pro: 50000, enterprise: 150000 };
       const msg = buildPaymentReminder(pharmacy, prices[sub.plan] || sub.amount, daysOverdue);
       const result = await sendWhatsApp(pharmacy.phone, msg);
-      if (result.success) sent++;
+      if (result.success) {
+        sent++;
+        await query(`INSERT INTO whatsapp_sends (pharmacy_id, type) VALUES ($1,'payment_reminder')`, [pharmacy.id]);
+      }
     }
   }
   console.log(`✅ Payment reminders: ${sent} sent`);
