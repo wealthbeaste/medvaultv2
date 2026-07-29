@@ -4795,6 +4795,7 @@ async function boot(data) {
     localStorage.setItem('mv_token', token);
     localStorage.setItem('mv_user', JSON.stringify(user));
   }
+  _notifs = JSON.parse(localStorage.getItem(_notifKey()) || '[]');
 
   // ── 1. Update sidebar UI ────────────────────────────────
   document.getElementById('userName').textContent   = user.name || user.pharmacyName || 'Pharmacy';
@@ -4936,12 +4937,19 @@ function activateGracePeriod() {
 // ═══════════════════════════════════════════════════════════
 // NOTIFICATION BELL
 // ═══════════════════════════════════════════════════════════
-let _notifs = JSON.parse(localStorage.getItem('mv_notifs') || '[]');
+function _notifKey() {
+  try {
+    const u = JSON.parse(localStorage.getItem('mv_user') || '{}');
+    return 'mv_notifs_' + (u.pharmacyId || u.orgId || 'anon');
+  } catch (e) { return 'mv_notifs_anon'; }
+}
+
+let _notifs = JSON.parse(localStorage.getItem(_notifKey()) || '[]');
 
 function _saveNotifs() {
   // Keep only the latest 40
   _notifs = _notifs.slice(0, 40);
-  localStorage.setItem('mv_notifs', JSON.stringify(_notifs));
+  localStorage.setItem(_notifKey(), JSON.stringify(_notifs));
 }
 
 function addNotif({ icon, type = 'info', msg, action }) {
@@ -5101,7 +5109,7 @@ function _timeAgo(ts) {
 
 /** Called after login and on a timer — scans drugs for alerts */
 function refreshNotifs() {
-  const drugs = MedVaultOffline.getDrugs ? MedVaultOffline.getDrugs() : [];
+  const drugs = (getBusinessType() === 'pharmacy' && MedVaultOffline.getDrugs) ? MedVaultOffline.getDrugs() : [];
   const now   = new Date();
   const today = now.toISOString().slice(0, 10);
   const in30  = new Date(now.getTime() + 30 * 86400000).toISOString().slice(0, 10);
