@@ -5518,7 +5518,8 @@ function loadDashboard() {
   document.getElementById('dTx').textContent   = stats.transactionsToday;
   document.getElementById('dLow').textContent  = stats.lowStockCount;
   document.getElementById('dExp').textContent  = stats.expiringCount;
-  document.getElementById('lowBadge').textContent = stats.lowStockCount;
+  const lowBadgeEl = document.getElementById('lowBadge');
+  if (lowBadgeEl) lowBadgeEl.textContent = stats.lowStockCount;
 
   // Then refresh from live API — ensures staff/new sessions always see real numbers
   fetch(API() + '/api/dashboard', { headers: H() })
@@ -5529,7 +5530,8 @@ function loadDashboard() {
       document.getElementById('dTx').textContent   = data.transactionsToday || 0;
       document.getElementById('dLow').textContent  = data.lowStockCount || 0;
       document.getElementById('dExp').textContent  = data.expiringCount || 0;
-      document.getElementById('lowBadge').textContent = data.lowStockCount || 0;
+      const lowBadgeEl2 = document.getElementById('lowBadge');
+      if (lowBadgeEl2) lowBadgeEl2.textContent = data.lowStockCount || 0;
       document.getElementById('dRevSub').textContent  = 'live data';
 
       // Update recent sales from live data

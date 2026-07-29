@@ -9,8 +9,16 @@ module.exports = function registerReportsRoutes(app, { query, auth, can }) {
     if (!pharmacyId) return err(res, 400, 'AUTH_NO_PHARMACY', 'No pharmacy assigned. Ask your owner to reassign you.', 'pharmacyId');
     try {
       const [rev, tx, low, exp, week, recent] = await Promise.all([
-        query(`SELECT COALESCE(SUM(total_amount),0) as rev FROM sales WHERE pharmacy_id=$1 AND voided_at IS NULL AND DATE(created_at)=CURRENT_DATE`, [pharmacyId]),
-        query(`SELECT COUNT(*) as cnt FROM sales WHERE pharmacy_id=$1 AND voided_at IS NULL AND DATE(created_at)=CURRENT_DATE`, [pharmacyId]),
+        query(`SELECT
+                 COALESCE((SELECT SUM(total_amount) FROM sales WHERE pharmacy_id=$1 AND voided_at IS NULL AND DATE(created_at)=CURRENT_DATE),0)
+                 +
+                 COALESCE((SELECT SUM(total_amount) FROM bar_orders WHERE pharmacy_id=$1 AND status='paid' AND DATE(closed_at)=CURRENT_DATE),0)
+                 as rev`, [pharmacyId]),
+        query(`SELECT
+                 (SELECT COUNT(*) FROM sales WHERE pharmacy_id=$1 AND voided_at IS NULL AND DATE(created_at)=CURRENT_DATE)
+                 +
+                 (SELECT COUNT(*) FROM bar_orders WHERE pharmacy_id=$1 AND status='paid' AND DATE(closed_at)=CURRENT_DATE)
+                 as cnt`, [pharmacyId]),
         query(`SELECT COUNT(*) as cnt FROM drugs WHERE pharmacy_id=$1 AND quantity<=threshold`, [pharmacyId]),
         query(`SELECT COUNT(*) as cnt FROM drugs WHERE pharmacy_id=$1 AND expiry_date IS NOT NULL AND expiry_date<=CURRENT_DATE+INTERVAL '30 days' AND expiry_date>=CURRENT_DATE`, [pharmacyId]),
         query(`SELECT DATE(created_at) as day,COALESCE(SUM(total_amount),0) as revenue FROM sales WHERE pharmacy_id=$1 AND voided_at IS NULL AND created_at>=CURRENT_DATE-INTERVAL '6 days' GROUP BY DATE(created_at) ORDER BY day`, [pharmacyId]),
