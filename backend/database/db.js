@@ -2069,7 +2069,14 @@ async function runMigrations() {
     `ALTER TABLE bar_order_items ADD COLUMN IF NOT EXISTS menu_item_id INTEGER REFERENCES bar_menu_items(id) ON DELETE SET NULL`,
     `ALTER TABLE bar_orders ADD COLUMN IF NOT EXISTS customer_name VARCHAR(255)`,
     `ALTER TABLE bar_orders ADD COLUMN IF NOT EXISTS customer_phone VARCHAR(50)`,
-    `ALTER TABLE bar_orders ADD COLUMN IF NOT EXISTS payment_method VARCHAR(30)`
+    `ALTER TABLE bar_orders ADD COLUMN IF NOT EXISTS payment_method VARCHAR(30)`,
+    `CREATE TABLE IF NOT EXISTS whatsapp_sends (
+      id SERIAL PRIMARY KEY,
+      pharmacy_id INTEGER NOT NULL REFERENCES pharmacies(id) ON DELETE CASCADE,
+      type VARCHAR(30) NOT NULL,
+      sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_whatsapp_sends_pharmacy ON whatsapp_sends(pharmacy_id, type, sent_at)`
 
   ];
 
