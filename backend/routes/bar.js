@@ -130,10 +130,13 @@ module.exports = function registerBarRoutes(app, { query, auth, can, audit, requ
 
   // Close/settle an order (mark paid) — table goes back to available
   app.post('/api/bar/orders/:id/close', auth, can('bar:write'), gate, async (req, res) => {
+    const b = req.body || {};
     try {
       const r = await query(
-        `UPDATE bar_orders SET status='paid', closed_at=NOW() WHERE id=$1 RETURNING *`,
-        [req.params.id]
+        `UPDATE bar_orders SET status='paid', closed_at=NOW(),
+                customer_name=$2, customer_phone=$3, payment_method=$4
+         WHERE id=$1 RETURNING *`,
+        [req.params.id, b.customer_name || null, b.customer_phone || null, b.payment_method || null]
       );
       if (!r.rows.length) return err(res, 404, 'NOT_FOUND', 'Order not found.');
       if (r.rows[0].table_id) {

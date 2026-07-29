@@ -2066,7 +2066,10 @@ async function runMigrations() {
       UNIQUE(menu_item_id)
     )`,
     `CREATE INDEX IF NOT EXISTS idx_bar_stock_menu_item ON bar_stock(menu_item_id)`,
-    `ALTER TABLE bar_order_items ADD COLUMN IF NOT EXISTS menu_item_id INTEGER REFERENCES bar_menu_items(id) ON DELETE SET NULL`
+    `ALTER TABLE bar_order_items ADD COLUMN IF NOT EXISTS menu_item_id INTEGER REFERENCES bar_menu_items(id) ON DELETE SET NULL`,
+    `ALTER TABLE bar_orders ADD COLUMN IF NOT EXISTS customer_name VARCHAR(255)`,
+    `ALTER TABLE bar_orders ADD COLUMN IF NOT EXISTS customer_phone VARCHAR(50)`,
+    `ALTER TABLE bar_orders ADD COLUMN IF NOT EXISTS payment_method VARCHAR(30)`
 
   ];
 

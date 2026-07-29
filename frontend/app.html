@@ -6742,6 +6742,7 @@ async function loadBarOrders() {
     const res = await fetch(API() + '/api/bar/orders?status=open', { headers: H() });
     const data = await res.json();
     const orders = data.orders || [];
+    barOrdersCache = orders;
     if (!orders.length) {
       body.innerHTML = '<tr><td colspan="5" style="color:var(--muted);font-size:13px;padding:16px;text-align:center">No open orders.</td></tr>';
       return;
@@ -6934,14 +6935,85 @@ async function submitBarPosOrder() {
 
 
 
-async function closeBarOrder(orderId) {
-  if (!confirm('Close and settle this order?')) return;
+let barOrdersCache = [];
+let barCheckoutPayMethod = 'cash';
+
+function closeBarOrder(orderId) {
+  const order = barOrdersCache.find(o => o.id === orderId);
+  if (!order) { showToast('Order not found', 'warn'); return; }
+  barCheckoutPayMethod = 'cash';
+  const items = order.items || [];
+  const total = Number(order.total_amount || 0);
+  showGenericModal(
+    '<div style="font-family:var(--display);font-weight:700;font-size:18px;margin-bottom:14px">Checkout — ' + (order.table_number ? 'Table ' + order.table_number : 'Order #' + order.id) + '</div>' +
+    '<div style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px">' +
+      '<div><label style="font-size:12px;color:var(--muted)">Customer Name (optional)</label>' +
+      '<input type="text" id="barCoName" class="input" placeholder="Walk-in" style="width:100%"></div>' +
+      '<div><label style="font-size:12px;color:var(--muted)">Phone (optional)</label>' +
+      '<input type="text" id="barCoPhone" class="input" placeholder="e.g. 0700000000" style="width:100%"></div>' +
+    '</div>' +
+    '<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Payment Method</div>' +
+    '<div class="pmethods" style="margin-bottom:16px">' +
+      '<div class="pm sel" onclick="selBarCoPay(this,\'cash\')" data-m="cash"><div class="pmi">💵</div>Cash</div>' +
+      '<div class="pm" onclick="selBarCoPay(this,\'mtn_momo\')" data-m="mtn_momo"><div class="pmi">📱</div>MTN MoMo</div>' +
+      '<div class="pm" onclick="selBarCoPay(this,\'airtel_money\')" data-m="airtel_money"><div class="pmi">📲</div>Airtel</div>' +
+    '</div>' +
+    '<div style="border-top:1px solid var(--border);padding-top:12px;margin-bottom:16px;display:flex;justify-content:space-between;font-weight:700">' +
+      '<span>Total (' + items.length + (items.length === 1 ? ' item' : ' items') + ')</span><span>UGX ' + total.toLocaleString() + '</span>' +
+    '</div>' +
+    '<div style="display:flex;gap:10px;justify-content:flex-end">' +
+      '<button class="btn btn-ghost" onclick="closeGenericModal()">Cancel</button>' +
+      '<button class="btn btn-primary" id="barCoSubmitBtn" onclick="submitBarCheckout(' + orderId + ')">Complete & Print Receipt</button>' +
+    '</div>'
+  );
+}
+
+function selBarCoPay(el, method) {
+  document.querySelectorAll('#genericOverlay .pm').forEach(m => m.classList.remove('sel'));
+  el.classList.add('sel');
+  barCheckoutPayMethod = method;
+}
+
+async function submitBarCheckout(orderId) {
+  const order = barOrdersCache.find(o => o.id === orderId);
+  if (!order) return;
+  const customer_name = document.getElementById('barCoName').value.trim() || 'Walk-in';
+  const customer_phone = document.getElementById('barCoPhone').value.trim();
+  const btn = document.getElementById('barCoSubmitBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Processing...'; }
   try {
-    const res = await fetch(API() + '/api/bar/orders/' + orderId + '/close', { method: 'POST', headers: H() });
+    const res = await fetch(API() + '/api/bar/orders/' + orderId + '/close', {
+      method: 'POST', headers: H(),
+      body: JSON.stringify({ customer_name, customer_phone, payment_method: barCheckoutPayMethod })
+    });
     const data = await res.json();
-    if (data.success) { showToast('✅ Order closed!'); loadBarOrders(); }
-    else { showToast(data.message || 'Failed to close order', 'warn'); }
-  } catch (e) { showToast('Failed to close order', 'warn'); }
+    if (!data.success) { showToast(data.message || 'Failed to close order', 'warn'); if (btn) { btn.disabled = false; btn.textContent = 'Complete & Print Receipt'; } return; }
+    closeGenericModal();
+    renderBarReceipt(order, customer_name, customer_phone, barCheckoutPayMethod);
+    loadBarOrders();
+  } catch (e) {
+    showToast('Failed to close order', 'warn');
+    if (btn) { btn.disabled = false; btn.textContent = 'Complete & Print Receipt'; }
+  }
+}
+
+function renderBarReceipt(order, customerName, customerPhone, payMethod) {
+  const items = order.items || [];
+  const total = Number(order.total_amount || 0);
+  const payLabels = { cash: 'Cash', mtn_momo: 'MTN MoMo', airtel_money: 'Airtel Money' };
+  document.getElementById('rNum').textContent = 'Bar Order #' + order.id;
+  document.getElementById('rDate').textContent = new Date().toLocaleDateString('en-UG', { dateStyle: 'medium' });
+  document.getElementById('rCust').textContent = customerName + (customerPhone ? ' · ' + customerPhone : '');
+  document.getElementById('rOfflineTag').innerHTML = '';
+  document.getElementById('rItems').innerHTML = items.map(i =>
+    '<div class="ri"><span>' + i.item_name + '</span><span style="text-align:center">' + i.quantity + '</span><span style="text-align:right">UGX ' + Number((i.unit_price || 0) * i.quantity).toLocaleString() + '</span></div>'
+  ).join('');
+  document.getElementById('rSub').textContent = 'UGX ' + total.toLocaleString();
+  document.getElementById('rDisc').textContent = 'None';
+  document.getElementById('rTot').textContent = 'UGX ' + total.toLocaleString();
+  document.getElementById('rPay').textContent = payLabels[payMethod] || payMethod;
+  document.getElementById('rDisp').textContent = (getCurrentUser()?.name) || currentUser?.name || '—';
+  document.getElementById('overlay').classList.add('open');
 }
 
 // ── KITCHEN ─────────────────────────────────────────────────
