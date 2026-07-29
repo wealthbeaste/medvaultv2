@@ -21,7 +21,13 @@ module.exports = function registerReportsRoutes(app, { query, auth, can }) {
                  as cnt`, [pharmacyId]),
         query(`SELECT COUNT(*) as cnt FROM drugs WHERE pharmacy_id=$1 AND quantity<=threshold`, [pharmacyId]),
         query(`SELECT COUNT(*) as cnt FROM drugs WHERE pharmacy_id=$1 AND expiry_date IS NOT NULL AND expiry_date<=CURRENT_DATE+INTERVAL '30 days' AND expiry_date>=CURRENT_DATE`, [pharmacyId]),
-        query(`SELECT DATE(created_at) as day,COALESCE(SUM(total_amount),0) as revenue FROM sales WHERE pharmacy_id=$1 AND voided_at IS NULL AND created_at>=CURRENT_DATE-INTERVAL '6 days' GROUP BY DATE(created_at) ORDER BY day`, [pharmacyId]),
+        query(`SELECT day, SUM(revenue) as revenue FROM (
+                 SELECT DATE(created_at) as day, total_amount as revenue FROM sales
+                 WHERE pharmacy_id=$1 AND voided_at IS NULL AND created_at>=CURRENT_DATE-INTERVAL '6 days'
+                 UNION ALL
+                 SELECT DATE(closed_at) as day, total_amount as revenue FROM bar_orders
+                 WHERE pharmacy_id=$1 AND status='paid' AND closed_at>=CURRENT_DATE-INTERVAL '6 days'
+               ) combined GROUP BY day ORDER BY day`, [pharmacyId]),
         query(`SELECT id,customer_name,total_amount,payment_method,created_at FROM sales WHERE pharmacy_id=$1 AND voided_at IS NULL ORDER BY created_at DESC LIMIT 5`, [pharmacyId]),
       ]);
       res.json({
