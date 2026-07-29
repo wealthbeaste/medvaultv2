@@ -350,14 +350,17 @@ function registerWhatsAppRoutes(app) {
     const pharmacy = pharmacyRes.rows[0];
     if (!pharmacy) return res.json({ error: 'Pharmacy not found' }, 404);
 
-    const { drugs, todaySales, orders } = await getPharmacyReportData(pharmacy.id);
+    const { drugs, todaySales, orders, businessType, barOrdersToday, barLowStock, barOpenTabs } = await getPharmacyReportData(pharmacy.id);
+    pharmacy.businessType = businessType;
+    const isBar = businessType === 'bar';
+    const barRevenue = barOrdersToday.reduce((s,o) => s + parseFloat(o.total_amount||0), 0);
     const stats  = {
-      revenueToday:      todaySales.reduce((s, x) => s + parseFloat(x.total_amount || 0), 0),
-      transactionsToday: todaySales.length,
-      pendingOrders:     orders.filter(o => o.order_status === 'pending').length,
+      revenueToday:      todaySales.reduce((s, x) => s + parseFloat(x.total_amount || 0), 0) + barRevenue,
+      transactionsToday: todaySales.length + barOrdersToday.length,
+      pendingOrders:     isBar ? barOpenTabs : orders.filter(o => o.order_status === 'pending').length,
     };
     const alerts = {
-      lowStock: drugs.filter(d => d.quantity <= d.threshold),
+      lowStock: isBar ? barLowStock : drugs.filter(d => d.quantity <= d.threshold),
       expiring: drugs.filter(d => {
         const days = Math.ceil((new Date(d.expiry_date) - new Date()) / 86400000);
         return days <= 30 && days >= 0;
@@ -366,6 +369,9 @@ function registerWhatsAppRoutes(app) {
 
     const msg    = buildDailyReport(pharmacy, stats, alerts);
     const result = await sendWhatsApp(pharmacy.phone, msg);
+    if (result.success) {
+      await query(`INSERT INTO whatsapp_sends (pharmacy_id, type) VALUES ($1,'daily_report')`, [pharmacy.id]);
+    }
 
     res.json({
       message: result.success ? '✅ Daily report sent!' : '❌ Failed to send',
@@ -385,6 +391,9 @@ function registerWhatsAppRoutes(app) {
     const items  = (await query(`SELECT * FROM order_items WHERE order_id=$1`, [orderId])).rows;
     const msg    = buildNewOrderAlert(pharmacy, order, items);
     const result = await sendWhatsApp(pharmacy.phone, msg);
+    if (result.success) {
+      await query(`INSERT INTO whatsapp_sends (pharmacy_id, type) VALUES ($1,'order_alert')`, [pharmacy.id]);
+    }
 
     res.json({ message: result.success ? '✅ Order alert sent!' : '❌ Failed', preview: msg });
   });
@@ -393,11 +402,16 @@ function registerWhatsAppRoutes(app) {
   app.post('/api/whatsapp/low-stock-alert/:pharmacyId', auth, async (req, res) => {
     const pharmacy = (await query(`SELECT * FROM pharmacies WHERE id=$1`, [parseInt(req.params.pharmacyId)])).rows[0];
     if (!pharmacy) return res.json({ error: 'Pharmacy not found' }, 404);
-    const drugs = (await query(`SELECT * FROM drugs WHERE pharmacy_id=$1`, [pharmacy.id])).rows;
-    const critical = drugs.filter(d => d.quantity <= d.threshold);
-    if (!critical.length) return res.json({ message: 'No low stock drugs', sent: false });
+    const { drugs, businessType, barLowStock } = await getPharmacyReportData(pharmacy.id);
+    pharmacy.businessType = businessType;
+    const isBar = businessType === 'bar';
+    const critical = isBar ? barLowStock : drugs.filter(d => d.quantity <= d.threshold);
+    if (!critical.length) return res.json({ message: isBar ? 'No low stock items' : 'No low stock drugs', sent: false });
     const msg    = buildLowStockAlert(pharmacy, critical);
     const result = await sendWhatsApp(pharmacy.phone, msg);
+    if (result.success) {
+      await query(`INSERT INTO whatsapp_sends (pharmacy_id, type) VALUES ($1,'low_stock')`, [pharmacy.id]);
+    }
     res.json({ message: result.success ? '✅ Alert sent!' : '❌ Failed', preview: msg });
   });
 
@@ -413,6 +427,9 @@ function registerWhatsAppRoutes(app) {
     const amount   = prices[sub?.plan] || 50000;
     const msg      = buildPaymentReminder(pharmacy, amount, 0);
     const result   = await sendWhatsApp(pharmacy.phone, msg);
+    if (result.success) {
+      await query(`INSERT INTO whatsapp_sends (pharmacy_id, type) VALUES ($1,'payment_reminder')`, [pharmacy.id]);
+    }
     res.json({ message: result.success ? '✅ Reminder sent!' : '❌ Failed', preview: msg });
   });
 
@@ -426,10 +443,34 @@ function registerWhatsAppRoutes(app) {
   app.get('/api/whatsapp/preview/:pharmacyId', auth, async (req, res) => {
     const pharmacy = (await query(`SELECT * FROM pharmacies WHERE id=$1`, [parseInt(req.params.pharmacyId)])).rows[0];
     if (!pharmacy) return res.json({ error: 'Not found' }, 404);
-    const { drugs, todaySales, orders } = await getPharmacyReportData(pharmacy.id);
-    const stats  = { revenueToday: todaySales.reduce((s,x) => s+parseFloat(x.total_amount||0),0), transactionsToday: todaySales.length, pendingOrders: orders.filter(o=>o.order_status==='pending').length };
-    const alerts = { lowStock: drugs.filter(d=>d.quantity<=d.threshold), expiring: drugs.filter(d=>{ const days=Math.ceil((new Date(d.expiry_date)-new Date())/86400000); return days<=30&&days>=0; }) };
+    const { drugs, todaySales, orders, businessType, barOrdersToday, barLowStock, barOpenTabs } = await getPharmacyReportData(pharmacy.id);
+    pharmacy.businessType = businessType;
+    const isBar = businessType === 'bar';
+    const barRevenue = barOrdersToday.reduce((s,o) => s + parseFloat(o.total_amount||0), 0);
+    const stats  = { revenueToday: todaySales.reduce((s,x) => s+parseFloat(x.total_amount||0),0) + barRevenue, transactionsToday: todaySales.length + barOrdersToday.length, pendingOrders: isBar ? barOpenTabs : orders.filter(o=>o.order_status==='pending').length };
+    const alerts = { lowStock: isBar ? barLowStock : drugs.filter(d=>d.quantity<=d.threshold), expiring: drugs.filter(d=>{ const days=Math.ceil((new Date(d.expiry_date)-new Date())/86400000); return days<=30&&days>=0; }) };
     res.json({ phone: pharmacy.phone, preview: buildDailyReport(pharmacy, stats, alerts) });
+  });
+
+  // New WhatsApp send-count stats for the dashboard cards
+  app.get('/api/whatsapp/stats/:pharmacyId', auth, async (req, res) => {
+    const pharmacyId = parseInt(req.params.pharmacyId);
+    const r = await query(
+      `SELECT
+         COUNT(*) FILTER (WHERE type='daily_report' AND sent_at >= date_trunc('month', now())) as reports_sent,
+         COUNT(*) FILTER (WHERE type='order_alert' AND sent_at >= date_trunc('month', now())) as order_alerts,
+         COUNT(*) FILTER (WHERE type='low_stock' AND sent_at >= now() - interval '7 days') as stock_alerts,
+         COUNT(*) FILTER (WHERE type='payment_reminder') as payment_reminders
+       FROM whatsapp_sends WHERE pharmacy_id=$1`,
+      [pharmacyId]
+    );
+    const row = r.rows[0] || {};
+    res.json({
+      reportsSentThisMonth: parseInt(row.reports_sent || 0),
+      orderAlertsAutoSent: parseInt(row.order_alerts || 0),
+      stockAlertsThisWeek: parseInt(row.stock_alerts || 0),
+      paymentRemindersSent: parseInt(row.payment_reminders || 0),
+    });
   });
 
   console.log('✅ WhatsApp routes registered');
