@@ -100,15 +100,16 @@ async function sendWhatsApp(phone, message) {
 
 // Daily summary report — sent every evening at 8 PM
 function buildDailyReport(pharmacy, stats, alerts) {
+  const isBar = pharmacy.businessType === 'bar';
   const lines = [
-    `💊 *MedVault Daily Report*`,
+    isBar ? `🍺 *MedVault Daily Report*` : `💊 *MedVault Daily Report*`,
     `📍 *${pharmacy.name}*`,
     `📅 ${new Date().toLocaleDateString('en-UG', { weekday: 'long', day: 'numeric', month: 'long' })}`,
     ``,
     `📊 *Today's Performance*`,
     `💰 Revenue: UGX ${Math.round(stats.revenueToday).toLocaleString()}`,
     `🧾 Transactions: ${stats.transactionsToday}`,
-    `🛒 Online Orders: ${stats.pendingOrders || 0} pending`,
+    isBar ? `🍺 Open Tabs: ${stats.pendingOrders || 0}` : `🛒 Online Orders: ${stats.pendingOrders || 0} pending`,
     ``,
   ];
 
@@ -158,6 +159,7 @@ function buildNewOrderAlert(pharmacy, order, items) {
 
 // Low stock warning — sent when any drug drops below threshold
 function buildLowStockAlert(pharmacy, drugs) {
+  const isBar = pharmacy.businessType === 'bar';
   const list = drugs.map(d =>
     `  ⚠️ ${d.name}: *${d.quantity} units* (min: ${d.threshold})`
   ).join('\n');
@@ -165,7 +167,7 @@ function buildLowStockAlert(pharmacy, drugs) {
     `📦 *Low Stock Warning*`,
     `📍 ${pharmacy.name}`,
     ``,
-    `These drugs need restocking:`,
+    isBar ? `These items need restocking:` : `These drugs need restocking:`,
     list,
     ``,
     `Manage inventory: https://app.medvault.ug`,
