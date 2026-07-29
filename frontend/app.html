@@ -1457,11 +1457,11 @@ img,svg,video{max-width:100%;}
       <div class="card"><div class="card-head"><div class="card-title">Recent Sales</div><a class="see-all" onclick="go('sales',document.querySelectorAll('.nav-item')[2])">See all →</a></div><table class="tbl"><thead><tr><th>Customer</th><th>Amount</th><th>Method</th><th></th></tr></thead><tbody id="recentSalesBody"></tbody></table></div>
     </div>
     <div class="two-col">
-      <div class="card"><div class="card-head"><div class="card-title">Stock Alerts</div><a class="see-all" onclick="go('inventory',document.querySelectorAll('.nav-item')[1])">Manage →</a></div><table class="tbl"><thead><tr><th>Drug</th><th>Stock</th><th>Status</th></tr></thead><tbody id="alertsBody"></tbody></table></div>
+      <div class="card"><div class="card-head"><div class="card-title" id="stockAlertsTitle">Stock Alerts</div><a class="see-all" id="stockAlertsSeeAll" onclick="go('inventory',document.querySelectorAll('.nav-item')[1])">Manage →</a></div><table class="tbl"><thead><tr id="alertsTheadRow"><th>Drug</th><th>Stock</th><th>Status</th></tr></thead><tbody id="alertsBody"></tbody></table></div>
       <div class="card"><div class="card-head"><div class="card-title">Quick Actions</div></div><div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <div onclick="go('sales',document.querySelectorAll('.nav-item')[2])" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;text-align:center;transition:all 0.2s" onmouseover="this.style.borderColor='rgba(0,212,170,0.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.07)'"><div style="font-size:22px;margin-bottom:5px">🧾</div><div style="font-size:13px;font-weight:500">New Sale</div></div>
+        <div id="qaNewSale" onclick="go('sales',document.querySelectorAll('.nav-item')[2])" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;text-align:center;transition:all 0.2s" onmouseover="this.style.borderColor='rgba(0,212,170,0.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.07)'"><div style="font-size:22px;margin-bottom:5px">🧾</div><div style="font-size:13px;font-weight:500">New Sale</div></div>
         <div onclick="go('orders',document.querySelectorAll('.nav-item')[3])" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;text-align:center;transition:all 0.2s" onmouseover="this.style.borderColor='rgba(0,212,170,0.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.07)'"><div style="font-size:22px;margin-bottom:5px">🛒</div><div style="font-size:13px;font-weight:500">Orders</div></div>
-        <div onclick="go('inventory',document.querySelectorAll('.nav-item')[1])" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;text-align:center;transition:all 0.2s" onmouseover="this.style.borderColor='rgba(0,212,170,0.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.07)'"><div style="font-size:22px;margin-bottom:5px">📦</div><div style="font-size:13px;font-weight:500">Inventory</div></div>
+        <div id="qaInventory" onclick="go('inventory',document.querySelectorAll('.nav-item')[1])" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;text-align:center;transition:all 0.2s" onmouseover="this.style.borderColor='rgba(0,212,170,0.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.07)'"><div style="font-size:22px;margin-bottom:5px">📦</div><div style="font-size:13px;font-weight:500">Inventory</div></div>
         <div onclick="go('whatsapp',document.querySelectorAll('.nav-item')[6])" style="background:rgba(37,211,102,0.08);border:1px solid rgba(37,211,102,0.2);border-radius:12px;padding:16px;cursor:pointer;text-align:center;transition:all 0.2s"><div style="font-size:22px;margin-bottom:5px">💬</div><div style="font-size:13px;font-weight:500;color:#25d366">WhatsApp</div></div>
       </div></div>
     </div>
@@ -4828,6 +4828,7 @@ async function boot(data) {
   // ── 3. Apply role-based nav — now that user is in localStorage ──
   applyRoleUI();
   applyModuleUI();
+  applyDashboardBusinessType();
 
   // ── 4. Navigate based on role ───────────────────────────
   const role = getRole();
@@ -5336,6 +5337,54 @@ function handleTopBtn() {
   }
 }
 
+function applyDashboardBusinessType() {
+  if (getBusinessType() !== 'bar') return;
+
+  const title = document.getElementById('stockAlertsTitle');
+  if (title) title.textContent = 'Bar Stock Alerts';
+
+  const seeAll = document.getElementById('stockAlertsSeeAll');
+  if (seeAll) seeAll.setAttribute('onclick', "go('bar', document.getElementById('navBar')); setTimeout(function(){ switchBarTab('menu'); }, 0);");
+
+  const theadRow = document.getElementById('alertsTheadRow');
+  if (theadRow) theadRow.innerHTML = '<th>Item</th><th>Stock</th><th>Status</th>';
+
+  const qaNewSale = document.getElementById('qaNewSale');
+  if (qaNewSale) {
+    qaNewSale.setAttribute('onclick', "go('bar', document.getElementById('navBar'))");
+    const lbl = qaNewSale.querySelector('div:last-child');
+    if (lbl) lbl.textContent = 'New Order';
+  }
+
+  const qaInventory = document.getElementById('qaInventory');
+  if (qaInventory) {
+    qaInventory.setAttribute('onclick', "go('bar', document.getElementById('navBar')); setTimeout(function(){ switchBarTab('menu'); }, 0);");
+    const lbl2 = qaInventory.querySelector('div:last-child');
+    if (lbl2) lbl2.textContent = 'Bar Stock';
+  }
+}
+
+async function loadBarStockAlerts() {
+  const body = document.getElementById('alertsBody');
+  if (!body) return;
+  try {
+    const res = await fetch(API() + '/api/bar/menu-items', { headers: H() });
+    const data = await res.json();
+    const items = (data.items || []).filter(i => i.active && i.quantity_on_hand !== undefined && i.quantity_on_hand !== null && i.quantity_on_hand <= (i.low_stock_threshold || 0));
+    if (!items.length) {
+      body.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:16px;color:var(--muted)">✅ All stock levels good!</td></tr>';
+      return;
+    }
+    body.innerHTML = items.slice(0,5).map(i => {
+      const critical = i.quantity_on_hand <= Math.floor((i.low_stock_threshold||0) * 0.5);
+      return '<tr><td><strong>' + i.name + '</strong></td><td>' + i.quantity_on_hand + ' units</td>' +
+        '<td><span class="pill ' + (critical ? 'critical' : 'low') + '">' + (critical ? 'Critical' : 'Low Stock') + '</span></td></tr>';
+    }).join('');
+  } catch (e) {
+    body.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:16px;color:var(--danger)">Failed to load stock alerts.</td></tr>';
+  }
+}
+
 function updateTopActionBtn(page) {
   const btn = document.getElementById('topActionBtn');
   if (!btn) return;
@@ -5599,11 +5648,15 @@ function loadDashboard() {
   `).join('') || '<tr><td colspan="4" style="text-align:center;padding:16px;color:var(--muted)">No sales yet today</td></tr>';
 
   // Alerts
-  const lowStock = drugs.filter(d => d.quantity <= (d.threshold||20));
-  document.getElementById('alertsBody').innerHTML = lowStock.slice(0,5).map(d => `
-    <tr><td><strong>${d.name}</strong></td><td>${d.quantity} units</td>
-    <td><span class="pill ${d.stock_status}">${d.stock_status==='critical'?'Critical':'Low Stock'}</span></td></tr>
-  `).join('') || '<tr><td colspan="3" style="text-align:center;padding:16px;color:var(--muted)">✅ All stock levels good!</td></tr>';
+  if (getBusinessType() === 'bar') {
+    loadBarStockAlerts();
+  } else {
+    const lowStock = drugs.filter(d => d.quantity <= (d.threshold||20));
+    document.getElementById('alertsBody').innerHTML = lowStock.slice(0,5).map(d => `
+      <tr><td><strong>${d.name}</strong></td><td>${d.quantity} units</td>
+      <td><span class="pill ${d.stock_status}">${d.stock_status==='critical'?'Critical':'Low Stock'}</span></td></tr>
+    `).join('') || '<tr><td colspan="3" style="text-align:center;padding:16px;color:var(--muted)">✅ All stock levels good!</td></tr>';
+  }
 }
 // ═══════════════════════════════════════════════════════════
 // INVENTORY — reads from local storage
