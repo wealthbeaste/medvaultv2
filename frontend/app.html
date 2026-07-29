@@ -3875,7 +3875,7 @@ Or open: https://app.medvault.ug</div>
 <div class="overlay" id="overlay" onclick="if(event.target===this)closeModal()">
   <div class="rmodal">
     <div class="rpaper" id="rcptPaper">
-      <div class="rtop"><div class="rlogo">💊 MedVault</div><div class="raddr" id="rPharmAddr">Kato Pharma · Kampala, Uganda</div></div>
+      <div class="rtop"><div class="rlogo" id="rLogo">💊 MedVault</div><div class="raddr" id="rPharmAddr">Kato Pharma · Kampala, Uganda</div></div>
       <hr class="rdiv"/>
       <div class="rmr"><span id="rNum"></span><span id="rDate"></span></div>
       <div class="rmr"><span>Customer: <strong id="rCust"></strong></span><span id="rOfflineTag"></span></div>
@@ -3890,7 +3890,7 @@ Or open: https://app.medvault.ug</div>
         <div class="rtr" style="margin-top:5px"><span>Payment</span><span id="rPay"></span></div>
         <div class="rtr" style="margin-top:5px"><span>Dispensed by</span><span id="rDisp" style="color:var(--muted)"></span></div>
       </div>
-      <div class="rfooter">Thank you for your purchase!<br>Keep medicines out of reach of children.<br><strong>MedVault</strong> · medvault.ug</div>
+      <div class="rfooter" id="rFooter">Thank you for your purchase!<br>Keep medicines out of reach of children.<br><strong>MedVault</strong> · medvault.ug</div>
     </div>
     <div class="ract"><button class="rabtn pr" onclick="printRcpt()">🖨️ Print</button><button class="rabtn cl" onclick="closeModal()">✕ Close</button></div>
   </div>
@@ -4450,6 +4450,7 @@ function getBusinessType() {
 // should not appear for non-pharmacy business types (e.g. Bar, Hotel).
 // Additive/non-destructive: pharmacy orgs are completely unaffected.
 const PHARMACY_ONLY_NAV_IDS = [
+  'navSales',
   'navInventory','navVariance','navForecast','navExpiryIntel','navNDA',
   'navDhis2','navPharmacovigilance','navHivTb','navSicklecell','navEfris','navTax',
   'navPurchaseOrders','navWarehouse','navMargins','navPurchasing','navGRN','navReturns',
@@ -6414,6 +6415,18 @@ function clearLocal() {
 // RECEIPT
 // ═══════════════════════════════════════════════════════════
 function closeModal(){ document.getElementById('overlay').classList.remove('open'); }
+function setReceiptBranding(type) {
+  const logo = document.getElementById('rLogo');
+  const footer = document.getElementById('rFooter');
+  if (type === 'bar') {
+    if (logo) logo.textContent = '🍺 MedVault';
+    if (footer) footer.innerHTML = 'Cheers! See you again soon.<br><strong>MedVault</strong> · medvault.ug';
+  } else {
+    if (logo) logo.textContent = '💊 MedVault';
+    if (footer) footer.innerHTML = 'Thank you for your purchase!<br>Keep medicines out of reach of children.<br><strong>MedVault</strong> · medvault.ug';
+  }
+}
+
 function printRcpt(){
   const c=document.getElementById('rcptPaper').innerHTML;
   const w=window.open('','_blank','width=400,height=620');
@@ -7000,6 +7013,7 @@ async function submitBarCheckout(orderId) {
 }
 
 function renderBarReceipt(order, customerName, customerPhone, payMethod) {
+  setReceiptBranding('bar');
   const items = order.items || [];
   const total = Number(order.total_amount || 0);
   const payLabels = { cash: 'Cash', mtn_momo: 'MTN MoMo', airtel_money: 'Airtel Money' };
@@ -11020,6 +11034,7 @@ const _origCompleteSale = completeSale;
 function completeSale() {
   if (!canRecordSale()) { showToast('⛔ Not allowed', 'warn'); return; }
   if (!cart.length) return;
+  setReceiptBranding('pharmacy');
 
   const sub  = cart.reduce((s,c) => s + c.unit_price * c.quantity, 0);
   const disc = parseFloat(document.getElementById('discInp').value) || 0;
