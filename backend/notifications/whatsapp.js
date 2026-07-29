@@ -214,12 +214,26 @@ function buildPaymentReminder(pharmacy, amount, daysOverdue) {
 
 // Send daily report to all active pharmacies
 async function getPharmacyReportData(pharmacyId) {
-  const [drugsRes, salesRes, ordersRes] = await Promise.all([
+  const [drugsRes, salesRes, ordersRes, btRes, barOrdersRes, barStockRes, barOpenRes] = await Promise.all([
     query(`SELECT * FROM drugs WHERE pharmacy_id=$1`, [pharmacyId]),
     query(`SELECT * FROM sales WHERE pharmacy_id=$1 AND voided_at IS NULL AND DATE(created_at)=CURRENT_DATE`, [pharmacyId]),
     query(`SELECT * FROM orders WHERE pharmacy_id=$1`, [pharmacyId]),
+    query(`SELECT o.business_type FROM pharmacies p JOIN organisations o ON o.id=p.organisation_id WHERE p.id=$1`, [pharmacyId]),
+    query(`SELECT * FROM bar_orders WHERE pharmacy_id=$1 AND status='paid' AND DATE(closed_at)=CURRENT_DATE`, [pharmacyId]),
+    query(`SELECT bmi.name, bs.quantity_on_hand AS quantity, bs.low_stock_threshold AS threshold
+           FROM bar_stock bs JOIN bar_menu_items bmi ON bmi.id=bs.menu_item_id
+           WHERE bmi.pharmacy_id=$1 AND bmi.active=true AND bs.quantity_on_hand<=bs.low_stock_threshold`, [pharmacyId]),
+    query(`SELECT COUNT(*) as cnt FROM bar_orders WHERE pharmacy_id=$1 AND status='open'`, [pharmacyId]),
   ]);
-  return { drugs: drugsRes.rows, todaySales: salesRes.rows, orders: ordersRes.rows };
+  return {
+    drugs: drugsRes.rows,
+    todaySales: salesRes.rows,
+    orders: ordersRes.rows,
+    businessType: (btRes.rows[0] && btRes.rows[0].business_type) || 'pharmacy',
+    barOrdersToday: barOrdersRes.rows,
+    barLowStock: barStockRes.rows,
+    barOpenTabs: parseInt(barOpenRes.rows[0]?.cnt || 0),
+  };
 }
 
 async function sendDailyReports() {
