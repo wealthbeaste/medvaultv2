@@ -1364,7 +1364,7 @@ img,svg,video{max-width:100%;}
     <div class="nav-item" id="navAPLedger" onclick="go('ap-ledger',this)"><span class="nav-icon">📒</span>AP Ledger</div>
     <div class="nav-item" id="navPriceLevels" onclick="go('price-levels',this)"><span class="nav-icon">💹</span>Price Levels</div>
     <div class="nav-item" id="navSuppliers" onclick="go('suppliers',this)"><span class="nav-icon">🏬</span>Suppliers & Orders</div>
-    <div class="nav-label">Clinical</div>
+    <div class="nav-label" id="navLabelClinical">Clinical</div>
     <div class="nav-item" id="navPatients" onclick="go('patients',this)"><span class="nav-icon">🧑‍🤝‍🧑</span>Patients</div>
     <div class="nav-item" id="navDoctors" onclick="go('doctors',this)"><span class="nav-icon">🩺</span>Doctors</div>
     <div class="nav-item" id="navAppointments" onclick="go('appointments',this)"><span class="nav-icon">📅</span>Appointments</div>
@@ -1372,14 +1372,14 @@ img,svg,video{max-width:100%;}
     <div class="nav-item" id="navPrescriptions" onclick="go('prescriptions',this)"><span class="nav-icon">📝</span>Prescriptions</div>
     <div class="nav-item" id="navErx" onclick="go('erx',this)"><span class="nav-icon">🔗</span>E-Prescriptions</div>
     <div class="nav-item" id="navErxReferrals" onclick="go('erx-referrals',this)"><span class="nav-icon">📨</span>Referrals to Fulfill</div>
-    <div class="nav-label">Laboratory</div>
+    <div class="nav-label" id="navLabelLaboratory">Laboratory</div>
     <div class="nav-item" id="navLabTests" onclick="go('lab-tests',this)"><span class="nav-icon">🧪</span>Lab Tests</div>
     <div class="nav-item" id="navLabRequests" onclick="go('lab-requests',this)"><span class="nav-icon">🔬</span>Lab Requests</div>
-    <div class="nav-label">Hospital</div>
+    <div class="nav-label" id="navLabelHospital">Hospital</div>
     <div class="nav-item" id="navWards" onclick="go('wards',this)"><span class="nav-icon">🏥</span>Wards & Beds</div>
     <div class="nav-item" id="navAdmissions" onclick="go('admissions',this)"><span class="nav-icon">🛏️</span>Admissions</div>
     <div class="nav-item" id="navInsurance" onclick="go('insurance',this)"><span class="nav-icon">🛡️</span>Insurance</div>
-    <div class="nav-label">Enterprise</div>
+    <div class="nav-label" id="navLabelEnterprise">Enterprise</div>
     <div class="nav-item" id="navRegional" onclick="go('regional',this)"><span class="nav-icon">🌍</span>Regional Dashboard</div>
     <div class="nav-item" id="navAccounting" onclick="go('accounting',this)"><span class="nav-icon">📒</span>GL Accounting</div>
     <div class="nav-item" id="navDepartments" onclick="go('departments',this)"><span class="nav-icon">🏛️</span>Departments</div>
@@ -4455,7 +4455,9 @@ const PHARMACY_ONLY_NAV_IDS = [
   'navPurchaseOrders','navWarehouse','navMargins','navPurchasing','navGRN','navReturns',
   'navSuppliers','navPatients','navDoctors','navAppointments','navConsultations',
   'navPrescriptions','navErx','navErxReferrals','navLabTests','navLabRequests',
-  'navWards','navAdmissions','navInsurance'
+  'navWards','navAdmissions','navInsurance',
+  'navLabelClinical','navLabelLaboratory','navLabelHospital','navLabelEnterprise',
+  'navRegional','navAccounting','navDepartments'
 ];
 function hideNonPharmacyNavItems() {
   if (getBusinessType() === 'pharmacy') return;
