@@ -1992,10 +1992,10 @@ img,svg,video{max-width:100%;}
   <!-- WHATSAPP PAGE -->
   <div class="page" id="page-whatsapp">
     <div class="stats-grid" style="grid-template-columns:repeat(4,1fr)">
-      <div class="stat-card g"><div class="sh"><div class="sl">Reports Sent</div><div class="si ig">💬</div></div><div class="sv">47</div><div class="sc">this month</div></div>
-      <div class="stat-card b"><div class="sh"><div class="sl">Order Alerts</div><div class="si ib">🛒</div></div><div class="sv">23</div><div class="sc">auto-sent</div></div>
-      <div class="stat-card w"><div class="sh"><div class="sl">Stock Alerts</div><div class="si iw">⚠️</div></div><div class="sv">8</div><div class="sc">this week</div></div>
-      <div class="stat-card p"><div class="sh"><div class="sl">Pay Reminders</div><div class="si ip">💳</div></div><div class="sc" style="margin-top:8px;font-size:12px;color:var(--muted)">Sent by admin</div></div>
+      <div class="stat-card g"><div class="sh"><div class="sl">Reports Sent</div><div class="si ig">💬</div></div><div class="sv" id="waStatReportsSent">—</div><div class="sc">this month</div></div>
+      <div class="stat-card b"><div class="sh"><div class="sl">Order Alerts</div><div class="si ib">🛒</div></div><div class="sv" id="waStatOrderAlerts">—</div><div class="sc">auto-sent</div></div>
+      <div class="stat-card w"><div class="sh"><div class="sl">Stock Alerts</div><div class="si iw">⚠️</div></div><div class="sv" id="waStatStockAlerts">—</div><div class="sc">this week</div></div>
+      <div class="stat-card p"><div class="sh"><div class="sl">Pay Reminders</div><div class="si ip">💳</div></div><div class="sv" id="waStatPayReminders">—</div><div class="sc" style="margin-top:8px;font-size:12px;color:var(--muted)">Sent by admin</div></div>
     </div>
 
     <!-- Daily Report Preview -->
@@ -2017,8 +2017,8 @@ img,svg,video{max-width:100%;}
     <!-- Order Alert Preview -->
     <div class="wa-panel">
       <div class="wa-head">
-        <div class="wa-title">🛒 Order Alert Preview</div>
-        <span style="font-size:12px;color:var(--muted)">Sent instantly when customer orders</span>
+        <div class="wa-title" id="waOrderTitle">🛒 Order Alert Preview</div>
+        <span style="font-size:12px;color:var(--muted)" id="waOrderSubtitle">Sent instantly when customer orders</span>
       </div>
       <div class="wa-body">
         <div class="wa-preview" id="waOrderPreview">🛒 *New Order Received!*
@@ -2037,7 +2037,7 @@ img,svg,video{max-width:100%;}
 Reply *CONFIRM* to accept or *CANCEL* to reject.
 Or open: https://app.medvault.ug</div>
         <div class="wa-actions">
-          <button class="btn btn-ghost" onclick="toast('Order alerts fire automatically when customer places an order!')">ℹ️ Auto-fires on new orders</button>
+          <button class="btn btn-ghost" id="waOrderInfoBtn" onclick="toast('Order alerts fire automatically when customer places an order!')">ℹ️ Auto-fires on new orders</button>
         </div>
       </div>
     </div>
@@ -6325,10 +6325,43 @@ async function deleteCustomer(id, name) {
 // ═══════════════════════════════════════════════════════════
 // WHATSAPP PREVIEWS
 // ═══════════════════════════════════════════════════════════
+function applyWhatsAppBusinessType(isBar) {
+  const title = document.getElementById('waOrderTitle');
+  const subtitle = document.getElementById('waOrderSubtitle');
+  const preview = document.getElementById('waOrderPreview');
+  const infoBtn = document.getElementById('waOrderInfoBtn');
+  if (!title || !preview) return;
+  if (isBar) {
+    title.textContent = '🍺 New Order Alert Preview';
+    if (subtitle) subtitle.textContent = 'Sent instantly when a new bar order opens';
+    preview.textContent = '🍺 *New Order Opened!*\n\n🪑 Table: *4*\n🧑 Server: *Hassan*\n\n*Items ordered:*\n  • Nile Special × 4\n  • Waragi and Coke × 2\n\n💰 Total: UGX 36,000\n\nReply *CONFIRM* to acknowledge.\nOr open: https://app.medvault.ug';
+    if (infoBtn) infoBtn.setAttribute('onclick', "toast('Order alerts fire automatically when a new bar order opens!')");
+  } else {
+    title.textContent = '🛒 Order Alert Preview';
+    if (subtitle) subtitle.textContent = 'Sent instantly when customer orders';
+    preview.textContent = '🛒 *New Order Received!*\n\n👤 Customer: *Sarah Emong*\n📞 Phone: 0701445678\n📍 Delivery: Ntinda, Kampala\n💳 Payment: MTN MoMo\n\n*Items ordered:*\n  • Coartem (AL) 6-tabs × 1\n  • Paracetamol 500mg × 3\n\n💰 Total: UGX 17,000\n\nReply *CONFIRM* to accept or *CANCEL* to reject.\nOr open: https://app.medvault.ug';
+    if (infoBtn) infoBtn.setAttribute('onclick', "toast('Order alerts fire automatically when customer places an order!')");
+  }
+}
+
+async function loadWAStats() {
+  try {
+    const res = await fetch(MedVaultOffline.API_BASE + '/api/whatsapp/stats/' + (currentUser?.pharmacyId || 1), { headers: {'Authorization': 'Bearer ' + token} });
+    const data = await res.json();
+    const r = document.getElementById('waStatReportsSent'); if (r) r.textContent = data.reportsSentThisMonth ?? 0;
+    const o = document.getElementById('waStatOrderAlerts'); if (o) o.textContent = data.orderAlertsAutoSent ?? 0;
+    const s = document.getElementById('waStatStockAlerts'); if (s) s.textContent = data.stockAlertsThisWeek ?? 0;
+    const p = document.getElementById('waStatPayReminders'); if (p) p.textContent = data.paymentRemindersSent ?? 0;
+  } catch (e) { /* offline — leave placeholders */ }
+}
+
 async function loadWAPreview() {
   if (!token) return;
+  const isBar = getBusinessType() === 'bar';
+  applyWhatsAppBusinessType(isBar);
+  loadWAStats();
   try {
-    const res = await fetch(MedVaultOffline.API_BASE + '/api/whatsapp/preview/1', {
+    const res = await fetch(MedVaultOffline.API_BASE + '/api/whatsapp/preview/' + (currentUser?.pharmacyId || 1), {
       headers: {'Authorization': 'Bearer ' + token}
     });
     const data = await res.json();
@@ -6340,10 +6373,10 @@ async function loadWAPreview() {
   } catch(e) {
     // Offline fallback preview
     const stats = MedVaultOffline.getDashboardStats();
-    const drugs = MedVaultOffline.getDrugs();
+    const drugs = isBar ? [] : MedVaultOffline.getDrugs();
     const lowStock = drugs.filter(d=>d.quantity<=d.threshold);
     const preview = [
-      '💊 *MedVault Daily Report*',
+      isBar ? '🍺 *MedVault Daily Report*' : '💊 *MedVault Daily Report*',
       `📍 *${currentUser?.pharmacyName || 'Your Pharmacy'}*`,
       `📅 ${new Date().toLocaleDateString('en-UG',{weekday:'long',day:'numeric',month:'long'})}`,
       '',
@@ -6359,10 +6392,10 @@ async function loadWAPreview() {
   }
 
   // Stock alert preview
-  const drugs    = MedVaultOffline.getDrugs();
+  const drugs    = isBar ? [] : MedVaultOffline.getDrugs();
   const lowStock = drugs.filter(d => d.quantity <= (d.threshold||20));
   if (lowStock.length > 0) {
-    const stockMsg = ['📦 *Low Stock Warning*','','These drugs need restocking:',...lowStock.slice(0,5).map(d=>`  ⚠️ ${d.name}: *${d.quantity} units* (min: ${d.threshold||20})`),'','Manage inventory: https://app.medvault.ug'].join('\n');
+    const stockMsg = ['📦 *Low Stock Warning*','', isBar ? 'These items need restocking:' : 'These drugs need restocking:',...lowStock.slice(0,5).map(d=>`  ⚠️ ${d.name}: *${d.quantity} units* (min: ${d.threshold||20})`),'','Manage inventory: https://app.medvault.ug'].join('\n');
     document.getElementById('waStockPreview').innerHTML = stockMsg.replace(/\*(.+?)\*/g,'<strong>$1</strong>');
   } else {
     document.getElementById('waStockPreview').innerHTML = '✅ All stock levels are good! No alerts to send.';
@@ -6372,7 +6405,7 @@ async function loadWAPreview() {
 async function sendDailyNow() {
   showToast('📱 Sending daily report to your WhatsApp…');
   try {
-    const res = await fetch(MedVaultOffline.API_BASE+'/api/whatsapp/daily-report/1',{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'}});
+    const res = await fetch(MedVaultOffline.API_BASE+'/api/whatsapp/daily-report/' + (currentUser?.pharmacyId || 1),{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'}});
     const data = await res.json();
     showToast(data.sandbox ? '📱 Sandbox mode — check your server console! Set WA_ACCESS_TOKEN to send real messages.' : data.message, 'wa');
   } catch(e) { showToast('📴 Offline — cannot send WhatsApp right now','warn'); }
@@ -6381,7 +6414,7 @@ async function sendDailyNow() {
 async function sendStockAlertNow() {
   showToast('📱 Sending low stock alert…');
   try {
-    const res = await fetch(MedVaultOffline.API_BASE+'/api/whatsapp/low-stock-alert/1',{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'}});
+    const res = await fetch(MedVaultOffline.API_BASE+'/api/whatsapp/low-stock-alert/' + (currentUser?.pharmacyId || 1),{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'}});
     const data = await res.json();
     showToast(data.message || '✅ Alert sent!', 'wa');
   } catch(e) { showToast('📴 Offline — cannot send right now','warn'); }
