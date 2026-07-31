@@ -2070,6 +2070,60 @@ async function runMigrations() {
     `ALTER TABLE bar_orders ADD COLUMN IF NOT EXISTS customer_name VARCHAR(255)`,
     `ALTER TABLE bar_orders ADD COLUMN IF NOT EXISTS customer_phone VARCHAR(50)`,
     `ALTER TABLE bar_orders ADD COLUMN IF NOT EXISTS payment_method VARCHAR(30)`,
+
+    // ── Bar payments (Phase 4, Step B) ──────────────────────────
+    // A proper payment ledger rather than the single payment_method
+    // string on bar_orders — supports split/partial payments (cash +
+    // mobile money on one bill) and is also what the reporting
+    // endpoints below aggregate over. bar_orders.payment_method is
+    // kept as a legacy summary column (set to the method used, or
+    // 'split' when more than one method was used on the same bill).
+    `CREATE TABLE IF NOT EXISTS bar_payments (
+      id             SERIAL PRIMARY KEY,
+      order_id       INTEGER NOT NULL REFERENCES bar_orders(id) ON DELETE CASCADE,
+      pharmacy_id    INTEGER NOT NULL REFERENCES pharmacies(id) ON DELETE CASCADE,
+      method         VARCHAR(30) NOT NULL,
+      amount         NUMERIC(14,2) NOT NULL,
+      reference      VARCHAR(100),
+      tendered       NUMERIC(14,2),
+      change_due     NUMERIC(14,2),
+      received_by    INTEGER REFERENCES users(id),
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_bar_payments_order ON bar_payments(order_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_bar_payments_pharmacy ON bar_payments(pharmacy_id, created_at)`,
+
+    // Idempotency keys so a queued offline action that gets retried after
+    // a flaky connection (device sent it, never saw the response, retries
+    // on reconnect) doesn't add the same item twice or charge the same
+    // payment twice. Same pattern as sales.client_txn_id.
+    `ALTER TABLE bar_order_items ADD COLUMN IF NOT EXISTS client_txn_id VARCHAR(100)`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_bar_order_items_client_txn ON bar_order_items(order_id, client_txn_id) WHERE client_txn_id IS NOT NULL`,
+    `ALTER TABLE bar_payments ADD COLUMN IF NOT EXISTS client_txn_id VARCHAR(100)`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_bar_payments_client_txn ON bar_payments(order_id, client_txn_id) WHERE client_txn_id IS NOT NULL`,
+
+    // ── Manager approval PIN (Phase 4, Step C) ──────────────────
+    // A short PIN, separate from the account password, that an
+    // owner/manager types on the terminal to approve a discount or
+    // void without having to log the cashier out. Same hash() used
+    // for passwords (see core/password.js) — just a shorter secret.
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS pin_hash VARCHAR(255)`,
+
+    // ── Bar discounts + void audit trail (Phase 4, Step C) ──────
+    // Discounts are stored on the order (one discount per bill, not
+    // per line) and always require the approving manager's user id —
+    // never just a boolean — so reports can show who authorised what.
+    // Voided items are kept (not deleted) with the same audit fields,
+    // so a manager can later see exactly which items were voided,
+    // by whom, and who approved it.
+    `ALTER TABLE bar_orders ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(14,2) NOT NULL DEFAULT 0`,
+    `ALTER TABLE bar_orders ADD COLUMN IF NOT EXISTS discount_reason VARCHAR(255)`,
+    `ALTER TABLE bar_orders ADD COLUMN IF NOT EXISTS discount_approved_by INTEGER REFERENCES users(id)`,
+    `ALTER TABLE bar_order_items ADD COLUMN IF NOT EXISTS voided_at TIMESTAMPTZ`,
+    `ALTER TABLE bar_order_items ADD COLUMN IF NOT EXISTS voided_reason VARCHAR(255)`,
+    `ALTER TABLE bar_order_items ADD COLUMN IF NOT EXISTS voided_by INTEGER REFERENCES users(id)`,
+    `ALTER TABLE bar_order_items ADD COLUMN IF NOT EXISTS voided_approved_by INTEGER REFERENCES users(id)`,
+
     `CREATE TABLE IF NOT EXISTS whatsapp_sends (
       id SERIAL PRIMARY KEY,
       pharmacy_id INTEGER NOT NULL REFERENCES pharmacies(id) ON DELETE CASCADE,
