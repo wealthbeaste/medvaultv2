@@ -138,6 +138,9 @@ const PERMISSIONS = {
   'bar:read':                 ['owner', 'manager', 'cashier', 'staff'],
   'bar:write':                ['owner', 'manager', 'cashier', 'staff'],
   'bar-menu:write':           ['owner', 'manager', 'super_admin'],
+  'bar-payments:write':       ['owner', 'manager', 'cashier', 'staff'],
+  'bar-reports:read':         ['owner', 'manager'],
+  'bar-pin:write':            ['owner', 'manager', 'super_admin'],
 };
 
 function can(permission) {
