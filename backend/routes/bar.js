@@ -7,8 +7,52 @@ const err = require('./_err');
 // new tables (bar_tables, bar_orders, bar_order_items), no
 // existing pharmacy workflow is touched.
 // ============================================================
-module.exports = function registerBarRoutes(app, { query, auth, can, audit, requireModule }) {
+module.exports = function registerBarRoutes(app, { query, pool, auth, can, audit, requireModule, hash, compare }) {
   const gate = requireModule('bar');
+
+  // Any owner/manager at this pharmacy can approve — not just the one
+  // who happens to be logged in — since on a physical terminal it's
+  // whichever manager is on shift who punches their PIN in. Returns the
+  // approving manager's user id, or null if no PIN matched.
+  async function verifyManagerPin(pharmacyId, pin) {
+    if (!pin) return null;
+    const r = await query(
+      `SELECT id, pin_hash FROM users WHERE pharmacy_id=$1 AND role IN ('owner','manager') AND pin_hash IS NOT NULL AND is_active=true`,
+      [pharmacyId]
+    );
+    for (const u of r.rows) {
+      if (compare(String(pin), u.pin_hash)) return u.id;
+    }
+    return null;
+  }
+
+  // Single source of truth for total_amount: subtotal of non-voided
+  // items, minus the order's discount, floored at 0. Called inside
+  // every transaction that can change what's owed (add item, void
+  // item, apply discount) so the figure customers are charged and the
+  // figure reports aggregate can never drift apart.
+  async function recomputeOrderTotal(client, orderId) {
+    await client.query(
+      `UPDATE bar_orders SET total_amount = GREATEST(
+         (SELECT COALESCE(SUM(quantity * unit_price),0) FROM bar_order_items WHERE order_id=$1 AND voided_at IS NULL)
+         - discount_amount, 0)
+       WHERE id=$1`,
+      [orderId]
+    );
+  }
+
+  // ── MANAGER APPROVAL PIN ──────────────────────────────────
+  // Owner/manager sets a short PIN once; it's what gets typed on the
+  // terminal to approve a discount or void (see verifyManagerPin above).
+  app.post('/api/bar/manager-pin', auth, can('bar-pin:write'), gate, async (req, res) => {
+    const { userId } = req.user;
+    const pin = String(req.body?.pin || '');
+    if (!/^\d{4,6}$/.test(pin)) return err(res, 400, 'VALIDATION_INVALID', 'PIN must be 4-6 digits.', 'pin');
+    try {
+      await query(`UPDATE users SET pin_hash=$1 WHERE id=$2`, [hash(pin), userId]);
+      res.json({ success: true, message: 'Manager PIN set.' });
+    } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
+  });
 
   // ── TABLES ────────────────────────────────────────────────
   app.get('/api/bar/tables', auth, can('bar:read'), gate, async (req, res) => {
