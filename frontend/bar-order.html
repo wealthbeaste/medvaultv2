@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MedVault — Bar Ordering</title>
+<style>
+  :root { --bg:#0b0f14; --s1:#131a22; --border:#232c37; --text:#e8edf2; --muted:#8b98a5; --accent:#3aa6ff; --good:#2ecc71; --warn:#f5a623; --bad:#e74c3c; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,Segoe UI,Roboto,sans-serif; padding:20px; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  .sub { color:var(--muted); font-size:13px; margin-bottom:20px; }
+  .msg { font-size:13px; color:var(--warn); background:rgba(245,166,35,.1); border:1px solid rgba(245,166,35,.3); padding:10px 12px; border-radius:8px; margin-bottom:16px; }
+  .msg.good { color:var(--good); background:rgba(46,204,113,.1); border-color:rgba(46,204,113,.3); }
+  .msg.bad { color:var(--bad); background:rgba(231,76,60,.1); border-color:rgba(231,76,60,.3); }
+  .msg.locked { color:var(--muted); background:var(--s1); border-color:var(--border); }
+  a.login-link { color:var(--accent); }
+  .bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:16px; }
+  .bar button { background:var(--accent); border:none; color:#04101c; font-weight:600; padding:9px 16px; border-radius:8px; cursor:pointer; font-size:13px; }
+  .bar button.secondary { background:transparent; border:1px solid var(--border); color:var(--text); }
+  .bar button.danger { background:var(--bad); color:#fff; }
+  .bar button:disabled { opacity:.5; cursor:default; }
+  .layout { display:grid; grid-template-columns:1fr; gap:20px; }
+  @media (min-width:900px) { .layout { grid-template-columns: 1.1fr 1fr; align-items:start; } }
+  .card { background:var(--s1); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:16px; }
+  .section-title { font-size:14px; font-weight:700; margin:0 0 12px; }
+  .tables-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:10px; }
+  .table-tile { border:1px solid var(--border); border-radius:10px; padding:12px 10px; text-align:center; cursor:pointer; background:var(--bg); transition:border-color .15s; }
+  .table-tile:hover { border-color:var(--accent); }
+  .table-tile.selected { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+  .table-tile .num { font-size:18px; font-weight:700; }
+  .table-tile .cap { font-size:11px; color:var(--muted); }
+  .table-tile .status { font-size:10px; font-weight:600; margin-top:6px; padding:2px 8px; border-radius:20px; display:inline-block; }
+  .table-tile .status.available { background:rgba(46,204,113,.15); color:var(--good); }
+  .table-tile .status.occupied { background:rgba(245,166,35,.15); color:var(--warn); }
+  .new-table-form { display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+  .new-table-form input { background:var(--bg); border:1px solid var(--border); color:var(--text); padding:8px; border-radius:8px; font-size:13px; width:90px; }
+  .menu-cat { font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin:14px 0 6px; }
+  .menu-cat:first-child { margin-top:0; }
+  .menu-item { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 0; border-bottom:1px solid var(--border); }
+  .menu-item:last-child { border-bottom:none; }
+  .menu-item .name { font-size:13px; }
+  .menu-item .price { font-size:12px; color:var(--muted); }
+  .menu-item .stock-low { color:var(--bad); font-size:11px; }
+  .menu-item button { background:var(--accent); border:none; color:#04101c; font-weight:600; padding:6px 12px; border-radius:8px; cursor:pointer; font-size:12px; }
+  .order-line { display:flex; justify-content:space-between; font-size:13px; padding:6px 0; border-bottom:1px solid var(--border); }
+  .order-line:last-child { border-bottom:none; }
+  .order-line .qty { color:var(--muted); margin-right:6px; }
+  .total-row { display:flex; justify-content:space-between; font-size:16px; font-weight:700; margin-top:12px; padding-top:12px; border-top:1px solid var(--border); }
+  .balance-row { display:flex; justify-content:space-between; font-size:13px; color:var(--muted); margin-top:4px; }
+  .balance-row.due { color:var(--warn); }
+  .empty-hint { color:var(--muted); font-size:13px; padding:20px 0; text-align:center; }
+  .pay-panel { margin-top:14px; padding-top:14px; border-top:1px solid var(--border); }
+  .pay-panel .formgrid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
+  .pay-panel label { font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px; }
+  .pay-panel input, .pay-panel select { background:var(--bg); border:1px solid var(--border); color:var(--text); padding:8px; border-radius:8px; font-size:13px; font-family:inherit; }
+  .pay-panel .full { grid-column:1/-1; }
+  .change-note { font-size:12px; color:var(--good); margin:-4px 0 8px; }
+  .paid-list { margin-top:10px; }
+  .paid-list .row { display:flex; justify-content:space-between; font-size:12px; color:var(--muted); padding:4px 0; }
+  #barSyncBar { display:none; font-size:12px; font-weight:600; border:1px solid var(--border); border-radius:8px; padding:8px 12px; margin-bottom:14px; }
+  .item-action { font-size:11px; color:var(--muted); margin-left:8px; cursor:pointer; text-decoration:underline; }
+  .item-action:hover { color:var(--accent); }
+  .comp-tag { font-size:10px; color:var(--good); background:rgba(46,204,113,.12); padding:1px 6px; border-radius:5px; margin-left:4px; }
+  button.danger { background:var(--bad); color:#fff; }
+</style>
+</head>
+<body>
+
+<h1>Bar Ordering</h1>
+<div class="sub">Pick a table, add items from the menu, and settle the bill.
+  <a href="#" id="pinSetupLink" style="display:none; color:var(--accent);" onclick="event.preventDefault();setManagerPin()">Set manager PIN</a>
+</div>
+
+<div id="barSyncBar"></div>
+<div id="authMsg"></div>
+
+<div id="content" style="display:none;">
+
+  <div class="card">
+    <div class="section-title">Tables</div>
+    <div class="tables-grid" id="tablesGrid">Loading…</div>
+    <div class="new-table-form">
+      <input id="newTableNum" placeholder="Table #">
+      <input id="newTableCap" placeholder="Seats" value="4">
+      <button class="secondary" onclick="createTable()">+ Add table</button>
+    </div>
+  </div>
+
+  <div class="layout">
+    <!-- MENU -->
+    <div class="card">
+      <div class="section-title">Menu</div>
+      <div id="menuWrap">Select a table to start ordering.</div>
+    </div>
+
+    <!-- CURRENT ORDER -->
+    <div class="card">
+      <div class="section-title" id="orderTitle">Order</div>
+      <div id="orderWrap"><div class="empty-hint">No table selected.</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="./bar-offline.js"></script>
+<script>
+const BASE = window.location.origin;
+let selectedTable = null;   // full table row
+let currentOrder = null;    // full order row (with items[])
+let menuItems = [];
+
+function authHeaders() {
+  const token = localStorage.getItem('mv_token');
+  return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (token || '') };
+}
+
+// A real network failure (offline, DNS, dropped connection) makes fetch()
+// itself throw a TypeError. A server that responded but rejected the
+// request (403 locked, 409 conflict, etc.) throws a normal Error with the
+// server's message via api() below — those must NOT be treated as "go
+// offline", or a real validation error would silently vanish into the
+// sync queue instead of being shown to the user.
+class OfflineError extends Error {}
+
+async function apiOrOffline(path, opts) {
+  try {
+    return await api(path, opts);
+  } catch (e) {
+    if (e.message === 'locked') throw e;
+    if (e instanceof TypeError || !navigator.onLine) throw new OfflineError(e.message);
+    throw e;
+  }
+}
+
+function requireAuth() {
+  const token = localStorage.getItem('mv_token');
+  const el = document.getElementById('authMsg');
+  if (!token) {
+    el.innerHTML = '<div class="msg">Not logged in. <a class="login-link" href="./app.html">Log in to MedVault</a>, then come back to this page.</div>';
+    return false;
+  }
+  el.innerHTML = '';
+  return true;
+}
+
+function showLocked(errorMsg) {
+  document.getElementById('content').style.display = 'none';
+  document.getElementById('authMsg').innerHTML =
+    `<div class="msg locked">🔒 ${errorMsg || 'This module is not included in your subscription.'} Contact MedVault to add the Bar module.</div>`;
+}
+
+async function api(path, opts) {
+  const r = await fetch(BASE + path, { headers: authHeaders(), ...(opts || {}) });
+  if (r.status === 403) {
+    const d = await r.json().catch(() => ({}));
+    if (d.code === 'MODULE_NOT_ENABLED') { showLocked(d.error); throw new Error('locked'); }
+  }
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || ('Request failed (' + r.status + ')'));
+  return d;
+}
+
+// ── TABLES ──────────────────────────────────────────────
+function renderTablesGrid(tables) {
+  const grid = document.getElementById('tablesGrid');
+  document.getElementById('content').style.display = 'block';
+  if (!tables.length) { grid.innerHTML = '<div class="empty-hint">No tables yet — add one below.</div>'; return; }
+  grid.innerHTML = tables.map(t => `
+    <div class="table-tile ${selectedTable && selectedTable.id === t.id ? 'selected' : ''}" onclick="selectTable('${t.id}')">
+      <div class="num">#${t.table_number}${t._offline ? ' 📴' : ''}</div>
+      <div class="cap">${t.capacity} seats</div>
+      <div class="status ${t.status}">${t.status}</div>
+    </div>
+  `).join('');
+}
+
+async function loadTables() {
+  const grid = document.getElementById('tablesGrid');
+  try {
+    const d = await apiOrOffline('/api/bar/tables');
+    const tables = d.tables || [];
+    BarOffline.cacheTables(tables);
+    renderTablesGrid(tables);
+  } catch (e) {
+    if (e.message === 'locked') return;
+    if (e instanceof OfflineError) {
+      renderTablesGrid(BarOffline.getCachedTables());
+    } else {
+      grid.innerHTML = '<div class="msg bad">Failed to load tables.</div>';
+    }
+  }
+}
+
+async function createTable() {
+  const num = document.getElementById('newTableNum').value.trim();
+  const cap = parseInt(document.getElementById('newTableCap').value) || 4;
+  if (!num) return;
+  try {
+    await apiOrOffline('/api/bar/tables', { method: 'POST', body: JSON.stringify({ table_number: num, capacity: cap }) });
+  } catch (e) {
+    if (e.message === 'locked') return;
+    if (e instanceof OfflineError) {
+      BarOffline.createTableLocal(num, cap);
+    } else {
+      alert(e.message);
+      return;
+    }
+  }
+  document.getElementById('newTableNum').value = '';
+  loadTables();
+}
+
+async function selectTable(tableId) {
+  try {
+    const d = await apiOrOffline('/api/bar/tables');
+    selectedTable = (d.tables || []).find(t => String(t.id) === String(tableId)) || null;
+    BarOffline.cacheTables(d.tables || []);
+  } catch (e) {
+    if (e instanceof OfflineError) {
+      selectedTable = BarOffline.getCachedTables().find(t => String(t.id) === String(tableId)) || null;
+    } else {
+      return;
+    }
+  }
+  await loadTables();
+  await loadMenu();
+  await findOrOpenOrder();
+}
+
+// ── MENU ────────────────────────────────────────────────
+function renderMenu(wrap) {
+  if (!menuItems.length) { wrap.innerHTML = '<div class="empty-hint">No menu items yet. Add some from Admin → Bar Menu.</div>'; return; }
+  const byCat = {};
+  menuItems.forEach(m => { const c = m.category || 'Other'; (byCat[c] = byCat[c] || []).push(m); });
+  wrap.innerHTML = Object.keys(byCat).sort().map(cat => `
+    <div class="menu-cat">${cat}</div>
+    ${byCat[cat].map(m => `
+      <div class="menu-item">
+        <div>
+          <div class="name">${m.name}</div>
+          <div class="price">UGX ${Number(m.price).toLocaleString()}
+            ${m.quantity_on_hand != null && m.quantity_on_hand <= (m.low_stock_threshold || 0) ? `<span class="stock-low"> · low stock (${m.quantity_on_hand})</span>` : ''}
+          </div>
+        </div>
+        <button onclick="addItem('${m.id}')" ${!currentOrder ? 'disabled' : ''}>Add</button>
+      </div>
+    `).join('')}
+  `).join('');
+}
+
+async function loadMenu() {
+  const wrap = document.getElementById('menuWrap');
+  if (!selectedTable) { wrap.innerHTML = 'Select a table to start ordering.'; return; }
+  try {
+    const d = await apiOrOffline('/api/bar/menu-items');
+    menuItems = d.items || [];
+    BarOffline.cacheMenu(menuItems);
+    renderMenu(wrap);
+  } catch (e) {
+    if (e.message === 'locked') return;
+    if (e instanceof OfflineError) {
+      menuItems = BarOffline.getCachedMenu();
+      renderMenu(wrap);
+    } else {
+      wrap.innerHTML = '<div class="msg bad">Failed to load menu.</div>';
+    }
+  }
+}
+
+// ── ORDER (per table) ────────────────────────────────────
+async function findOrOpenOrder() {
+  const wrap = document.getElementById('orderWrap');
+  document.getElementById('orderTitle').textContent = 'Order — Table #' + selectedTable.table_number;
+  wrap.innerHTML = 'Loading…';
+  try {
+    const d = await apiOrOffline('/api/bar/orders?status=open');
+    const existing = (d.orders || []).find(o => String(o.table_id) === String(selectedTable.id));
+    if (existing) {
+      currentOrder = existing;
+      const pd = await apiOrOffline('/api/bar/orders/' + currentOrder.id + '/payments');
+      payments = pd.payments || [];
+    } else {
+      const created = await apiOrOffline('/api/bar/orders', { method: 'POST', body: JSON.stringify({ table_id: selectedTable.id }) });
+      currentOrder = { ...created.order, items: [] };
+      payments = [];
+    }
+    renderOrder();
+    loadMenu(); // re-render so Add buttons enable
+  } catch (e) {
+    if (e.message === 'locked') return;
+    if (e instanceof OfflineError) {
+      // Reuse a not-yet-synced local order for this table if one exists,
+      // otherwise start a brand new one entirely on-device.
+      currentOrder = BarOffline.findOpenLocalOrderForTable(selectedTable.id) || BarOffline.createOrderLocal(selectedTable.id);
+      payments = (currentOrder.payments || []);
+      renderOrder();
+      loadMenu();
+      return;
+    }
+    wrap.innerHTML = '<div class="msg bad">Failed to open order for this table.</div>';
+  }
+}
+
+let payments = []; // payments already recorded against currentOrder
+
+function renderOrder() {
+  const wrap = document.getElementById('orderWrap');
+  if (!currentOrder) { wrap.innerHTML = '<div class="empty-hint">No table selected.</div>'; return; }
+  const items = currentOrder.items || [];
+  const total = Number(currentOrder.total_amount || 0);
+  const paid = Number(currentOrder.paid_amount || 0);
+  const balance = currentOrder.balance_due != null ? Number(currentOrder.balance_due) : (total - paid);
+  const discountAmount = Number(currentOrder.discount_amount || 0);
+  const subtotal = items.reduce((s, i) => s + i.quantity * Number(i.unit_price), 0);
+  // Comp/void need a live manager-PIN check against the server, and once a
+  // payment has landed the bill math shouldn't move under it — so these
+  // only show for a synced order with items still unpaid.
+  const canAdjust = !currentOrder._offline && paid === 0;
+
+  wrap.innerHTML = `
+    ${currentOrder._offline ? '<div class="msg">📴 Saved on this device — will sync once you\'re back online.</div>' : ''}
+    ${items.length ? items.map(i => `
+      <div class="order-line">
+        <span><span class="qty">${i.quantity}×</span>${i.item_name}${i._offline ? ' 📴' : ''}${i.comped_at ? ' <span class="comp-tag">comped</span>' : ''}</span>
+        <span>
+          UGX ${(i.quantity * i.unit_price).toLocaleString()}
+          ${canAdjust && !i._offline && !i.comped_at ? `
+            <a class="item-action" onclick="compItem('${i.id}')">comp</a><a class="item-action" onclick="voidItem('${i.id}')">void</a>
+          ` : ''}
+        </span>
+      </div>
+    `).join('') : '<div class="empty-hint">No items added yet.</div>'}
+    ${discountAmount > 0 ? `
+      <div class="balance-row"><span>Subtotal</span><span>UGX ${subtotal.toLocaleString()}</span></div>
+      <div class="balance-row"><span>Discount${currentOrder.discount_reason ? ' · ' + currentOrder.discount_reason : ''}</span><span>-UGX ${discountAmount.toLocaleString()}</span></div>
+    ` : ''}
+    <div class="total-row"><span>Total</span><span>UGX ${total.toLocaleString()}</span></div>
+    ${paid > 0 ? `
+      <div class="balance-row"><span>Paid so far</span><span>UGX ${paid.toLocaleString()}</span></div>
+      <div class="balance-row due"><span>Balance due</span><span>UGX ${balance.toLocaleString()}</span></div>
+    ` : ''}
+    ${payments.length ? `<div class="paid-list">${payments.map(p => `
+      <div class="row"><span>${p.method.replace('_',' ')}${p.reference ? ' · ' + p.reference : ''}</span><span>UGX ${Number(p.amount).toLocaleString()}</span></div>
+    `).join('')}</div>` : ''}
+
+    ${items.length && balance > 0 ? `
+      <div class="pay-panel">
+        <div class="formgrid">
+          <label>Method
+            <select id="pay_method" onchange="onPayMethodChange()">
+              <option value="cash">Cash</option>
+              <option value="mobile_money">Mobile money</option>
+              <option value="card">Card</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+          <label>Amount
+            <input type="number" id="pay_amount" value="${balance}" min="0.01" step="0.01" max="${balance}">
+          </label>
+          <label id="pay_tendered_wrap">Cash tendered
+            <input type="number" id="pay_tendered" placeholder="e.g. amount handed over" min="0" step="0.01" oninput="updateChangeNote()">
+          </label>
+          <label>Reference <input id="pay_reference" placeholder="optional — txn ID"></label>
+        </div>
+        <div class="change-note" id="changeNote"></div>
+        <div id="payMsg"></div>
+        <div class="bar">
+          <button onclick="recordPayment()">Record payment</button>
+        </div>
+      </div>
+    ` : ''}
+    ${canAdjust && items.length ? `
+      <div class="bar" style="margin-top:14px;">
+        <button class="secondary" onclick="openDiscount()">Apply discount</button>
+        ${balance > 0 ? '<button class="danger" onclick="voidTabWithBalance()">Void tab (manager)</button>' : ''}
+      </div>
+    ` : ''}
+    ${!items.length ? `
+      <div class="bar" style="margin-top:14px;">
+        <button class="secondary" onclick="voidOrder()">Cancel / void table</button>
+      </div>
+    ` : ''}
+  `;
+}
+
+function onPayMethodChange() {
+  const method = document.getElementById('pay_method').value;
+  document.getElementById('pay_tendered_wrap').style.display = method === 'cash' ? 'flex' : 'none';
+  updateChangeNote();
+}
+
+function updateChangeNote() {
+  const method = document.getElementById('pay_method')?.value;
+  const note = document.getElementById('changeNote');
+  if (!note) return;
+  if (method !== 'cash') { note.textContent = ''; return; }
+  const amount = parseFloat(document.getElementById('pay_amount').value) || 0;
+  const tendered = parseFloat(document.getElementById('pay_tendered').value);
+  if (!isNaN(tendered) && tendered >= amount) {
+    note.textContent = 'Change due: UGX ' + (tendered - amount).toLocaleString();
+  } else {
+    note.textContent = '';
+  }
+}
+
+async function addItem(menuItemId) {
+  if (!currentOrder) return;
+  const menuItem = menuItems.find(m => String(m.id) === String(menuItemId));
+
+  // Order was already created locally (not yet synced) — go straight to
+  // the local path rather than hitting an order id the server doesn't
+  // know about yet.
+  if (currentOrder._offline) {
+    BarOffline.addItemLocal(currentOrder, menuItem, 1);
+    renderOrder();
+    loadMenu();
+    return;
+  }
+
+  try {
+    await apiOrOffline('/api/bar/orders/' + currentOrder.id + '/items', {
+      method: 'POST',
+      body: JSON.stringify({ menu_item_id: menuItemId, quantity: 1 })
+    });
+    // Refresh order + menu (stock counts change)
+    const d = await apiOrOffline('/api/bar/orders?status=open');
+    currentOrder = (d.orders || []).find(o => o.id === currentOrder.id) || currentOrder;
+    renderOrder();
+    loadMenu();
+  } catch (e) {
+    if (e.message === 'locked') return;
+    if (e instanceof OfflineError) {
+      BarOffline.addItemLocal(currentOrder, menuItem, 1);
+      renderOrder();
+      loadMenu();
+      return;
+    }
+    alert(e.message);
+  }
+}
+
+async function recordPayment() {
+  if (!currentOrder) return;
+  const msg = document.getElementById('payMsg');
+  const method = document.getElementById('pay_method').value;
+  const amount = parseFloat(document.getElementById('pay_amount').value);
+  const tendered = document.getElementById('pay_tendered').value;
+  const reference = document.getElementById('pay_reference').value;
+  if (!amount || amount <= 0) { msg.innerHTML = '<div class="msg bad">Enter a valid amount.</div>'; return; }
+  msg.innerHTML = 'Recording…';
+  const body = { method, amount, reference: reference || null };
+  if (method === 'cash' && tendered) body.tendered = parseFloat(tendered);
+
+  if (currentOrder._offline) {
+    const payment = BarOffline.recordPaymentLocal(currentOrder, body);
+    payments.push(payment);
+  } else {
+    try {
+      const d = await apiOrOffline('/api/bar/orders/' + currentOrder.id + '/payments', { method: 'POST', body: JSON.stringify(body) });
+      currentOrder = d.order;
+      payments.push(d.payment);
+    } catch (e) {
+      if (e.message === 'locked') return;
+      if (e instanceof OfflineError) {
+        const payment = BarOffline.recordPaymentLocal(currentOrder, body);
+        payments.push(payment);
+      } else {
+        msg.innerHTML = '<div class="msg bad">' + e.message + '</div>';
+        return;
+      }
+    }
+  }
+
+  {
+    if (currentOrder.status === 'paid') {
+      msg.innerHTML = '';
+      // Fully settled — clear the table selection and go back to the floor plan.
+      setTimeout(() => {
+        currentOrder = null; selectedTable = null; payments = [];
+        document.getElementById('orderTitle').textContent = 'Order';
+        document.getElementById('orderWrap').innerHTML = '<div class="empty-hint">No table selected.</div>';
+        document.getElementById('menuWrap').innerHTML = 'Select a table to start ordering.';
+        loadTables();
+      }, 500);
+      wrap_settled_message();
+    } else {
+      renderOrder();
+      loadMenu();
+    }
+  }
+}
+
+function wrap_settled_message() {
+  document.getElementById('orderWrap').innerHTML = '<div class="msg good">Bill fully settled — table freed.</div>';
+}
+
+// ─── Manager-PIN-gated actions (discount / comp / void) ───
+// These need a live server round-trip to check the PIN, so they're not
+// available while offline — the buttons that trigger them are only shown
+// for a synced order in the first place (see renderOrder / canAdjust).
+
+async function managerAction(path, extraBody) {
+  const reason = prompt('Reason (required):');
+  if (!reason) return null;
+  const pin = prompt('Manager PIN:');
+  if (!pin) return null;
+  try {
+    const d = await api(path, { method: 'POST', body: JSON.stringify({ reason, manager_pin: pin, ...extraBody }) });
+    return d;
+  } catch (e) {
+    alert(e.message || 'Action failed.');
+    return null;
+  }
+}
+
+async function compItem(itemId) {
+  const d = await managerAction(`/api/bar/orders/${currentOrder.id}/items/${itemId}/comp`, {});
+  if (!d) return;
+  currentOrder = d.order;
+  currentOrder.items = (currentOrder.items || []);
+  await findOrOpenOrder();
+}
+
+async function voidItem(itemId) {
+  if (!confirm('Void this item? Stock will be restored.')) return;
+  const d = await managerAction(`/api/bar/orders/${currentOrder.id}/items/${itemId}/void`, {});
+  if (!d) return;
+  await findOrOpenOrder();
+  loadMenu();
+}
+
+async function openDiscount() {
+  const type = confirm('Percentage discount? (Cancel = fixed amount)') ? 'pct' : 'fixed';
+  const value = parseFloat(prompt(type === 'pct' ? 'Discount percentage (e.g. 10):' : 'Discount amount in UGX:'));
+  if (!value || value <= 0) return;
+  const d = await managerAction(`/api/bar/orders/${currentOrder.id}/discount`, { type, value });
+  if (!d) return;
+  await findOrOpenOrder();
+}
+
+async function voidTabWithBalance() {
+  if (!confirm('Write off this entire tab? This cannot be undone.')) return;
+  const d = await managerAction(`/api/bar/orders/${currentOrder.id}/void`, {});
+  if (!d) return;
+  currentOrder = null;
+  selectedTable = null;
+  payments = [];
+  document.getElementById('orderTitle').textContent = 'Order';
+  document.getElementById('orderWrap').innerHTML = '<div class="empty-hint">No table selected.</div>';
+  document.getElementById('menuWrap').innerHTML = 'Select a table to start ordering.';
+  loadTables();
+}
+
+async function voidOrder() {
+  if (!currentOrder) return;
+  if (!confirm('Cancel this table with no charges? This cannot be undone.')) return;
+
+  if (currentOrder._offline) {
+    BarOffline.voidOrderLocal(currentOrder);
+  } else {
+    try {
+      await apiOrOffline('/api/bar/orders/' + currentOrder.id + '/close', { method: 'POST', body: JSON.stringify({}) });
+    } catch (e) {
+      if (e.message === 'locked') return;
+      if (e instanceof OfflineError) {
+        BarOffline.voidOrderLocal(currentOrder);
+      } else {
+        alert(e.message);
+        return;
+      }
+    }
+  }
+
+  currentOrder = null;
+  selectedTable = null;
+  payments = [];
+  document.getElementById('orderTitle').textContent = 'Order';
+  document.getElementById('orderWrap').innerHTML = '<div class="empty-hint">No table selected.</div>';
+  document.getElementById('menuWrap').innerHTML = 'Select a table to start ordering.';
+  loadTables();
+}
+
+async function setManagerPin() {
+  const pin = prompt('Choose a 4-6 digit manager PIN (used to approve discounts, comps, and voids):');
+  if (!pin) return;
+  try {
+    await api('/api/bar/manager-pin', { method: 'POST', body: JSON.stringify({ pin }) });
+    alert('Manager PIN saved.');
+  } catch (e) {
+    alert(e.message || 'Failed to save PIN.');
+  }
+}
+
+// ─── Init ───
+const BASE_TOKEN = localStorage.getItem('mv_token');
+if (requireAuth()) {
+  loadTables();
+  BarOffline.init(BASE, BASE_TOKEN);
+  try {
+    const me = JSON.parse(localStorage.getItem('mv_user') || '{}');
+    if (['owner', 'manager'].includes(me.role)) {
+      document.getElementById('pinSetupLink').style.display = 'inline';
+    }
+  } catch (e) {}
+  // After a background sync pushes queued changes, refresh whatever's on
+  // screen so offline tags disappear and real server ids take over.
+  window.onBarSynced = () => {
+    loadTables();
+    if (selectedTable) loadMenu();
+    if (currentOrder && !currentOrder._offline) findOrOpenOrder();
+  };
+}
+</script>
+</body>
+</html>

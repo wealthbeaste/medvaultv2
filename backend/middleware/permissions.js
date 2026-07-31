@@ -140,7 +140,11 @@ const PERMISSIONS = {
   'bar-menu:write':           ['owner', 'manager', 'super_admin'],
   'bar-payments:write':       ['owner', 'manager', 'cashier', 'staff'],
   'bar-reports:read':         ['owner', 'manager'],
-  'bar-pin:write':            ['owner', 'manager', 'super_admin'],
+  // Any front-of-house staff can *request* a discount/comp/void — the PIN
+  // check inside the handler is what actually gates it on a manager's
+  // approval, not the role check here.
+  'bar-adjustments:write':    ['owner', 'manager', 'cashier', 'staff'],
+  'bar-adjustments:read':     ['owner', 'manager'],
 };
 
 function can(permission) {
