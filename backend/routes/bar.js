@@ -137,39 +137,93 @@ module.exports = function registerBarRoutes(app, { query, pool, auth, can, audit
   // Supports either a catalog menu_item_id (preferred — auto-fills name/price
   // and decrements stock) or legacy free-typed item_name/unit_price.
   app.post('/api/bar/orders/:id/items', auth, can('bar:write'), gate, async (req, res) => {
+    const { pharmacyId } = req.user;
+    if (!pharmacyId) return err(res, 400, 'AUTH_NO_PHARMACY', 'No pharmacy assigned.', 'pharmacyId');
     const b = req.body || {};
     const quantity = b.quantity || 1;
+    const clientTxnId = b.client_txn_id || null;
     let item_name = b.item_name;
     let unit_price = b.unit_price || 0;
+
+    // Everything below runs on one client inside a single transaction:
+    // verify the order is this pharmacy's, read stock, insert the line
+    // item, decrement stock, recompute the order total. The order row
+    // is locked first (so it can't be closed out from under us) and the
+    // stock row is locked with SELECT ... FOR UPDATE, so two waiters
+    // adding the same drink at the same moment can't both read the same
+    // quantity_on_hand and oversell it — the second request queues
+    // behind the first until it commits.
+    const client = await pool.connect();
     try {
+      await client.query('BEGIN');
+
+      const orderCheck = await client.query(
+        `SELECT id FROM bar_orders WHERE id=$1 AND pharmacy_id=$2 FOR UPDATE`,
+        [req.params.id, pharmacyId]
+      );
+      if (!orderCheck.rows.length) { await client.query('ROLLBACK'); return err(res, 404, 'NOT_FOUND', 'Order not found.'); }
+
+      // Idempotency: a device that went offline mid-add will retry the
+      // exact same client_txn_id once it reconnects, possibly after the
+      // original request actually succeeded server-side but the response
+      // never made it back. If we've already recorded this txn, hand back
+      // the existing row untouched rather than adding the item (and
+      // decrementing stock) a second time.
+      if (clientTxnId) {
+        const existing = await client.query(
+          `SELECT * FROM bar_order_items WHERE order_id=$1 AND client_txn_id=$2`,
+          [req.params.id, clientTxnId]
+        );
+        if (existing.rows.length) {
+          await client.query('ROLLBACK');
+          return res.json({ success: true, item: existing.rows[0], replay: true });
+        }
+      }
+
+      let stockRow = null;
       if (b.menu_item_id) {
-        const mi = await query(`SELECT * FROM bar_menu_items WHERE id=$1 AND active=true`, [b.menu_item_id]);
-        if (!mi.rows.length) return err(res, 404, 'NOT_FOUND', 'Menu item not found or inactive.');
+        const mi = await client.query(
+          `SELECT * FROM bar_menu_items WHERE id=$1 AND pharmacy_id=$2 AND active=true`,
+          [b.menu_item_id, pharmacyId]
+        );
+        if (!mi.rows.length) { await client.query('ROLLBACK'); return err(res, 404, 'NOT_FOUND', 'Menu item not found or inactive.'); }
         item_name = mi.rows[0].name;
         unit_price = mi.rows[0].price;
-      }
-      if (!item_name) return err(res, 400, 'VALIDATION_INVALID', 'item_name or menu_item_id is required.');
 
-      const r = await query(
-        `INSERT INTO bar_order_items (order_id, item_name, quantity, unit_price, menu_item_id) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-        [req.params.id, item_name, quantity, unit_price, b.menu_item_id || null]
+        const stockRes = await client.query(
+          `SELECT * FROM bar_stock WHERE menu_item_id=$1 FOR UPDATE`,
+          [b.menu_item_id]
+        );
+        stockRow = stockRes.rows[0] || null;
+        if (stockRow && stockRow.quantity_on_hand < quantity) {
+          await client.query('ROLLBACK');
+          return err(res, 409, 'STOCK_INSUFFICIENT', `Only ${stockRow.quantity_on_hand} left in stock.`);
+        }
+      }
+      if (!item_name) { await client.query('ROLLBACK'); return err(res, 400, 'VALIDATION_INVALID', 'item_name or menu_item_id is required.'); }
+
+      const r = await client.query(
+        `INSERT INTO bar_order_items (order_id, item_name, quantity, unit_price, menu_item_id, client_txn_id) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+        [req.params.id, item_name, quantity, unit_price, b.menu_item_id || null, clientTxnId]
       );
 
-      if (b.menu_item_id) {
-        await query(
+      if (stockRow) {
+        await client.query(
           `UPDATE bar_stock SET quantity_on_hand = GREATEST(quantity_on_hand - $1, 0), updated_at=NOW() WHERE menu_item_id=$2`,
           [quantity, b.menu_item_id]
         );
       }
 
-      await query(
-        `UPDATE bar_orders SET total_amount = (
-           SELECT COALESCE(SUM(quantity * unit_price),0) FROM bar_order_items WHERE order_id=$1
-         ) WHERE id=$1`,
-        [req.params.id]
-      );
+      await recomputeOrderTotal(client, req.params.id);
+
+      await client.query('COMMIT');
       res.json({ success: true, item: r.rows[0] });
-    } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
+    } catch (e) {
+      try { await client.query('ROLLBACK'); } catch (_) {}
+      return err(res, 500, 'SERVER_ERROR', e.message);
+    } finally {
+      client.release();
+    }
   });
 
   // Close/settle an order (mark paid) — table goes back to available
