@@ -1349,6 +1349,7 @@ img,svg,video{max-width:100%;}
     <div class="nav-item" id="navPharmacovigilance" onclick="window.location.href='./pharmacovigilance.html'"><span class="nav-icon">⚠️</span>Pharmacovigilance (ADR)</div>
     <div class="nav-item" id="navHivTb" onclick="window.location.href='./hiv-tb.html'"><span class="nav-icon">🧬</span>HIV/ART, PMTCT & TB</div>
     <div class="nav-item" id="navSicklecell" onclick="window.location.href='./sicklecell.html'"><span class="nav-icon">🩸</span>Sickle Cell Screening</div>
+    <div class="nav-item" id="navBar" onclick="window.location.href='./bar.html'"><span class="nav-icon">🍺</span>Bar / Restaurant</div>
     <div class="nav-item" id="navEfris" onclick="window.location.href='./efris.html'"><span class="nav-icon">🧾</span>EFRIS / URA E-Invoicing</div>
     <div class="nav-item" id="navTax" onclick="go('tax-report',this)"><span class="nav-icon">📋</span>URA Tax Report</div>
     <div class="nav-item" id="navCashier" onclick="go('cashier',this)"><span class="nav-icon">🧮</span>Cashier Session</div>
@@ -4483,6 +4484,7 @@ function canSee(page) {
     'pharmacovigilance':['owner','manager','pharmacist'],
     'hiv-tb':           ['owner','manager','pharmacist'],
     'sicklecell':       ['owner','manager','pharmacist'],
+    'bar':              ['owner','manager','cashier','staff'],
     'efris':            ['owner','manager'],
     'erx':              ['owner','manager','pharmacist','staff'],
     'erx-referrals':    ['owner','manager','pharmacist','staff'],
@@ -4496,6 +4498,9 @@ function canSee(page) {
     if (role === 'cashier' || role === 'super_admin') return true;
     // For owners/managers checking: require pro or enterprise plan
     return ['pro','enterprise'].includes(plan);
+  }
+  if (page === 'bar') {
+    return roleOk && moduleEnabled('bar');
   }
   // Branches: Enterprise plan only
   if (page === 'branches') {
@@ -4566,6 +4571,7 @@ function applyRoleUI() {
   'pharmacovigilance':'navPharmacovigilance',
   'hiv-tb':'navHivTb',
   'sicklecell':'navSicklecell',
+  'bar':'navBar',
   'efris':'navEfris',
   'erx':'navErx',
   'erx-referrals':'navErxReferrals',
