@@ -117,6 +117,16 @@
     <div id="dailySummaryBody">Pick a date and tap View.</div>
   </div>
 
+  <div class="card" id="staffPerfCard">
+    <div class="section-title">Staff Performance</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
+      <input type="date" id="staffPerfFrom" style="width:150px;">
+      <input type="date" id="staffPerfTo" style="width:150px;">
+      <button onclick="loadStaffPerformance()">View</button>
+    </div>
+    <div id="staffPerfBody">Pick a date range and tap View.</div>
+  </div>
+
   <div class="layout">
     <!-- MENU -->
     <div class="card">
@@ -395,6 +405,37 @@ function renderDailySummary(d) {
     <div class="menu-item"><span>${disc.discounted_orders||0} discounted orders</span><span>UGX ${Number(disc.total_discounted||0).toLocaleString()}</span></div>
     <div class="menu-item"><span>${vo.voided_items||0} voided items</span><span>UGX ${Number(vo.voided_value||0).toLocaleString()}</span></div>
   `;
+}
+async function loadStaffPerformance() {
+  const fromInput = document.getElementById('staffPerfFrom');
+  const toInput = document.getElementById('staffPerfTo');
+  const today = new Date().toISOString().slice(0,10);
+  const fromStr = fromInput.value || today;
+  const toStr = toInput.value || today;
+  const from = fromStr + 'T00:00:00';
+  const to = toStr + 'T23:59:59';
+  const body = document.getElementById('staffPerfBody');
+  body.innerHTML = 'Loading…';
+  try {
+    const d = await api('/api/bar/reports/staff?from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to));
+    renderStaffPerformance(d);
+  } catch (e) {
+    body.innerHTML = '<div class="msg bad">Failed to load staff performance: ' + (e.message || 'unknown error') + '</div>';
+  }
+}
+function renderStaffPerformance(d) {
+  const body = document.getElementById('staffPerfBody');
+  const staff = d.staff || [];
+  if (!staff.length) { body.innerHTML = '<div class="empty-hint">No staff activity in this range.</div>'; return; }
+  body.innerHTML = staff.map(s => `
+    <div class="menu-item" style="align-items:flex-start;">
+      <div>
+        <div class="name">${s.staff_name || 'Unknown'}</div>
+        <div class="price">${s.orders_opened||0} orders opened · ${s.payments_taken||0} payments taken${s.void_count ? ` · <span class="stock-low">${s.void_count} voids (UGX ${Number(s.void_value).toLocaleString()})</span>` : ''}</div>
+      </div>
+      <div style="font-weight:700;">UGX ${Number(s.revenue_collected||0).toLocaleString()}</div>
+    </div>
+  `).join('');
 }
 async function createMenuItem() {
   const name = document.getElementById('newItemName').value.trim();
@@ -729,6 +770,8 @@ if (requireAuth()) {
   loadTables();
   loadManageMenu();
   document.getElementById('summaryDate').value = new Date().toISOString().slice(0,10);
+  document.getElementById('staffPerfFrom').value = new Date().toISOString().slice(0,10);
+  document.getElementById('staffPerfTo').value = new Date().toISOString().slice(0,10);
   BarOffline.init(BASE, BASE_TOKEN);
   // After a background sync pushes queued changes, refresh whatever's on
   // screen so offline tags disappear and real server ids take over.
