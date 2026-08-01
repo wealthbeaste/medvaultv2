@@ -1364,7 +1364,7 @@ img,svg,video{max-width:100%;}
     <div class="nav-item" id="navAPLedger" onclick="go('ap-ledger',this)"><span class="nav-icon">📒</span>AP Ledger</div>
     <div class="nav-item" id="navPriceLevels" onclick="go('price-levels',this)"><span class="nav-icon">💹</span>Price Levels</div>
     <div class="nav-item" id="navSuppliers" onclick="go('suppliers',this)"><span class="nav-icon">🏬</span>Suppliers & Orders</div>
-    <div class="nav-label">Clinical</div>
+    <div class="nav-label" id="navLabelClinical">Clinical</div>
     <div class="nav-item" id="navPatients" onclick="go('patients',this)"><span class="nav-icon">🧑‍🤝‍🧑</span>Patients</div>
     <div class="nav-item" id="navDoctors" onclick="go('doctors',this)"><span class="nav-icon">🩺</span>Doctors</div>
     <div class="nav-item" id="navAppointments" onclick="go('appointments',this)"><span class="nav-icon">📅</span>Appointments</div>
@@ -1372,10 +1372,10 @@ img,svg,video{max-width:100%;}
     <div class="nav-item" id="navPrescriptions" onclick="go('prescriptions',this)"><span class="nav-icon">📝</span>Prescriptions</div>
     <div class="nav-item" id="navErx" onclick="go('erx',this)"><span class="nav-icon">🔗</span>E-Prescriptions</div>
     <div class="nav-item" id="navErxReferrals" onclick="go('erx-referrals',this)"><span class="nav-icon">📨</span>Referrals to Fulfill</div>
-    <div class="nav-label">Laboratory</div>
+    <div class="nav-label" id="navLabelLaboratory">Laboratory</div>
     <div class="nav-item" id="navLabTests" onclick="go('lab-tests',this)"><span class="nav-icon">🧪</span>Lab Tests</div>
     <div class="nav-item" id="navLabRequests" onclick="go('lab-requests',this)"><span class="nav-icon">🔬</span>Lab Requests</div>
-    <div class="nav-label">Hospital</div>
+    <div class="nav-label" id="navLabelHospital">Hospital</div>
     <div class="nav-item" id="navWards" onclick="go('wards',this)"><span class="nav-icon">🏥</span>Wards & Beds</div>
     <div class="nav-item" id="navAdmissions" onclick="go('admissions',this)"><span class="nav-icon">🛏️</span>Admissions</div>
     <div class="nav-item" id="navInsurance" onclick="go('insurance',this)"><span class="nav-icon">🛡️</span>Insurance</div>
@@ -4665,6 +4665,12 @@ function applyRoleUI() {
     qaCard.style.display = anyVisible ? '' : 'none';
   }
 
+  // Hide empty Clinical/Laboratory/Hospital section labels for bar orgs
+  ['navLabelClinical','navLabelLaboratory','navLabelHospital'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = (getBusinessType() === 'bar') ? 'none' : '';
+  });
+
   // Cashier role: always show navCashier — it is their primary workspace
   if (role === 'cashier') {
     const nc = document.getElementById('navCashier');
@@ -4679,7 +4685,7 @@ function applyRoleUI() {
   // Topbar "+ Add Drug" button
   const topAdd = document.querySelector('.topbar-right .btn.btn-primary');
   if (topAdd && topAdd.textContent?.toLowerCase().includes('add drug')) {
-    topAdd.style.display = canManageDrugs() ? '' : 'none';
+    topAdd.style.display = (canManageDrugs() && canSee('inventory')) ? '' : 'none';
   }
 
   // Sales — Complete Sale button visible for dispensors only (not cashiers)
