@@ -107,6 +107,15 @@
     <div id="manageMenuList" style="margin-top:12px;">Loading…</div>
   </div>
 
+  <div class="card" id="dailySummaryCard">
+    <div class="section-title">Daily Summary</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
+      <input type="date" id="summaryDate" style="width:160px;">
+      <button onclick="loadDailySummary()">View</button>
+    </div>
+    <div id="dailySummaryBody">Pick a date and tap View.</div>
+  </div>
+
   <div class="layout">
     <!-- MENU -->
     <div class="card">
@@ -344,6 +353,47 @@ function filterMenuSearch() {
     (m.name || '').toLowerCase().includes(q) || (m.category || '').toLowerCase().includes(q)
   );
   renderManageMenuList(filtered);
+}
+async function loadDailySummary() {
+  const dateInput = document.getElementById('summaryDate');
+  const dateStr = dateInput.value || new Date().toISOString().slice(0,10);
+  const from = dateStr + 'T00:00:00';
+  const to = dateStr + 'T23:59:59';
+  const body = document.getElementById('dailySummaryBody');
+  body.innerHTML = 'Loading…';
+  try {
+    const d = await api('/api/bar/reports/summary?from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to));
+    renderDailySummary(d);
+  } catch (e) {
+    body.innerHTML = '<div class="msg bad">Failed to load summary: ' + (e.message || 'unknown error') + '</div>';
+  }
+}
+function renderDailySummary(d) {
+  const body = document.getElementById('dailySummaryBody');
+  const s = d.summary || {};
+  const methods = (d.payment_methods || []).map(m =>
+    `<div class="menu-item"><span>${m.method}</span><span>UGX ${Number(m.total).toLocaleString()} (${m.count})</span></div>`
+  ).join('') || '<div class="empty-hint">No payments in this range.</div>';
+  const items = (d.top_items || []).map(i =>
+    `<div class="menu-item"><span>${i.item_name}</span><span>${i.quantity_sold} sold · UGX ${Number(i.revenue).toLocaleString()}</span></div>`
+  ).join('') || '<div class="empty-hint">No sales in this range.</div>';
+  const open = d.open_orders || {};
+  const disc = d.discounts || {};
+  const vo = d.voids || {};
+  body.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px;">
+      <div class="stat-card g"><div class="sl">Revenue</div><div class="sv">UGX ${Number(s.revenue||0).toLocaleString()}</div></div>
+      <div class="stat-card b"><div class="sl">Paid Orders</div><div class="sv">${s.paid_orders||0}</div></div>
+      <div class="stat-card w"><div class="sl">Avg Order</div><div class="sv">UGX ${Math.round(Number(s.avg_order_value||0)).toLocaleString()}</div></div>
+    </div>
+    <div class="menu-cat">Payment Methods</div>${methods}
+    <div class="menu-cat">Top Items</div>${items}
+    <div class="menu-cat">Open Tables (unpaid)</div>
+    <div class="menu-item"><span>${open.open_orders||0} open</span><span>UGX ${Number(open.open_value||0).toLocaleString()} tied up</span></div>
+    <div class="menu-cat">Discounts &amp; Voids</div>
+    <div class="menu-item"><span>${disc.discounted_orders||0} discounted orders</span><span>UGX ${Number(disc.total_discounted||0).toLocaleString()}</span></div>
+    <div class="menu-item"><span>${vo.voided_items||0} voided items</span><span>UGX ${Number(vo.voided_value||0).toLocaleString()}</span></div>
+  `;
 }
 async function createMenuItem() {
   const name = document.getElementById('newItemName').value.trim();
@@ -677,6 +727,7 @@ const BASE_TOKEN = localStorage.getItem('mv_token');
 if (requireAuth()) {
   loadTables();
   loadManageMenu();
+  document.getElementById('summaryDate').value = new Date().toISOString().slice(0,10);
   BarOffline.init(BASE, BASE_TOKEN);
   // After a background sync pushes queued changes, refresh whatever's on
   // screen so offline tags disappear and real server ids take over.
