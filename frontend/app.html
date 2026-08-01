@@ -4554,7 +4554,7 @@ function canSee(page) {
   // module + shared tools (dashboard, staff, offline-settings) visible.
   // Mirrors the ngoHidden carve-out above but keyed off business_type
   // (set per-org, independent of plan/billing) rather than plan.
-  const barOnlyHidden = ['inventory','sales','orders','customers','whatsapp','credit','variance','tax-report','cashier','forecast','expiry-intel','invoices','purchase-orders','warehouse','grn','loyalty','margins','purchasing','ap-ledger','price-levels','returns','suppliers','nda-report','efris','erx','erx-referrals','dhis2-export','pharmacovigilance','hiv-tb','sicklecell','patients','doctors','appointments','consultations','prescriptions','lab-tests','lab-requests','wards','admissions','insurance'];
+  const barOnlyHidden = ['inventory','sales','orders','customers','whatsapp','credit','variance','tax-report','cashier','forecast','expiry-intel','invoices','purchase-orders','warehouse','grn','loyalty','margins','purchasing','ap-ledger','price-levels','returns','suppliers','nda-report','efris','erx','erx-referrals','dhis2-export','pharmacovigilance','hiv-tb','sicklecell','patients','doctors','appointments','consultations','prescriptions','lab-tests','lab-requests','wards','admissions','insurance','daily-summary'];
   if (getBusinessType() === 'bar' && barOnlyHidden.includes(page)) {
     return role === 'super_admin';
   }
