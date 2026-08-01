@@ -94,6 +94,47 @@ async function checkLowStock() {
   }
 }
 
+// ── BAR LOW STOCK SCANNER ─────────────────────────────────────
+async function checkBarLowStock() {
+  try {
+    const items = await query(
+      `SELECT bmi.id, bmi.name, bs.quantity_on_hand, bs.low_stock_threshold, bmi.pharmacy_id,
+              p.organisation_id as org_id
+       FROM bar_menu_items bmi
+       JOIN bar_stock bs ON bs.menu_item_id = bmi.id
+       JOIN pharmacies p ON p.id = bmi.pharmacy_id
+       WHERE bmi.active = true AND bs.quantity_on_hand <= bs.low_stock_threshold AND bs.quantity_on_hand >= 0`
+    );
+
+    for (const item of items.rows) {
+      const recent = await query(
+        `SELECT id FROM notifications
+         WHERE pharmacy_id = $1 AND type = 'low_stock'
+           AND data->>'bar_item_id' = $2
+           AND created_at >= NOW() - INTERVAL '6 hours'
+         LIMIT 1`,
+        [item.pharmacy_id, String(item.id)]
+      );
+      if (recent.rows.length) continue;
+
+      await query(
+        `INSERT INTO notifications (org_id, pharmacy_id, type, title, body, data)
+         VALUES ($1, $2, 'low_stock', $3, $4, $5)`,
+        [
+          item.org_id, item.pharmacy_id,
+          `Low Stock: ${item.name}`,
+          `${item.name} has only ${item.quantity_on_hand} units left (threshold: ${item.low_stock_threshold}).`,
+          JSON.stringify({ bar_item_id: String(item.id), quantity: item.quantity_on_hand, threshold: item.low_stock_threshold }),
+        ]
+      );
+    }
+    if (items.rows.length > 0)
+      console.log(`\ud83c\udf7a [Scheduler] Bar low stock check: ${items.rows.length} items below threshold`);
+  } catch (e) {
+    console.error('\u26a0\ufe0f  [Scheduler] Bar low stock check failed:', e.message);
+  }
+}
+
 // ── OVERDUE CREDIT FLAGGER ────────────────────────────────────
 async function flagOverdueCredit() {
   try {
@@ -340,6 +381,7 @@ function startScheduler() {
     console.log('⏰ [Scheduler] Running initial checks...');
     await checkExpiryAlerts();
     await checkLowStock();
+    await checkBarLowStock();
     await flagOverdueCredit();
     await checkTrialExpiry();
     await writeDailySnapshots();
@@ -350,6 +392,7 @@ function startScheduler() {
 
   setInterval(checkExpiryAlerts,        SIX_HOURS);
   setInterval(checkLowStock,            SIX_HOURS);
+  setInterval(checkBarLowStock,          SIX_HOURS);
   setInterval(flagOverdueCredit,        ONE_DAY);
   setInterval(checkTrialExpiry,         ONE_DAY);
   setInterval(writeDailySnapshots,      ONE_DAY);
