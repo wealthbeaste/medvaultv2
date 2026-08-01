@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MedVault — Kitchen / Bar Display</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root{--bg:#0a0f1e;--surface:#111827;--surface2:#1a2235;--accent:#00d4aa;--accent2:#3b82f6;--warn:#f59e0b;--danger:#ef4444;--success:#10b981;--text:#f0f4ff;--muted:#6b7a99;}
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;}
+  .header{padding:24px 30px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.07);}
+  .logo{display:flex;align-items:center;gap:14px;}
+  .logo-icon{width:44px;height:44px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;}
+  .logo-text{font-family:'Syne',sans-serif;font-weight:800;font-size:22px;}
+  .clock{font-family:'Syne',sans-serif;font-size:26px;font-weight:700;color:var(--accent);}
+  .main{flex:1;padding:20px 30px;display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;align-content:start;}
+  .ticket{background:var(--surface);border:1px solid rgba(255,255,255,0.07);border-radius:14px;padding:16px;animation:fadeIn 0.3s ease;}
+  .ticket.preparing{border-color:var(--warn);}
+  .t-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.07);}
+  .t-table{font-family:'Syne',sans-serif;font-weight:800;font-size:16px;}
+  .t-time{font-size:11px;color:var(--muted);}
+  .t-item{font-size:15px;margin-bottom:6px;}
+  .t-qty{color:var(--accent);font-weight:700;margin-right:6px;}
+  .t-actions{margin-top:12px;display:flex;gap:8px;}
+  .t-actions button{flex:1;padding:10px;border:none;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;}
+  .btn-preparing{background:var(--warn);color:#111;}
+  .btn-ready{background:var(--success);color:#111;}
+  .btn-served{background:var(--accent2);color:#fff;}
+  .empty{grid-column:1/-1;text-align:center;padding:60px;color:var(--muted);font-size:16px;}
+  .footer{padding:14px 30px;text-align:center;font-size:12px;color:var(--muted);border-top:1px solid rgba(255,255,255,0.07);}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo"><div class="logo-icon">🍺</div><div><div class="logo-text">Kitchen / Bar</div><div style="font-size:11px;color:var(--muted)">Live order tickets</div></div></div>
+    <div class="clock" id="clock">--:--</div>
+  </div>
+  <div class="main" id="ticketsGrid"><div class="empty">Loading tickets…</div></div>
+  <div class="footer">Refreshes automatically every 10 seconds</div>
+
+<script>
+const BASE = window.location.origin;
+const TOKEN = localStorage.getItem('mv_token') || '';
+
+function authHeaders() {
+  return { 'Authorization': 'Bearer ' + TOKEN, 'Content-Type': 'application/json' };
+}
+
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+}
+updateClock();
+setInterval(updateClock, 1000);
+
+function timeAgo(dateStr) {
+  const mins = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins === 1) return '1 min ago';
+  return mins + ' min ago';
+}
+
+async function loadKitchen() {
+  try {
+    const res = await fetch(BASE + '/api/bar/kitchen', { headers: authHeaders() });
+    if (!res.ok) return;
+    const data = await res.json();
+    const items = data.items || [];
+    const grid = document.getElementById('ticketsGrid');
+
+    if (!items.length) {
+      grid.innerHTML = '<div class="empty">No pending orders — all caught up 🎉</div>';
+      return;
+    }
+
+    // Group items by order/table so each table gets one ticket card
+    const byOrder = {};
+    items.forEach(i => {
+      const key = i.order_id;
+      if (!byOrder[key]) byOrder[key] = { table_number: i.table_number, created_at: i.created_at, items: [] };
+      byOrder[key].items.push(i);
+    });
+
+    grid.innerHTML = Object.values(byOrder).map(order => `
+      <div class="ticket ${order.items.some(i => i.status === 'preparing') ? 'preparing' : ''}">
+        <div class="t-head">
+          <div class="t-table">${order.table_number ? 'Table #' + order.table_number : 'Walk-in'}</div>
+          <div class="t-time">${timeAgo(order.created_at)}</div>
+        </div>
+        ${order.items.map(i => `
+          <div class="t-item"><span class="t-qty">${i.quantity}×</span>${i.item_name}</div>
+        `).join('')}
+        <div class="t-actions">
+          ${order.items.map(i => {
+            const next = i.status === 'pending' ? 'preparing' : i.status === 'preparing' ? 'ready' : 'served';
+            const label = i.status === 'pending' ? 'Start' : i.status === 'preparing' ? 'Ready' : 'Served';
+            const cls = next === 'preparing' ? 'btn-preparing' : next === 'ready' ? 'btn-ready' : 'btn-served';
+            return `<button class="${cls}" onclick="advanceItem('${i.id}','${next}')">${label}</button>`;
+          }).join('')}
+        </div>
+      </div>
+    `).join('');
+  } catch (e) {
+    console.error('Kitchen load error:', e);
+  }
+}
+
+async function advanceItem(itemId, newStatus) {
+  try {
+    await fetch(BASE + '/api/bar/order-items/' + itemId, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ status: newStatus })
+    });
+    loadKitchen();
+  } catch (e) {
+    console.error('Failed to update item:', e);
+  }
+}
+
+loadKitchen();
+setInterval(loadKitchen, 10000);
+</script>
+</body>
+</html>
