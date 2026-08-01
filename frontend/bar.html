@@ -108,7 +108,7 @@
     <div id="manageMenuList" style="margin-top:12px;">Loading…</div>
   </div>
 
-  <div class="card" id="dailySummaryCard">
+  <div class="card" id="dailySummaryCard" style="display:none;">
     <div class="section-title">Daily Summary</div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
       <input type="date" id="summaryDate" style="width:160px;">
@@ -117,7 +117,7 @@
     <div id="dailySummaryBody">Pick a date and tap View.</div>
   </div>
 
-  <div class="card" id="staffPerfCard">
+  <div class="card" id="staffPerfCard" style="display:none;">
     <div class="section-title">Staff Performance</div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
       <input type="date" id="staffPerfFrom" style="width:150px;">
@@ -322,6 +322,8 @@ function getRole() {
 async function loadManageMenu() {
   const card = document.getElementById('manageMenuCard');
   if (!['owner', 'manager', 'super_admin'].includes(getRole())) { card.style.display = 'none'; return; }
+  document.getElementById('dailySummaryCard').style.display = '';
+  document.getElementById('staffPerfCard').style.display = '';
   card.style.display = '';
   const list = document.getElementById('manageMenuList');
   list.innerHTML = 'Loading…';
