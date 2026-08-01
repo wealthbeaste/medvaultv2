@@ -139,6 +139,38 @@ module.exports = function registerBarRoutes(app, { query, pool, auth, can, audit
     } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
   });
 
+  // Move an open order to a different table — e.g. a party asks to move,
+  // or two tables need combining. Marks the old table available and the
+  // new one occupied, same status transitions as opening/closing an order.
+  app.patch('/api/bar/orders/:id/transfer', auth, can('bar:write'), gate, async (req, res) => {
+    const { pharmacyId } = req.user;
+    if (!pharmacyId) return err(res, 400, 'AUTH_NO_PHARMACY', 'No pharmacy assigned.', 'pharmacyId');
+    const b = req.body || {};
+    if (!b.new_table_id) return err(res, 400, 'VALIDATION_INVALID', 'new_table_id is required.', 'new_table_id');
+    try {
+      const orderRes = await query(`SELECT * FROM bar_orders WHERE id=$1 AND pharmacy_id=$2`, [req.params.id, pharmacyId]);
+      if (!orderRes.rows.length) return err(res, 404, 'NOT_FOUND', 'Order not found.');
+      const order = orderRes.rows[0];
+      if (order.status !== 'open') return err(res, 409, 'CONFLICT_STATE', 'Only open orders can be transferred.');
+
+      const newTableRes = await query(`SELECT * FROM bar_tables WHERE id=$1 AND pharmacy_id=$2`, [b.new_table_id, pharmacyId]);
+      if (!newTableRes.rows.length) return err(res, 404, 'NOT_FOUND', 'New table not found.');
+      const newTable = newTableRes.rows[0];
+      if (newTable.status === 'occupied' && String(newTable.id) !== String(order.table_id)) {
+        return err(res, 409, 'CONFLICT_STATE', 'That table is already occupied.');
+      }
+
+      const oldTableId = order.table_id;
+      const updated = await query(`UPDATE bar_orders SET table_id=$1 WHERE id=$2 AND pharmacy_id=$3 RETURNING *`, [b.new_table_id, req.params.id, pharmacyId]);
+      await query(`UPDATE bar_tables SET status='occupied', updated_at=NOW() WHERE id=$1 AND pharmacy_id=$2`, [b.new_table_id, pharmacyId]);
+      if (oldTableId) {
+        await query(`UPDATE bar_tables SET status='available', updated_at=NOW() WHERE id=$1 AND pharmacy_id=$2`, [oldTableId, pharmacyId]);
+      }
+      if (audit) await audit(query, { req, action: 'bar.order.transfer', entity: 'bar_order', entityId: req.params.id, payload: { from: oldTableId, to: b.new_table_id } });
+      res.json({ success: true, order: updated.rows[0] });
+    } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
+  });
+
   // Add an item to an order — this is what feeds the Kitchen view below.
   // Supports either a catalog menu_item_id (preferred — auto-fills name/price
   // and decrements stock) or legacy free-typed item_name/unit_price.
