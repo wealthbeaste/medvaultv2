@@ -88,6 +88,17 @@
       <input id="newItemName" placeholder="Item name" style="width:140px;">
       <input id="newItemCategory" placeholder="Category" style="width:100px;">
       <input id="newItemPrice" placeholder="Price (UGX)" style="width:110px;">
+<select id="newItemUnit" style="width:100px;">
+        <option value="">Unit…</option>
+        <option value="bottle">Bottle</option>
+        <option value="shot">Shot</option>
+        <option value="can">Can</option>
+        <option value="crate">Crate</option>
+        <option value="glass">Glass</option>
+        <option value="plate">Plate</option>
+      </select>
+      <input id="newItemCostPrice" placeholder="Cost price (UGX)" style="width:110px;">
+      <input id="newItemSupplier" placeholder="Supplier" style="width:120px;">
       <input id="newItemStock" placeholder="Initial stock" value="0" style="width:100px;">
       <input id="newItemLowThreshold" placeholder="Low stock at" value="0" style="width:100px;">
       <button onclick="createMenuItem()">+ Add item</button>
@@ -329,10 +340,14 @@ async function createMenuItem() {
   const price = Number(document.getElementById('newItemPrice').value);
   const initial_quantity = Number(document.getElementById('newItemStock').value || 0);
   const low_stock_threshold = Number(document.getElementById('newItemLowThreshold').value || 0);
+    const unit = document.getElementById('newItemUnit').value;
+  const cost_price = Number(document.getElementById('newItemCostPrice').value || 0) || null;
+const supplier = document.getElementById('newItemSupplier').value.trim() || null;
+
   if (!name) return alert('Item name is required.');
   if (!price || price <= 0) return alert('Enter a valid price.');
   try {
-    await api('/api/bar/menu-items', { method: 'POST', body: JSON.stringify({ name, category, price, initial_quantity, low_stock_threshold }) });
+    await api('/api/bar/menu-items', { method: 'POST', body: JSON.stringify({ name, category, price, unit, cost_price, supplier, initial_quantity, low_stock_threshold }) });
     document.getElementById('newItemName').value = '';
     document.getElementById('newItemCategory').value = '';
     document.getElementById('newItemPrice').value = '';

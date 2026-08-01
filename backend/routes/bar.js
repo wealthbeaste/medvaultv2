@@ -562,11 +562,11 @@ module.exports = function registerBarRoutes(app, { query, pool, auth, can, audit
     if (!b.name) return err(res, 400, 'VALIDATION_INVALID', 'name is required.', 'name');
     if (b.price === undefined || b.price === null) return err(res, 400, 'VALIDATION_INVALID', 'price is required.', 'price');
     try {
-      const r = await query(
-        `INSERT INTO bar_menu_items (org_id, pharmacy_id, name, category, price, active)
-         VALUES ($1,$2,$3,$4,$5,true) RETURNING *`,
-        [orgId, pharmacyId, b.name, b.category || null, b.price]
-      );
+const r = await query(
+  `INSERT INTO bar_menu_items (org_id, pharmacy_id, name, category, price, unit, cost_price, supplier, active)
+   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true) RETURNING *`,
+  [orgId, pharmacyId, b.name, b.category || null, b.price, b.unit || null, b.cost_price || null, b.supplier || null]
+);
       const menuItem = r.rows[0];
       await query(
         `INSERT INTO bar_stock (menu_item_id, quantity_on_hand, low_stock_threshold)
