@@ -19,7 +19,7 @@ module.exports = function registerReportsRoutes(app, { query, auth, can }) {
                  +
                  (SELECT COUNT(*) FROM bar_orders WHERE pharmacy_id=$1 AND status='paid' AND DATE(closed_at)=CURRENT_DATE)
                  as cnt`, [pharmacyId]),
-        query(`SELECT COUNT(*) as cnt FROM drugs WHERE pharmacy_id=$1 AND quantity<=threshold`, [pharmacyId]),
+        query(`SELECT (SELECT COUNT(*) FROM drugs WHERE pharmacy_id=$1 AND quantity<=threshold) + (SELECT COUNT(*) FROM bar_stock bs JOIN bar_menu_items bmi ON bmi.id=bs.menu_item_id WHERE bmi.pharmacy_id=$1 AND bmi.active=true AND bs.quantity_on_hand<=bs.low_stock_threshold) as cnt`, [pharmacyId]),
         query(`SELECT COUNT(*) as cnt FROM drugs WHERE pharmacy_id=$1 AND expiry_date IS NOT NULL AND expiry_date<=CURRENT_DATE+INTERVAL '30 days' AND expiry_date>=CURRENT_DATE`, [pharmacyId]),
         query(`SELECT day, SUM(revenue) as revenue FROM (
                  SELECT DATE(created_at) as day, total_amount as revenue FROM sales
@@ -28,7 +28,11 @@ module.exports = function registerReportsRoutes(app, { query, auth, can }) {
                  SELECT DATE(closed_at) as day, total_amount as revenue FROM bar_orders
                  WHERE pharmacy_id=$1 AND status='paid' AND closed_at>=CURRENT_DATE-INTERVAL '6 days'
                ) combined GROUP BY day ORDER BY day`, [pharmacyId]),
-        query(`SELECT id,customer_name,total_amount,payment_method,created_at FROM sales WHERE pharmacy_id=$1 AND voided_at IS NULL ORDER BY created_at DESC LIMIT 5`, [pharmacyId]),
+        query(`SELECT id,customer_name,total_amount,payment_method,created_at FROM (
+                 SELECT id,customer_name,total_amount,payment_method,created_at FROM sales WHERE pharmacy_id=$1 AND voided_at IS NULL
+                 UNION ALL
+                 SELECT id,customer_name,total_amount,payment_method,closed_at as created_at FROM bar_orders WHERE pharmacy_id=$1 AND status='paid'
+               ) combined ORDER BY created_at DESC LIMIT 5`, [pharmacyId]),
       ]);
       res.json({
         revenueToday:       parseFloat(rev.rows[0].rev),
