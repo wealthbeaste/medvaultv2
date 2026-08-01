@@ -1387,6 +1387,8 @@ img,svg,video{max-width:100%;}
     <div class="nav-item" onclick="window.open('queue-display.html','_blank')"><span class="nav-icon">📺</span>Queue Display ↗</div>
     <div class="nav-item" onclick="window.open('api-docs.html','_blank')"><span class="nav-icon">📖</span>API Docs ↗</div>
     <div class="nav-item" id="navOfflineSettings" onclick="go('offline-settings',this)"><span class="nav-icon">📴</span>Offline & Sync</div>
+    <div class="nav-label" id="businessModulesLabel" style="display:none">Business Modules</div>
+    <div id="externalModulesContainer"></div>
   </nav>
   <div class="sidebar-footer">
     <div class="user-card">
@@ -4405,7 +4407,44 @@ const MODULE_UI_HOOKS = {
   hardware:    'showHardwareModule',
   wholesale:   'showWholesaleModule',
 };
+// ── Generic external-module nav registry (Phase 5) ──────────
+// Purpose: adding a new business-vertical module (hotel, retail,
+// salon, etc.) should mean adding ONE line here — not hand-editing
+// the sidebar HTML, the nav visibility map, and canSee()'s allow
+// list separately like we did for `bar`. Existing modules (bar,
+// dhis2, sicklecell, hiv-tb, efris, pharmacovigilance) are left on
+// their original hardcoded pattern untouched; this registry is only
+// for modules registered from here on, rendered into the empty
+// #externalModulesContainer div under the "Business Modules"
+// sidebar section.
+const EXTERNAL_MODULE_REGISTRY = [
+  // { key: 'hotel',       label: 'Hotel / Lodging', icon: '🏨', url: './hotel.html',       roles: ['owner','manager'] },
+  // { key: 'supermarket', label: 'Retail POS',      icon: '🛒', url: './supermarket.html', roles: ['owner','manager','cashier','staff'] },
+  // { key: 'hardware',    label: 'Hardware Store',  icon: '🔧', url: './hardware.html',    roles: ['owner','manager','cashier','staff'] },
+  // { key: 'wholesale',   label: 'Wholesale',       icon: '📦', url: './wholesale.html',   roles: ['owner','manager'] },
+  // { key: 'salon',       label: 'Salon / Spa',     icon: '💇', url: './salon.html',       roles: ['owner','manager','cashier','staff'] },
+];
+function renderExternalModules() {
+  const container = document.getElementById('externalModulesContainer');
+  const label = document.getElementById('businessModulesLabel');
+  if (!container) return;
+  container.innerHTML = '';
+  const role = getRole();
+  let shown = 0;
+  EXTERNAL_MODULE_REGISTRY.forEach(mod => {
+    if (!mod.roles.includes(role) || !moduleEnabled(mod.key)) return;
+    const div = document.createElement('div');
+    div.className = 'nav-item';
+    div.id = 'navMod_' + mod.key;
+    div.onclick = () => { window.location.href = mod.url; };
+    div.innerHTML = `<span class="nav-icon">${mod.icon}</span>${mod.label}`;
+    container.appendChild(div);
+    shown++;
+  });
+  if (label) label.style.display = shown > 0 ? '' : 'none';
+}
 function applyModuleUI() {
+  renderExternalModules();
   for (const [flag, fnName] of Object.entries(MODULE_UI_HOOKS)) {
     if (moduleEnabled(flag) && typeof window[fnName] === 'function') {
       try { window[fnName](); } catch (e) { console.error(`Module UI hook ${fnName} failed:`, e); }
