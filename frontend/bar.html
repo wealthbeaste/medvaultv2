@@ -577,6 +577,17 @@ function renderOrder() {
         <button class="secondary" onclick="printBarReceipt()">🖨️ Print Receipt</button>
         <button class="secondary" onclick="openTransferModal()">🔀 Transfer Table</button>
       </div>
+    <div class="pay-panel" id="transferPanel" style="display:none;">
+      <div class="formgrid">
+        <label>Transfer to table
+          <select id="transferTableSelect"></select>
+        </label>
+      </div>
+      <div class="bar">
+        <button onclick="confirmTransferFromSelect()">Confirm Transfer</button>
+        <button class="secondary" onclick="closeTransferModal()">Cancel</button>
+      </div>
+    </div>
     ` : ''}
 
     ${items.length && balance > 0 ? `
@@ -736,19 +747,20 @@ async function recordPayment() {
 function wrap_settled_message() {
   document.getElementById('orderWrap').innerHTML = '<div class="msg good">Bill fully settled — table freed.</div>';
 }
-
 function openTransferModal() {
   if (!currentOrder) return;
   const available = _allTables.filter(t => t.status !== 'occupied' || String(t.id) === String(currentOrder.table_id));
   if (!available.length) return alert('No other tables available to transfer to.');
-  const list = available.map(t => `${t.table_number} (${t.status})`).join('\n');
-  const choice = prompt('Enter the table number to transfer this order to:\n\nAvailable: ' + available.map(t => t.table_number).join(', '));
-  if (!choice) return;
-  const target = available.find(t => String(t.table_number).trim() === choice.trim());
-  if (!target) return alert('Table "' + choice + '" not found or not available.');
-  confirmTransfer(target.id);
+  const sel = document.getElementById('transferTableSelect');
+  sel.innerHTML = available.map(t => `<option value="${t.id}">${t.table_number} (${t.status})</option>`).join('');
+  document.getElementById('transferPanel').style.display = '';
 }
-async function confirmTransfer(newTableId) {
+function closeTransferModal() {
+  document.getElementById('transferPanel').style.display = 'none';
+}
+async function confirmTransferFromSelect() {
+  const newTableId = document.getElementById('transferTableSelect').value;
+  if (!newTableId) return alert('Select a table.');
   try {
     await api('/api/bar/orders/' + currentOrder.id + '/transfer', { method: 'PATCH', body: JSON.stringify({ new_table_id: newTableId }) });
     await loadTables();
@@ -757,6 +769,7 @@ async function confirmTransfer(newTableId) {
     alert(e.message || 'Failed to transfer table.');
   }
 }
+
 async function voidOrder() {
   if (!currentOrder) return;
   if (!confirm('Cancel this table with no charges? This cannot be undone.')) return;
