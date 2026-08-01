@@ -102,7 +102,7 @@
       <input id="newItemSupplier" placeholder="Supplier" style="width:120px;">
       <input id="newItemStock" placeholder="Initial stock" value="0" style="width:100px;">
       <input id="newItemLowThreshold" placeholder="Low stock at" value="0" style="width:100px;">
-      <button onclick="createMenuItem()">+ Add item</button>
+      <button id="menuItemSubmitBtn" onclick="createMenuItem()">+ Add item</button>
     </div>
     <input id="menuStockSearch" placeholder="🔍 Search item or category…" style="width:100%;margin-top:10px;" oninput="filterMenuSearch()">
     <div id="manageMenuList" style="margin-top:12px;">Loading…</div>
@@ -352,6 +352,7 @@ function renderManageMenuList(items) {
           <button class="secondary" style="padding:6px 10px;" onclick="adjustStock('${m.id}',-1)">−</button>
           <button class="secondary" style="padding:6px 10px;" onclick="adjustStock('${m.id}',1)">+</button>
           <button class="secondary" style="padding:6px 10px;" onclick="toggleItemActive('${m.id}',${m.active === false})">${m.active === false ? 'Enable' : 'Disable'}</button>
+          <button class="secondary" style="padding:6px 10px;" onclick="startEditItem('${m.id}')">Edit</button>
         </div>
       </div>
     `).join('')}
@@ -437,29 +438,56 @@ function renderStaffPerformance(d) {
     </div>
   `).join('');
 }
+let _editingItemId = null;
+function startEditItem(id) {
+  const item = _menuStockItems.find(m => String(m.id) === String(id));
+  if (!item) return;
+  _editingItemId = id;
+  document.getElementById('newItemName').value = item.name || '';
+  document.getElementById('newItemCategory').value = item.category || '';
+  document.getElementById('newItemPrice').value = item.price || '';
+  document.getElementById('newItemUnit').value = item.unit || '';
+  document.getElementById('newItemCostPrice').value = item.cost_price || '';
+  document.getElementById('newItemSupplier').value = item.supplier || '';
+  const btn = document.getElementById('menuItemSubmitBtn');
+  if (btn) btn.textContent = '✅ Save Changes';
+  document.getElementById('newItemName').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+function resetItemForm() {
+  _editingItemId = null;
+  document.getElementById('newItemName').value = '';
+  document.getElementById('newItemCategory').value = '';
+  document.getElementById('newItemPrice').value = '';
+  document.getElementById('newItemUnit').value = '';
+  document.getElementById('newItemCostPrice').value = '';
+  document.getElementById('newItemSupplier').value = '';
+  document.getElementById('newItemStock').value = '0';
+  document.getElementById('newItemLowThreshold').value = '0';
+  const btn = document.getElementById('menuItemSubmitBtn');
+  if (btn) btn.textContent = '+ Add item';
+}
 async function createMenuItem() {
   const name = document.getElementById('newItemName').value.trim();
   const category = document.getElementById('newItemCategory').value.trim();
   const price = Number(document.getElementById('newItemPrice').value);
   const initial_quantity = Number(document.getElementById('newItemStock').value || 0);
   const low_stock_threshold = Number(document.getElementById('newItemLowThreshold').value || 0);
-    const unit = document.getElementById('newItemUnit').value;
+  const unit = document.getElementById('newItemUnit').value;
   const cost_price = Number(document.getElementById('newItemCostPrice').value || 0) || null;
-const supplier = document.getElementById('newItemSupplier').value.trim() || null;
-
+  const supplier = document.getElementById('newItemSupplier').value.trim() || null;
   if (!name) return alert('Item name is required.');
   if (!price || price <= 0) return alert('Enter a valid price.');
   try {
-    await api('/api/bar/menu-items', { method: 'POST', body: JSON.stringify({ name, category, price, unit, cost_price, supplier, initial_quantity, low_stock_threshold }) });
-    document.getElementById('newItemName').value = '';
-    document.getElementById('newItemCategory').value = '';
-    document.getElementById('newItemPrice').value = '';
-    document.getElementById('newItemStock').value = '0';
-    document.getElementById('newItemLowThreshold').value = '0';
+    if (_editingItemId) {
+      await api('/api/bar/menu-items/' + _editingItemId, { method: 'PATCH', body: JSON.stringify({ name, category, price, unit, cost_price, supplier }) });
+    } else {
+      await api('/api/bar/menu-items', { method: 'POST', body: JSON.stringify({ name, category, price, unit, cost_price, supplier, initial_quantity, low_stock_threshold }) });
+    }
+    resetItemForm();
     await loadManageMenu();
-    if (selectedTable) loadMenu(); // refresh the ordering menu too
+    if (selectedTable) loadMenu();
   } catch (e) {
-    if (e.message !== 'locked') alert(e.message || 'Failed to add item.');
+    if (e.message !== 'locked') alert(e.message || 'Failed to save item.');
   }
 }
 async function adjustStock(menuItemId, delta) {
