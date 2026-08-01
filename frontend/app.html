@@ -1442,7 +1442,7 @@ img,svg,video{max-width:100%;}
         </div>
       </div>
 
-      <button class="btn btn-primary" onclick="handleTopBtn()">+ Add Drug</button>
+      <button class="btn btn-primary" id="topAddDrugBtn" onclick="handleTopBtn()">+ Add Drug</button>
     </div>
   </div>
 
@@ -1456,15 +1456,15 @@ img,svg,video{max-width:100%;}
     </div>
     <div class="two-col">
       <div class="card"><div class="card-head"><div><div class="card-title">Weekly Sales</div><div class="card-sub">Revenue in UGX (local data)</div></div></div><div class="chart-area"><div class="chart-bars" id="chartBars"></div></div></div>
-      <div class="card"><div class="card-head"><div class="card-title">Recent Sales</div><a class="see-all" onclick="go('sales',document.querySelectorAll('.nav-item')[2])">See all →</a></div><table class="tbl"><thead><tr><th>Customer</th><th>Amount</th><th>Method</th><th></th></tr></thead><tbody id="recentSalesBody"></tbody></table></div>
+      <div class="card" id="dashRecentSalesCard"><div class="card-head"><div class="card-title">Recent Sales</div><a class="see-all" onclick="go('sales',document.querySelectorAll('.nav-item')[2])">See all →</a></div><table class="tbl"><thead><tr><th>Customer</th><th>Amount</th><th>Method</th><th></th></tr></thead><tbody id="recentSalesBody"></tbody></table></div>
     </div>
     <div class="two-col">
-      <div class="card"><div class="card-head"><div class="card-title">Stock Alerts</div><a class="see-all" onclick="go('inventory',document.querySelectorAll('.nav-item')[1])">Manage →</a></div><table class="tbl"><thead><tr><th>Drug</th><th>Stock</th><th>Status</th></tr></thead><tbody id="alertsBody"></tbody></table></div>
-      <div class="card"><div class="card-head"><div class="card-title">Quick Actions</div></div><div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <div onclick="go('sales',document.querySelectorAll('.nav-item')[2])" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;text-align:center;transition:all 0.2s" onmouseover="this.style.borderColor='rgba(0,212,170,0.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.07)'"><div style="font-size:22px;margin-bottom:5px">🧾</div><div style="font-size:13px;font-weight:500">New Sale</div></div>
-        <div onclick="go('orders',document.querySelectorAll('.nav-item')[3])" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;text-align:center;transition:all 0.2s" onmouseover="this.style.borderColor='rgba(0,212,170,0.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.07)'"><div style="font-size:22px;margin-bottom:5px">🛒</div><div style="font-size:13px;font-weight:500">Orders</div></div>
-        <div onclick="go('inventory',document.querySelectorAll('.nav-item')[1])" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;text-align:center;transition:all 0.2s" onmouseover="this.style.borderColor='rgba(0,212,170,0.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.07)'"><div style="font-size:22px;margin-bottom:5px">📦</div><div style="font-size:13px;font-weight:500">Inventory</div></div>
-        <div onclick="go('whatsapp',document.querySelectorAll('.nav-item')[6])" style="background:rgba(37,211,102,0.08);border:1px solid rgba(37,211,102,0.2);border-radius:12px;padding:16px;cursor:pointer;text-align:center;transition:all 0.2s"><div style="font-size:22px;margin-bottom:5px">💬</div><div style="font-size:13px;font-weight:500;color:#25d366">WhatsApp</div></div>
+      <div class="card" id="dashStockAlertsCard"><div class="card-head"><div class="card-title">Stock Alerts</div><a class="see-all" onclick="go('inventory',document.querySelectorAll('.nav-item')[1])">Manage →</a></div><table class="tbl"><thead><tr><th>Drug</th><th>Stock</th><th>Status</th></tr></thead><tbody id="alertsBody"></tbody></table></div>
+      <div class="card" id="dashQuickActionsCard"><div class="card-head"><div class="card-title">Quick Actions</div></div><div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div id="qaSales" onclick="go('sales',document.querySelectorAll('.nav-item')[2])" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;text-align:center;transition:all 0.2s" onmouseover="this.style.borderColor='rgba(0,212,170,0.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.07)'"><div style="font-size:22px;margin-bottom:5px">🧾</div><div style="font-size:13px;font-weight:500">New Sale</div></div>
+        <div id="qaOrders" onclick="go('orders',document.querySelectorAll('.nav-item')[3])" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;text-align:center;transition:all 0.2s" onmouseover="this.style.borderColor='rgba(0,212,170,0.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.07)'"><div style="font-size:22px;margin-bottom:5px">🛒</div><div style="font-size:13px;font-weight:500">Orders</div></div>
+        <div id="qaInventory" onclick="go('inventory',document.querySelectorAll('.nav-item')[1])" style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;text-align:center;transition:all 0.2s" onmouseover="this.style.borderColor='rgba(0,212,170,0.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.07)'"><div style="font-size:22px;margin-bottom:5px">📦</div><div style="font-size:13px;font-weight:500">Inventory</div></div>
+        <div id="qaWhatsapp" onclick="go('whatsapp',document.querySelectorAll('.nav-item')[6])" style="background:rgba(37,211,102,0.08);border:1px solid rgba(37,211,102,0.2);border-radius:12px;padding:16px;cursor:pointer;text-align:center;transition:all 0.2s"><div style="font-size:22px;margin-bottom:5px">💬</div><div style="font-size:13px;font-weight:500;color:#25d366">WhatsApp</div></div>
       </div></div>
     </div>
   </div>
@@ -4627,6 +4627,33 @@ function applyRoleUI() {
     const el = document.getElementById(id);
     if (el) el.style.display = canSee(page) ? '' : 'none';
   });
+
+  // Dashboard shortcuts (Quick Actions tiles, Stock Alerts / Recent Sales
+  // cards, "+ Add Drug" button) are separate hardcoded markup, not part of
+  // the sidebar `nav` map above — they were dead-ending into "Access
+  // denied" for bar-only orgs (whose canSee('inventory')/('sales') etc.
+  // are false) because nothing was hiding them. Same canSee() checks,
+  // just applied to these elements too.
+  const dashShortcuts = {
+    sales:     ['qaSales', 'dashRecentSalesCard'],
+    orders:    ['qaOrders'],
+    inventory: ['qaInventory', 'dashStockAlertsCard', 'topAddDrugBtn'],
+    whatsapp:  ['qaWhatsapp'],
+  };
+  Object.entries(dashShortcuts).forEach(([page, ids]) => {
+    ids.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = canSee(page) ? '' : 'none';
+    });
+  });
+  // If every Quick Actions tile is hidden, hide the whole card too rather
+  // than leaving an empty box.
+  const qaCard = document.getElementById('dashQuickActionsCard');
+  if (qaCard) {
+    const anyVisible = ['qaSales','qaOrders','qaInventory','qaWhatsapp']
+      .some(id => document.getElementById(id)?.style.display !== 'none');
+    qaCard.style.display = anyVisible ? '' : 'none';
+  }
 
   // Cashier role: always show navCashier — it is their primary workspace
   if (role === 'cashier') {

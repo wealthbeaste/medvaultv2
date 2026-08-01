@@ -81,6 +81,20 @@
     </div>
   </div>
 
+  <!-- MANAGE MENU & STOCK (owner/manager/super_admin only — mirrors backend's bar-menu:write) -->
+  <div class="card" id="manageMenuCard" style="display:none;">
+    <div class="section-title">Manage Menu &amp; Stock</div>
+    <div class="new-table-form" style="flex-wrap:wrap;">
+      <input id="newItemName" placeholder="Item name" style="width:140px;">
+      <input id="newItemCategory" placeholder="Category" style="width:100px;">
+      <input id="newItemPrice" placeholder="Price (UGX)" style="width:110px;">
+      <input id="newItemStock" placeholder="Initial stock" value="0" style="width:100px;">
+      <input id="newItemLowThreshold" placeholder="Low stock at" value="0" style="width:100px;">
+      <button onclick="createMenuItem()">+ Add item</button>
+    </div>
+    <div id="manageMenuList" style="margin-top:12px;">Loading…</div>
+  </div>
+
   <div class="layout">
     <!-- MENU -->
     <div class="card">
@@ -224,7 +238,7 @@ async function selectTable(tableId) {
 
 // ── MENU ────────────────────────────────────────────────
 function renderMenu(wrap) {
-  if (!menuItems.length) { wrap.innerHTML = '<div class="empty-hint">No menu items yet. Add some from Admin → Bar Menu.</div>'; return; }
+  if (!menuItems.length) { wrap.innerHTML = '<div class="empty-hint">No menu items yet. Owners/managers can add some in "Manage Menu & Stock" above.</div>'; return; }
   const byCat = {};
   menuItems.forEach(m => { const c = m.category || 'Other'; (byCat[c] = byCat[c] || []).push(m); });
   wrap.innerHTML = Object.keys(byCat).sort().map(cat => `
@@ -259,6 +273,93 @@ async function loadMenu() {
     } else {
       wrap.innerHTML = '<div class="msg bad">Failed to load menu.</div>';
     }
+  }
+}
+
+// ── MANAGE MENU & STOCK (owner/manager/super_admin — matches backend's
+// bar-menu:write permission exactly, so a staff/cashier account simply
+// never sees this card rather than seeing it and getting a 403). ──────
+function getRole() {
+  try {
+    const u = JSON.parse(localStorage.getItem('mv_user') || 'null');
+    return (u?.role || '').toString().trim().toLowerCase();
+  } catch (e) { return ''; }
+}
+async function loadManageMenu() {
+  const card = document.getElementById('manageMenuCard');
+  if (!['owner', 'manager', 'super_admin'].includes(getRole())) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  const list = document.getElementById('manageMenuList');
+  list.innerHTML = 'Loading…';
+  try {
+    const d = await api('/api/bar/menu-items');
+    renderManageMenuList(d.items || []);
+  } catch (e) {
+    if (e.message === 'locked') return;
+    list.innerHTML = '<div class="msg bad">Failed to load menu items.</div>';
+  }
+}
+function renderManageMenuList(items) {
+  const list = document.getElementById('manageMenuList');
+  if (!items.length) { list.innerHTML = '<div class="empty-hint">No menu items yet — add one above.</div>'; return; }
+  const byCat = {};
+  items.forEach(m => { const c = m.category || 'Other'; (byCat[c] = byCat[c] || []).push(m); });
+  list.innerHTML = Object.keys(byCat).sort().map(cat => `
+    <div class="menu-cat">${cat}</div>
+    ${byCat[cat].map(m => `
+      <div class="menu-item">
+        <div>
+          <div class="name">${m.name}${m.active === false ? ' <span class="stock-low">(inactive)</span>' : ''}</div>
+          <div class="price">UGX ${Number(m.price).toLocaleString()} · stock ${m.quantity_on_hand ?? 0}
+            ${m.quantity_on_hand != null && m.quantity_on_hand <= (m.low_stock_threshold || 0) ? '<span class="stock-low"> · low</span>' : ''}
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="secondary" style="padding:6px 10px;" onclick="adjustStock('${m.id}',-1)">−</button>
+          <button class="secondary" style="padding:6px 10px;" onclick="adjustStock('${m.id}',1)">+</button>
+          <button class="secondary" style="padding:6px 10px;" onclick="toggleItemActive('${m.id}',${m.active === false})">${m.active === false ? 'Enable' : 'Disable'}</button>
+        </div>
+      </div>
+    `).join('')}
+  `).join('');
+}
+async function createMenuItem() {
+  const name = document.getElementById('newItemName').value.trim();
+  const category = document.getElementById('newItemCategory').value.trim();
+  const price = Number(document.getElementById('newItemPrice').value);
+  const initial_quantity = Number(document.getElementById('newItemStock').value || 0);
+  const low_stock_threshold = Number(document.getElementById('newItemLowThreshold').value || 0);
+  if (!name) return alert('Item name is required.');
+  if (!price || price <= 0) return alert('Enter a valid price.');
+  try {
+    await api('/api/bar/menu-items', { method: 'POST', body: JSON.stringify({ name, category, price, initial_quantity, low_stock_threshold }) });
+    document.getElementById('newItemName').value = '';
+    document.getElementById('newItemCategory').value = '';
+    document.getElementById('newItemPrice').value = '';
+    document.getElementById('newItemStock').value = '0';
+    document.getElementById('newItemLowThreshold').value = '0';
+    await loadManageMenu();
+    if (selectedTable) loadMenu(); // refresh the ordering menu too
+  } catch (e) {
+    if (e.message !== 'locked') alert(e.message || 'Failed to add item.');
+  }
+}
+async function adjustStock(menuItemId, delta) {
+  try {
+    await api('/api/bar/stock/' + menuItemId, { method: 'PATCH', body: JSON.stringify({ adjustment: delta }) });
+    await loadManageMenu();
+    if (selectedTable) loadMenu();
+  } catch (e) {
+    if (e.message !== 'locked') alert(e.message || 'Failed to adjust stock.');
+  }
+}
+async function toggleItemActive(menuItemId, makeActive) {
+  try {
+    await api('/api/bar/menu-items/' + menuItemId, { method: 'PATCH', body: JSON.stringify({ active: makeActive }) });
+    await loadManageMenu();
+    if (selectedTable) loadMenu();
+  } catch (e) {
+    if (e.message !== 'locked') alert(e.message || 'Failed to update item.');
   }
 }
 
@@ -322,6 +423,11 @@ function renderOrder() {
     ${payments.length ? `<div class="paid-list">${payments.map(p => `
       <div class="row"><span>${p.method.replace('_',' ')}${p.reference ? ' · ' + p.reference : ''}</span><span>UGX ${Number(p.amount).toLocaleString()}</span></div>
     `).join('')}</div>` : ''}
+    ${items.length ? `
+      <div class="bar" style="margin-top:12px;">
+        <button class="secondary" onclick="printBarReceipt()">🖨️ Print Receipt</button>
+      </div>
+    ` : ''}
 
     ${items.length && balance > 0 ? `
       <div class="pay-panel">
@@ -497,10 +603,54 @@ async function voidOrder() {
   loadTables();
 }
 
+// ── RECEIPT PRINTING ────────────────────────────────────
+// Mirrors app.html's printRcpt(): a popup window styled with the same
+// r-prefixed classes, so pharmacy and bar receipts look consistent, then
+// auto-triggers the browser print dialog and closes itself after.
+function printBarReceipt() {
+  if (!currentOrder) return;
+  const items = currentOrder.items || [];
+  const total = Number(currentOrder.total_amount || 0);
+  const discount = Number(currentOrder.discount_amount || 0);
+  const subtotal = total + discount;
+  const paidTotal = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
+  const tableLabel = selectedTable ? 'Table #' + selectedTable.table_number : '';
+  const itemsHtml = items.map(i => `
+    <div class="ri" style="display:grid;grid-template-columns:2fr 1fr 1fr;font-size:12px;padding:4px 0;border-bottom:1px solid #f0f0f0;">
+      <span>${i.item_name}</span><span style="text-align:center">${i.quantity}</span><span style="text-align:right">${(i.quantity * i.unit_price).toLocaleString()}</span>
+    </div>
+  `).join('');
+  const paymentsHtml = payments.map(p => `
+    <div class="rtr" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;"><span>${p.method.replace('_',' ')}</span><span>UGX ${Number(p.amount).toLocaleString()}</span></div>
+  `).join('');
+  const content = `
+    <div class="rtop" style="text-align:center;margin-bottom:14px;"><div class="rlogo" style="font-family:'Syne',sans-serif;font-weight:800;font-size:20px;">🍺 MedVault Bar</div><div class="raddr" style="font-size:11px;color:#666;">${tableLabel}</div></div>
+    <hr class="rdiv" style="border:none;border-top:1px dashed #ccc;margin:12px 0;"/>
+    <div class="rmr" style="display:flex;justify-content:space-between;font-size:11px;color:#666;margin-bottom:7px;"><span>Order #${currentOrder.id}</span><span>${new Date(currentOrder.opened_at || Date.now()).toLocaleString()}</span></div>
+    <hr class="rdiv" style="border:none;border-top:1px dashed #ccc;margin:12px 0;"/>
+    <div class="rih" style="display:grid;grid-template-columns:2fr 1fr 1fr;font-size:10px;color:#999;text-transform:uppercase;margin-bottom:6px;"><span>Item</span><span style="text-align:center">Qty</span><span style="text-align:right">Total</span></div>
+    ${itemsHtml}
+    <div style="margin-top:10px">
+      <div class="rtr" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;"><span>Subtotal</span><span>UGX ${subtotal.toLocaleString()}</span></div>
+      ${discount > 0 ? `<div class="rtr" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;"><span>Discount</span><span>-UGX ${discount.toLocaleString()}</span></div>` : ''}
+      <div class="rtr rgrand" style="display:flex;justify-content:space-between;font-family:'Syne',sans-serif;font-weight:800;font-size:15px;border-top:2px solid #111;margin-top:5px;padding-top:6px;"><span>TOTAL</span><span>UGX ${total.toLocaleString()}</span></div>
+      ${paymentsHtml}
+      ${paidTotal < total ? `<div class="rtr" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:#e74c3c;"><span>Balance due</span><span>UGX ${(total - paidTotal).toLocaleString()}</span></div>` : ''}
+    </div>
+    <div class="rfooter" style="text-align:center;margin-top:12px;padding-top:12px;border-top:1px dashed #ccc;font-size:11px;color:#888;line-height:1.7;">Thank you — see you again soon!<br><strong>MedVault</strong> · medvault.ug</div>
+  `;
+  const w = window.open('', '_blank', 'width=400,height=620');
+  w.document.write(`<html><head><title>Receipt</title><link href="https://fonts.googleapis.com/css2?family=Syne:wght@800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet"><style>body{font-family:'DM Sans',sans-serif;padding:20px;max-width:320px;margin:0 auto;color:#111}</style></head><body>${content}
+<script>window.onload=()=>window.print()<\/script>
+</body></html>`);
+  w.document.close();
+}
+
 // ─── Init ───
 const BASE_TOKEN = localStorage.getItem('mv_token');
 if (requireAuth()) {
   loadTables();
+  loadManageMenu();
   BarOffline.init(BASE, BASE_TOKEN);
   // After a background sync pushes queued changes, refresh whatever's on
   // screen so offline tags disappear and real server ids take over.
