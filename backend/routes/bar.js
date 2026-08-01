@@ -727,4 +727,52 @@ const r = await query(
       });
     } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
   });
+
+  app.get('/api/bar/reports/staff', auth, can('bar-reports:read'), gate, async (req, res) => {
+    const { pharmacyId } = req.user;
+    if (!pharmacyId) return err(res, 400, 'AUTH_NO_PHARMACY', 'No pharmacy assigned.', 'pharmacyId');
+    const to = req.query.to ? new Date(req.query.to) : new Date();
+    const from = req.query.from ? new Date(req.query.from) : new Date(to.getTime() - 7 * 24 * 60 * 60 * 1000);
+    if (isNaN(from.getTime()) || isNaN(to.getTime())) return err(res, 400, 'VALIDATION_INVALID', 'from/to must be valid dates.');
+
+    try {
+      const ordersOpened = await query(
+        `SELECT u.id AS staff_id, u.name AS staff_name, COUNT(*) AS orders_opened
+         FROM bar_orders bo
+         JOIN users u ON u.id = bo.opened_by
+         WHERE bo.pharmacy_id=$1 AND bo.opened_at BETWEEN $2 AND $3
+         GROUP BY u.id, u.name ORDER BY orders_opened DESC`,
+        [pharmacyId, from, to]
+      );
+
+      const revenueCollected = await query(
+        `SELECT u.id AS staff_id, u.name AS staff_name, COALESCE(SUM(bp.amount),0) AS revenue_collected, COUNT(*) AS payments_taken
+         FROM bar_payments bp
+         JOIN users u ON u.id = bp.received_by
+         WHERE bp.pharmacy_id=$1 AND bp.created_at BETWEEN $2 AND $3
+         GROUP BY u.id, u.name ORDER BY revenue_collected DESC`,
+        [pharmacyId, from, to]
+      );
+
+      const voidsByStaff = await query(
+        `SELECT u.id AS staff_id, u.name AS staff_name, COUNT(*) AS void_count, COALESCE(SUM(boi.quantity * boi.unit_price),0) AS void_value
+         FROM bar_order_items boi
+         JOIN bar_orders bo ON bo.id = boi.order_id
+         JOIN users u ON u.id = boi.voided_by
+         WHERE bo.pharmacy_id=$1 AND boi.voided_at BETWEEN $2 AND $3
+         GROUP BY u.id, u.name ORDER BY void_count DESC`,
+        [pharmacyId, from, to]
+      );
+
+      // Merge the three datasets into one row per staff member
+      const byId = {};
+      ordersOpened.rows.forEach(r => { byId[r.staff_id] = { staff_name: r.staff_name, orders_opened: parseInt(r.orders_opened), revenue_collected: 0, payments_taken: 0, void_count: 0, void_value: 0 }; });
+      revenueCollected.rows.forEach(r => { byId[r.staff_id] = byId[r.staff_id] || { staff_name: r.staff_name, orders_opened: 0 }; byId[r.staff_id].revenue_collected = parseFloat(r.revenue_collected); byId[r.staff_id].payments_taken = parseInt(r.payments_taken); });
+      voidsByStaff.rows.forEach(r => { byId[r.staff_id] = byId[r.staff_id] || { staff_name: r.staff_name, orders_opened: 0, revenue_collected: 0, payments_taken: 0 }; byId[r.staff_id].void_count = parseInt(r.void_count); byId[r.staff_id].void_value = parseFloat(r.void_value); });
+
+      const staff = Object.entries(byId).map(([id, v]) => ({ staff_id: id, ...v })).sort((a,b) => b.revenue_collected - a.revenue_collected);
+
+      res.json({ range: { from: from.toISOString(), to: to.toISOString() }, staff });
+    } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
+  });
 };
