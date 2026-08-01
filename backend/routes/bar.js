@@ -589,6 +589,9 @@ const r = await query(
     if (b.category !== undefined) { fields.push(`category=$${i++}`); values.push(b.category); }
     if (b.price !== undefined) { fields.push(`price=$${i++}`); values.push(b.price); }
     if (b.active !== undefined) { fields.push(`active=$${i++}`); values.push(b.active); }
+    if (b.unit !== undefined) { fields.push(`unit=$${i++}`); values.push(b.unit || null); }
+    if (b.cost_price !== undefined) { fields.push(`cost_price=$${i++}`); values.push(b.cost_price || null); }
+    if (b.supplier !== undefined) { fields.push(`supplier=$${i++}`); values.push(b.supplier || null); }
     if (!fields.length) return err(res, 400, 'VALIDATION_INVALID', 'No fields to update.');
     fields.push(`updated_at=NOW()`);
     values.push(req.params.id, pharmacyId);
