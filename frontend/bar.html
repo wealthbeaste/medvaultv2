@@ -324,6 +324,7 @@ function renderManageMenuList(items) {
         <div>
           <div class="name">${m.name}${m.active === false ? ' <span class="stock-low">(inactive)</span>' : ''}</div>
           <div class="price">UGX ${Number(m.price).toLocaleString()} · stock ${m.quantity_on_hand ?? 0}
+            ${m.cost_price ? `<span style="color:var(--muted)"> · margin UGX ${(Number(m.price) - Number(m.cost_price)).toLocaleString()}</span>` : ''}
             ${m.quantity_on_hand != null && m.quantity_on_hand <= (m.low_stock_threshold || 0) ? '<span class="stock-low"> · low</span>' : ''}
           </div>
         </div>
