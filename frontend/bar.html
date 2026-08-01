@@ -214,7 +214,7 @@ async function loadTables() {
 async function createTable() {
   const num = document.getElementById('newTableNum').value.trim();
   const cap = parseInt(document.getElementById('newTableCap').value) || 4;
-  if (!num) return;
+  if (!num) return alert('Enter a table number.');
   try {
     await apiOrOffline('/api/bar/tables', { method: 'POST', body: JSON.stringify({ table_number: num, capacity: cap }) });
   } catch (e) {
