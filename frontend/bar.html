@@ -577,6 +577,12 @@ function renderOrder() {
 
     ${items.length && balance > 0 ? `
       <div class="pay-panel">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
+          <label style="font-size:12px;color:var(--muted);">Split evenly
+            <input type="number" id="splitWays" min="1" step="1" placeholder="e.g. 3" style="width:70px;margin-left:6px;">
+          </label>
+          <button class="secondary" style="padding:6px 10px;" onclick="applySplit()">Calculate share</button>
+        </div>
         <div class="formgrid">
           <label>Method
             <select id="pay_method" onchange="onPayMethodChange()">
@@ -609,6 +615,13 @@ function renderOrder() {
   `;
 }
 
+function applySplit() {
+  const ways = parseInt(document.getElementById('splitWays').value);
+  if (!ways || ways < 1) return alert('Enter how many people are splitting the bill.');
+  const balance = currentOrder.balance_due != null ? Number(currentOrder.balance_due) : 0;
+  const share = Math.ceil((balance / ways) * 100) / 100;
+  document.getElementById('pay_amount').value = share;
+}
 function onPayMethodChange() {
   const method = document.getElementById('pay_method').value;
   document.getElementById('pay_tendered_wrap').style.display = method === 'cash' ? 'flex' : 'none';
