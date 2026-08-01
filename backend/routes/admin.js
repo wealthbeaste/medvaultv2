@@ -180,6 +180,25 @@ module.exports = function registerAdminRoutes(app, { query, auth, can, hash, aud
     } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
   });
 
+  // Change an existing org's business_type, e.g. { "business_type": "bar" }.
+  // Mirrors the /plan route above. business_type is orthogonal to plan/
+  // billing — it only affects which nav sections canSee() hides on the
+  // frontend (see barOnlyHidden in app.html); it does not touch
+  // subscriptions, pricing, or the modules JSONB (still toggled separately
+  // via /modules below).
+  app.patch('/api/admin/orgs/:id/business-type', auth, adminOnly, async (req, res) => {
+    const { business_type } = req.body || {};
+    const BUSINESS_TYPES = ['pharmacy', 'supermarket', 'hotel', 'bar', 'hardware', 'retail_shop', 'wholesale_shop'];
+    if (!business_type) return err(res, 400, 'VALIDATION_REQUIRED', 'business_type is required', 'business_type');
+    if (!BUSINESS_TYPES.includes(business_type)) {
+      return err(res, 400, 'VALIDATION_INVALID', `business_type must be one of: ${BUSINESS_TYPES.join(', ')}`, 'business_type');
+    }
+    try {
+      await query(`UPDATE organisations SET business_type=$1 WHERE id=$2`, [business_type, req.params.id]);
+      res.json({ success: true, business_type });
+    } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
+  });
+
   // Toggle a paid add-on module for an org, e.g. { "modules": { "sicklecell": true } }.
   // Merges into the existing modules JSON rather than replacing it, so
   // enabling one add-on never accidentally disables another.

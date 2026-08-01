@@ -1504,6 +1504,7 @@ function openOrgDetail(id) {
   }
   if (o.sub_status==='active') {
     actions.push(`<button class="btn btn-ghost" onclick="changePlan(${o.id},'${esc(o.name)}')">Change Plan</button>`);
+    actions.push(`<button class="btn btn-ghost" onclick="changeBusinessType(${o.id},'${esc(o.name)}','${o.business_type||'pharmacy'}')">Change Business Type</button>`);
     actions.push(`<button class="btn btn-danger" onclick="suspendOrg(${o.id},'${esc(o.name)}');closeModal('detailModal')">🚫 Suspend</button>`);
   }
   if (o.sub_status==='suspended' || !o.is_active) {
@@ -1606,6 +1607,18 @@ async function extendTrial(id, name) {
   } else { toast('❌ '+(r?.data?.error||'Failed'),'err'); }
 }
 
+async function changeBusinessType(id, name, current) {
+  const bt = prompt(`Change business type for "${name}".
+Options: pharmacy, supermarket, hotel, bar, hardware, retail_shop, wholesale_shop`, current || 'pharmacy');
+  if (!bt) return;
+  const r = await api(`/api/admin/orgs/${id}/business-type`, {method:'PATCH', body:JSON.stringify({business_type: bt})});
+  if (r&&r.ok) {
+    const o = orgs.find(x=>x.id===id);
+    if (o) { o.business_type = bt; }
+    toast(`✅ ${name} set to ${bt}`);
+    loadPage(currentPage);
+  } else { toast('❌ '+(r?.data?.error||'Failed'),'err'); }
+}
 async function changePlan(id, name) {
   const plan = prompt(`Change plan for "${name}".
 Options: basic, pro, enterprise`, 'pro');
