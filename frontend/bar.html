@@ -103,6 +103,7 @@
       <input id="newItemLowThreshold" placeholder="Low stock at" value="0" style="width:100px;">
       <button onclick="createMenuItem()">+ Add item</button>
     </div>
+    <input id="menuStockSearch" placeholder="🔍 Search item or category…" style="width:100%;margin-top:10px;" oninput="filterMenuSearch()">
     <div id="manageMenuList" style="margin-top:12px;">Loading…</div>
   </div>
 
@@ -128,6 +129,7 @@ const BASE = window.location.origin;
 let selectedTable = null;   // full table row
 let currentOrder = null;    // full order row (with items[])
 let menuItems = [];
+let _menuStockItems = [];
 
 function authHeaders() {
   const token = localStorage.getItem('mv_token');
@@ -304,7 +306,7 @@ async function loadManageMenu() {
   list.innerHTML = 'Loading…';
   try {
     const d = await api('/api/bar/menu-items');
-    renderManageMenuList(d.items || []);
+    _menuStockItems = d.items || []; renderManageMenuList(_menuStockItems);
   } catch (e) {
     if (e.message === 'locked') return;
     list.innerHTML = '<div class="msg bad">Failed to load menu items.</div>';
@@ -333,6 +335,14 @@ function renderManageMenuList(items) {
       </div>
     `).join('')}
   `).join('');
+}
+function filterMenuSearch() {
+  const q = document.getElementById('menuStockSearch').value.trim().toLowerCase();
+  if (!q) { renderManageMenuList(_menuStockItems); return; }
+  const filtered = _menuStockItems.filter(m =>
+    (m.name || '').toLowerCase().includes(q) || (m.category || '').toLowerCase().includes(q)
+  );
+  renderManageMenuList(filtered);
 }
 async function createMenuItem() {
   const name = document.getElementById('newItemName').value.trim();
