@@ -2131,7 +2131,9 @@ async function runMigrations() {
       type VARCHAR(30) NOT NULL,
       sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`,
-    `CREATE INDEX IF NOT EXISTS idx_whatsapp_sends_pharmacy ON whatsapp_sends(pharmacy_id, type, sent_at)`
+    `CREATE INDEX IF NOT EXISTS idx_whatsapp_sends_pharmacy ON whatsapp_sends(pharmacy_id, type, sent_at)`,
+    `ALTER TABLE whatsapp_sends ADD COLUMN IF NOT EXISTS customer_id INTEGER REFERENCES customers(id)`,
+    `CREATE INDEX IF NOT EXISTS idx_whatsapp_sends_customer ON whatsapp_sends(customer_id, type, sent_at)`
 
   ];
 

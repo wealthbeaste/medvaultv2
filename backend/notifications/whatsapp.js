@@ -333,6 +333,41 @@ async function sendPaymentReminders() {
   return { sent };
 }
 
+async function sendLoyaltyReminders() {
+  const rows = (await query(
+    `SELECT c.id, c.pharmacy_id, c.name, c.phone, la.points_balance,
+            (SELECT MAX(s.created_at) FROM sales s WHERE s.customer_phone = c.phone) AS last_purchase
+     FROM customers c
+     JOIN loyalty_accounts la ON la.customer_id = c.id
+     WHERE la.points_balance > 0 AND c.phone IS NOT NULL AND c.phone <> ''`
+  )).rows;
+
+  let sent = 0;
+  for (const r of rows) {
+    if (r.last_purchase && (new Date() - new Date(r.last_purchase)) < 14 * 86400000) continue;
+
+    const recent = await query(
+      `SELECT id FROM whatsapp_sends
+       WHERE customer_id = $1 AND type = 'loyalty_reminder'
+         AND sent_at >= NOW() - INTERVAL '30 days' LIMIT 1`,
+      [r.id]
+    );
+    if (recent.rows.length) continue;
+
+    const msg = `Hi ${r.name}! You have ${r.points_balance} loyalty points waiting at MedVault. Come back soon and redeem them on your next visit!`;
+    const result = await sendWhatsApp(r.phone, msg);
+    if (result.success) {
+      sent++;
+      await query(
+        `INSERT INTO whatsapp_sends (pharmacy_id, customer_id, type) VALUES ($1,$2,'loyalty_reminder')`,
+        [r.pharmacy_id, r.id]
+      );
+    }
+  }
+  console.log(`✅ Loyalty reminders: ${sent} sent`);
+  return { sent };
+}
+
 // ── SCHEDULER: run tasks at the right time ──────────────────
 function startScheduler() {
   console.log('⏰ MedVault WhatsApp scheduler started');
@@ -350,6 +385,9 @@ function startScheduler() {
 
     // 10:00 AM — send payment reminders
     if (h === 10 && m === 0) sendPaymentReminders();
+
+    // 11:00 AM — send loyalty reminders
+    if (h === 11 && m === 0) sendLoyaltyReminders();
 
   }, 60000); // Check every minute
 }
@@ -495,6 +533,7 @@ module.exports = {
   sendDailyReports,
   sendLowStockAlerts,
   sendPaymentReminders,
+  sendLoyaltyReminders,
   startScheduler,
   registerWhatsAppRoutes,
   buildDailyReport,
