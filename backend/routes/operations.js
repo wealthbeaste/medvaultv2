@@ -297,11 +297,13 @@ module.exports = function registerOperationsRoutes(app, { query, pool, getNextRe
       );
       // Same automatic backup snapshot as the direct POS flow — see
       // GET /api/sales/reconcile and /api/sales/:id/audit-trail.
-      await client.query(
-        `INSERT INTO sales_audit_log (pharmacy_id, sale_id, event, user_id, snapshot)
-         VALUES ($1,$2,'created',$3,$4)`,
-        [pharmacyId, sale.id, userId || null, JSON.stringify({ sale, items: insertedItems, source: 'dispatch_collect', dispatch_id: ps.id })]
-      );
+      try {
+        await client.query(
+          `INSERT INTO sale_audit_trail (sale_id, pharmacy_id, action, user_id, after_data)
+           VALUES ($1,$2,'created',$3,$4)`,
+          [sale.id, pharmacyId, userId || null, JSON.stringify({ sale, items: insertedItems, source: 'dispatch_collect', dispatch_id: ps.id })]
+        );
+      } catch (e) { console.error("sale_audit_trail write failed:", e.message); }
       await client.query('COMMIT');
       res.json({ success: true, sale: { ...sale, items: insertedItems }, receipt_number });
     } catch (e) {
