@@ -283,8 +283,8 @@ module.exports = function registerBarRoutes(app, { query, pool, auth, can, audit
       }
 
       const r = await client.query(
-        `INSERT INTO bar_order_items (order_id, item_name, quantity, unit_price, menu_item_id, client_txn_id) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-        [req.params.id, item_name, quantity, unit_price, b.menu_item_id || null, clientTxnId]
+        `INSERT INTO bar_order_items (order_id, item_name, quantity, unit_price, menu_item_id, client_txn_id, seat_label) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+        [req.params.id, item_name, quantity, unit_price, b.menu_item_id || null, clientTxnId, b.seat_label || null]
       );
 
       if (stockRow) {
@@ -355,6 +355,36 @@ module.exports = function registerBarRoutes(app, { query, pool, auth, can, audit
     } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
   });
 
+  // Group an order's items by seat_label so staff can see what each
+  // person/seat owes without doing the math by hand. Items with no
+  // seat_label are grouped under "Unassigned". This is a read-only view —
+  // actual payment splitting already works via multiple calls to the
+  // /payments endpoint above (e.g. one call per seat's share).
+  app.get('/api/bar/orders/:id/split', auth, can('bar:read'), gate, async (req, res) => {
+    const { pharmacyId } = req.user;
+    if (!pharmacyId) return err(res, 400, 'AUTH_NO_PHARMACY', 'No pharmacy assigned.', 'pharmacyId');
+    try {
+      const ordRes = await query(`SELECT id FROM bar_orders WHERE id=$1 AND pharmacy_id=$2`, [req.params.id, pharmacyId]);
+      if (!ordRes.rows.length) return err(res, 404, 'NOT_FOUND', 'Order not found.');
+
+      const itemsRes = await query(
+        `SELECT id, item_name, quantity, unit_price, seat_label, (quantity*unit_price) AS line_total
+         FROM bar_order_items WHERE order_id=$1 AND voided_at IS NULL ORDER BY seat_label NULLS LAST, id`,
+        [req.params.id]
+      );
+
+      const groups = {};
+      for (const item of itemsRes.rows) {
+        const key = item.seat_label || 'Unassigned';
+        if (!groups[key]) groups[key] = { seat_label: key, items: [], subtotal: 0 };
+        groups[key].items.push(item);
+        groups[key].subtotal += Number(item.line_total);
+      }
+
+      res.json({ seats: Object.values(groups) });
+    } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
+  });
+
   // Record a payment against an order. Supports split/partial payments —
   // e.g. part cash, part mobile money on the same bill. Once payments
   // cover the full total_amount the order auto-closes (status='paid')
@@ -365,12 +395,14 @@ module.exports = function registerBarRoutes(app, { query, pool, auth, can, audit
     const b = req.body || {};
     const method = b.method;
     const amount = Number(b.amount);
+    const tipAmount = Number(b.tip_amount) || 0;
     const clientTxnId = b.client_txn_id || null;
     if (!PAYMENT_METHODS.includes(method)) return err(res, 400, 'VALIDATION_INVALID', `method must be one of ${PAYMENT_METHODS.join(', ')}.`, 'method');
     if (!amount || amount <= 0) return err(res, 400, 'VALIDATION_INVALID', 'amount must be a positive number.', 'amount');
+    if (tipAmount < 0) return err(res, 400, 'VALIDATION_INVALID', 'tip_amount cannot be negative.', 'tip_amount');
     const tendered = b.tendered !== undefined && b.tendered !== null ? Number(b.tendered) : null;
-    if (method === 'cash' && tendered !== null && tendered < amount) {
-      return err(res, 400, 'VALIDATION_INVALID', 'tendered cannot be less than amount.', 'tendered');
+    if (method === 'cash' && tendered !== null && tendered < amount + tipAmount) {
+      return err(res, 400, 'VALIDATION_INVALID', 'tendered cannot be less than amount plus tip.', 'tendered');
     }
 
     const client = await pool.connect();
@@ -419,12 +451,12 @@ module.exports = function registerBarRoutes(app, { query, pool, auth, can, audit
         return err(res, 409, 'CONFLICT_OVERPAYMENT', `Amount exceeds balance due (UGX ${balanceDue.toFixed(2)} remaining).`, 'amount');
       }
 
-      const changeDue = method === 'cash' && tendered !== null ? +(tendered - amount).toFixed(2) : null;
+      const changeDue = method === 'cash' && tendered !== null ? +(tendered - amount - tipAmount).toFixed(2) : null;
 
       const payRes = await client.query(
-        `INSERT INTO bar_payments (order_id, pharmacy_id, method, amount, reference, tendered, change_due, received_by, client_txn_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-        [order.id, pharmacyId, method, amount, b.reference || null, tendered, changeDue, userId || null, clientTxnId]
+        `INSERT INTO bar_payments (order_id, pharmacy_id, method, amount, tip_amount, reference, tendered, change_due, received_by, client_txn_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+        [order.id, pharmacyId, method, amount, tipAmount, b.reference || null, tendered, changeDue, userId || null, clientTxnId]
       );
 
       const newPaid = alreadyPaid + amount;
@@ -445,7 +477,7 @@ module.exports = function registerBarRoutes(app, { query, pool, auth, can, audit
       }
 
       await client.query('COMMIT');
-      if (audit) await audit(query, { req, action: 'bar.payment.record', entity: 'bar_payment', entityId: payRes.rows[0].id, payload: { method, amount } });
+      if (audit) await audit(query, { req, action: 'bar.payment.record', entity: 'bar_payment', entityId: payRes.rows[0].id, payload: { method, amount, tip_amount: tipAmount || undefined } });
       res.json({
         success: true,
         payment: payRes.rows[0],

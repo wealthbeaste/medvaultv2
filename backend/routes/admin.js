@@ -90,7 +90,7 @@ module.exports = function registerAdminRoutes(app, { query, auth, can, hash, aud
     if (!BUSINESS_TYPES.includes(bizType)) {
       return err(res, 400, 'VALIDATION_INVALID', `business_type must be one of: ${BUSINESS_TYPES.join(', ')}`, 'business_type');
     }
-    const planAmounts = { drug_shop: 20000, basic: 20000, single: 50000, pro: 50000, multi: 80000, branch: 40000, chain: 30000, enterprise: 150000 };
+    const planAmounts = { drug_shop: 20000, basic: 20000, single: 50000, pro: 50000, multi: 80000, branch: 40000, chain: 30000, enterprise: 150000, ngo_screening: 0, referral_partner: 0 };
     const amount = (plan in planAmounts) ? planAmounts[plan] : 50000;
     try {
       const tempPw = name.replace(/\s+/g, '').slice(0, 4) + phone.slice(-4) + '!';
@@ -109,7 +109,10 @@ module.exports = function registerAdminRoutes(app, { query, auth, can, hash, aud
         `INSERT INTO users (organisation_id,pharmacy_id,name,email,password_hash,role) VALUES ($1,$2,$3,$4,$5,'owner')`,
         [orgId, pharmacyId, owner_name || name, email.toLowerCase(), pwHash]
       );
-      const defaultModules = BUSINESS_TYPE_DEFAULT_MODULES[bizType] || {};
+      // The whole point of the ngo_screening plan is sickle cell screening —
+      // it shouldn't need a separate manual module toggle after signup on
+      // top of picking the plan itself.
+      const defaultModules = { ...(BUSINESS_TYPE_DEFAULT_MODULES[bizType] || {}), ...(plan === 'ngo_screening' ? { sicklecell: true } : {}) };
       await query(
         `INSERT INTO subscriptions (organisation_id,plan,amount_ugx,status,trial_ends_at,modules) VALUES ($1,$2,$3,'trial',NOW()+INTERVAL '14 days',$4)`,
         [orgId, plan || 'pro', amount, JSON.stringify(defaultModules)]

@@ -54,9 +54,12 @@ module.exports = function registerAuthRoutes(app, { query, pool, hash, compare, 
         const user = userRes.rows[0];
 
         const prices = { drug_shop: 20000, single: 50000, branch: 40000, chain: 30000, enterprise: 20000, ngo_screening: 0 };
+        // Signing up on the ngo_screening plan should give screening access
+        // immediately, not leave it waiting on a manual module toggle.
+        const defaultModules = selectedPlan === 'ngo_screening' ? { sicklecell: true } : {};
         await client.query(
-          `INSERT INTO subscriptions (organisation_id,plan,branch_count,amount_ugx,status) VALUES ($1,$2,$3,$4,$5)`,
-          [orgId, selectedPlan, 1, (selectedPlan in prices) ? prices[selectedPlan] : 50000, 'trial']
+          `INSERT INTO subscriptions (organisation_id,plan,branch_count,amount_ugx,status,modules) VALUES ($1,$2,$3,$4,$5,$6)`,
+          [orgId, selectedPlan, 1, (selectedPlan in prices) ? prices[selectedPlan] : 50000, 'trial', JSON.stringify(defaultModules)]
         );
 
         await client.query('COMMIT');

@@ -14,8 +14,8 @@ function getPool() {
   const connStr = process.env.DATABASE_URL || '';
 
   const cleanConn = connStr.includes('sslmode=')
-    ? connStr.replace(/sslmode=[^&]+/, 'sslmode=verify-full')
-    : connStr + (connStr.includes('?') ? '&' : '?') + 'sslmode=verify-full';
+    ? connStr.replace(/sslmode=[^&]+/, 'sslmode=require')
+    : connStr + (connStr.includes('?') ? '&' : '?') + 'sslmode=require';
 
   pool = new Pool({
     connectionString: cleanConn,
@@ -23,6 +23,7 @@ function getPool() {
     max: 5,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 15000,
+    keepAlive: true,
   });
 
   pool.on('error', (err) => {
@@ -2067,6 +2068,7 @@ async function runMigrations() {
     )`,
     `CREATE INDEX IF NOT EXISTS idx_bar_stock_menu_item ON bar_stock(menu_item_id)`,
     `ALTER TABLE bar_order_items ADD COLUMN IF NOT EXISTS menu_item_id INTEGER REFERENCES bar_menu_items(id) ON DELETE SET NULL`,
+    `ALTER TABLE bar_order_items ADD COLUMN IF NOT EXISTS seat_label VARCHAR(50)`,
 `ALTER TABLE bar_menu_items ADD COLUMN IF NOT EXISTS unit VARCHAR(50)`,
 `ALTER TABLE bar_menu_items ADD COLUMN IF NOT EXISTS cost_price NUMERIC(14,2)`,
 `ALTER TABLE bar_menu_items ADD COLUMN IF NOT EXISTS supplier VARCHAR(255)`,
@@ -2075,6 +2077,7 @@ async function runMigrations() {
     `ALTER TABLE bar_orders ADD COLUMN IF NOT EXISTS tab_limit NUMERIC(14,2)`,
     `ALTER TABLE bar_payments ADD COLUMN IF NOT EXISTS type VARCHAR(20) NOT NULL DEFAULT 'payment'`,
     `ALTER TABLE bar_orders ADD COLUMN IF NOT EXISTS payment_method VARCHAR(30)`,
+    `ALTER TABLE bar_payments ADD COLUMN IF NOT EXISTS tip_amount NUMERIC(14,2) NOT NULL DEFAULT 0`,
 
     // ── Bar payments (Phase 4, Step B) ──────────────────────────
     // A proper payment ledger rather than the single payment_method
