@@ -2072,6 +2072,8 @@ async function runMigrations() {
 `ALTER TABLE bar_menu_items ADD COLUMN IF NOT EXISTS supplier VARCHAR(255)`,
     `ALTER TABLE bar_orders ADD COLUMN IF NOT EXISTS customer_name VARCHAR(255)`,
     `ALTER TABLE bar_orders ADD COLUMN IF NOT EXISTS customer_phone VARCHAR(50)`,
+    `ALTER TABLE bar_orders ADD COLUMN IF NOT EXISTS tab_limit NUMERIC(14,2)`,
+    `ALTER TABLE bar_payments ADD COLUMN IF NOT EXISTS type VARCHAR(20) NOT NULL DEFAULT 'payment'`,
     `ALTER TABLE bar_orders ADD COLUMN IF NOT EXISTS payment_method VARCHAR(30)`,
 
     // ── Bar payments (Phase 4, Step B) ──────────────────────────

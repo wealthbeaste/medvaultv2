@@ -122,21 +122,37 @@ module.exports = function registerBarRoutes(app, { query, pool, auth, can, audit
     const { pharmacyId, orgId, userId } = req.user;
     if (!pharmacyId) return err(res, 400, 'AUTH_NO_PHARMACY', 'No pharmacy assigned.', 'pharmacyId');
     const b = req.body || {};
+    const depositAmount = Number(b.deposit_amount) || 0;
+    const tabLimit = b.tab_limit != null ? Number(b.tab_limit) : null;
+    const client = await pool.connect();
     try {
+      await client.query('BEGIN');
       if (b.table_id) {
-        const tableCheck = await query(`SELECT id FROM bar_tables WHERE id=$1 AND pharmacy_id=$2`, [b.table_id, pharmacyId]);
-        if (!tableCheck.rows.length) return err(res, 404, 'NOT_FOUND', 'Table not found.');
+        const tableCheck = await client.query(`SELECT id FROM bar_tables WHERE id=$1 AND pharmacy_id=$2`, [b.table_id, pharmacyId]);
+        if (!tableCheck.rows.length) { await client.query('ROLLBACK'); return err(res, 404, 'NOT_FOUND', 'Table not found.'); }
       }
-      const r = await query(
-        `INSERT INTO bar_orders (org_id, pharmacy_id, table_id, opened_by) VALUES ($1,$2,$3,$4) RETURNING *`,
-        [orgId, pharmacyId, b.table_id || null, userId || null]
+      const r = await client.query(
+        `INSERT INTO bar_orders (org_id, pharmacy_id, table_id, opened_by, tab_limit) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+        [orgId, pharmacyId, b.table_id || null, userId || null, tabLimit]
       );
       if (b.table_id) {
-        await query(`UPDATE bar_tables SET status='occupied', updated_at=NOW() WHERE id=$1 AND pharmacy_id=$2`, [b.table_id, pharmacyId]);
+        await client.query(`UPDATE bar_tables SET status='occupied', updated_at=NOW() WHERE id=$1 AND pharmacy_id=$2`, [b.table_id, pharmacyId]);
       }
-      if (audit) await audit(query, { req, action: 'bar.order.open', entity: 'bar_order', entityId: r.rows[0].id, payload: {} });
+      if (depositAmount > 0) {
+        await client.query(
+          `INSERT INTO bar_payments (order_id, pharmacy_id, method, amount, type, received_by) VALUES ($1,$2,$3,$4,'deposit',$5)`,
+          [r.rows[0].id, pharmacyId, b.deposit_method || 'cash', depositAmount, userId || null]
+        );
+      }
+      await client.query('COMMIT');
+      if (audit) await audit(query, { req, action: 'bar.order.open', entity: 'bar_order', entityId: r.rows[0].id, payload: { tab_limit: tabLimit, deposit_amount: depositAmount || undefined } });
       res.json({ success: true, order: r.rows[0] });
-    } catch (e) { return err(res, 500, 'SERVER_ERROR', e.message); }
+    } catch (e) {
+      try { await client.query('ROLLBACK'); } catch (_) {}
+      return err(res, 500, 'SERVER_ERROR', e.message);
+    } finally {
+      client.release();
+    }
   });
 
   // Move an open order to a different table — e.g. a party asks to move,
@@ -175,7 +191,7 @@ module.exports = function registerBarRoutes(app, { query, pool, auth, can, audit
   // Supports either a catalog menu_item_id (preferred — auto-fills name/price
   // and decrements stock) or legacy free-typed item_name/unit_price.
   app.post('/api/bar/orders/:id/items', auth, can('bar:write'), gate, async (req, res) => {
-    const { pharmacyId } = req.user;
+    const { pharmacyId, orgId, userId } = req.user;
     if (!pharmacyId) return err(res, 400, 'AUTH_NO_PHARMACY', 'No pharmacy assigned.', 'pharmacyId');
     const b = req.body || {};
     const quantity = b.quantity || 1;
@@ -196,7 +212,7 @@ module.exports = function registerBarRoutes(app, { query, pool, auth, can, audit
       await client.query('BEGIN');
 
       const orderCheck = await client.query(
-        `SELECT id FROM bar_orders WHERE id=$1 AND pharmacy_id=$2 FOR UPDATE`,
+        `SELECT * FROM bar_orders WHERE id=$1 AND pharmacy_id=$2 FOR UPDATE`,
         [req.params.id, pharmacyId]
       );
       if (!orderCheck.rows.length) { await client.query('ROLLBACK'); return err(res, 404, 'NOT_FOUND', 'Order not found.'); }
@@ -239,6 +255,32 @@ module.exports = function registerBarRoutes(app, { query, pool, auth, can, audit
         }
       }
       if (!item_name) { await client.query('ROLLBACK'); return err(res, 400, 'VALIDATION_INVALID', 'item_name or menu_item_id is required.'); }
+
+      // ── TAB LIMIT ────────────────────────────────────────────
+      // If this order has a tab_limit (set optionally when the tab was
+      // opened), block adding an item that would push the running total
+      // past it — unless a valid manager PIN is supplied, same override
+      // pattern as discounts/comps/voids. Every override is logged to
+      // bar_order_adjustments so unusual override rates are queryable.
+      if (orderCheck.rows[0].tab_limit != null) {
+        const subtotalRes = await client.query(
+          `SELECT COALESCE(SUM(quantity*unit_price),0) AS subtotal FROM bar_order_items WHERE order_id=$1 AND voided_at IS NULL`,
+          [req.params.id]
+        );
+        const projected = Number(subtotalRes.rows[0].subtotal) + unit_price * quantity;
+        const limit = Number(orderCheck.rows[0].tab_limit);
+        if (projected > limit) {
+          const managerId = await verifyManagerPin(pharmacyId, b.manager_pin);
+          if (!managerId) {
+            await client.query('ROLLBACK');
+            return err(res, 409, 'TAB_LIMIT_EXCEEDED', `This would bring the tab to UGX ${projected.toFixed(2)}, over the limit of UGX ${limit.toFixed(2)}. Manager PIN required to continue.`, 'manager_pin');
+          }
+          await client.query(
+            `INSERT INTO bar_order_adjustments (org_id, pharmacy_id, order_id, type, amount, reason, requested_by, approved_by) VALUES ($1,$2,$3,'tab_limit_override',$4,$5,$6,$7)`,
+            [orgId, pharmacyId, req.params.id, projected, 'Tab limit exceeded', userId || null, managerId]
+          );
+        }
+      }
 
       const r = await client.query(
         `INSERT INTO bar_order_items (order_id, item_name, quantity, unit_price, menu_item_id, client_txn_id) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
